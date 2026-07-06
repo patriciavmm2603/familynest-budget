@@ -364,7 +364,15 @@
       }
 
 </style>
-  </head>
+  
+  <link rel="manifest" href="/manifest.webmanifest">
+  <meta name="theme-color" content="#2f6f4e">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="FamilyNest">
+  <link rel="apple-touch-icon" href="/icons/icon-192.png">
+
+</head>
   <body>
     <div id="authScreen" class="auth-screen">
       <div class="auth-card">
@@ -390,7 +398,7 @@
           <div class="mark">FN</div>
           <div>
             <h1>FamilyNest</h1>
-            <p>Personal budget command center <span style="font-size:.72rem; opacity:.7;">v10</span></p>
+            <p>Personal budget command center <span style="font-size:.72rem; opacity:.7;">v11 app</span></p>
           </div>
         </div>
         <nav id="nav"></nav>
@@ -3111,5 +3119,16 @@
       document.querySelector("#authPassword").addEventListener("keydown", event => { if (event.key === "Enter") loginToSharedApp(); });
       startApp();
     </script>
-  </body>
+  
+  <script>
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", () => {
+        navigator.serviceWorker.register("/service-worker.js").catch(error => {
+          console.warn("FamilyNest service worker registration failed:", error);
+        });
+      });
+    }
+  </script>
+
+</body>
 </html>

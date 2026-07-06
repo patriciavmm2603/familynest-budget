@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>FamilyNest Shared</title>
+  <style>
+    :root {
+      --bg:#f7f4ee; --card:#fffdf9; --ink:#221f1b; --muted:#6f665b;
+      --line:#ddd3c4; --green:#2f6f4e; --red:#a94332;
+      font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body { margin:0; min-height:100vh; background:var(--bg); color:var(--ink); display:grid; place-items:center; padding:1rem; }
+    .card { width:min(760px,100%); background:var(--card); border:1px solid var(--line); border-radius:16px; padding:1.25rem; box-shadow:0 16px 40px rgba(49,39,25,.10); }
+    .logo { width:48px; height:48px; border-radius:14px; background:var(--green); color:white; display:grid; place-items:center; font-weight:950; margin-bottom:.75rem; }
+    h1 { margin:.2rem 0; font-size:clamp(2rem,6vw,3.5rem); line-height:1; }
+    p { color:var(--muted); line-height:1.45; }
+    label { display:grid; gap:.35rem; color:var(--muted); font-weight:850; margin:.75rem 0; }
+    input { width:100%; padding:.8rem; border:1px solid var(--line); border-radius:10px; font:inherit; }
+    button { border:0; border-radius:10px; padding:.8rem 1rem; background:var(--ink); color:white; font-weight:950; cursor:pointer; }
+    .error { color:var(--red); font-weight:900; }
+    .good { color:var(--green); font-weight:900; }
+    .muted { color:var(--muted); }
+    pre { white-space:pre-wrap; overflow:auto; background:#1f1f1f; color:#f8f8f2; border-radius:12px; padding:1rem; max-height:360px; }
+    .grid { display:grid; gap:.75rem; }
+    .metrics { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.75rem; margin-top:1rem; }
+    .metric { border:1px solid var(--line); border-radius:12px; padding:1rem; background:white; }
+    .metric strong { font-size:1.6rem; display:block; }
+    @media (max-width:650px){ .metrics { grid-template-columns:1fr; } }
+  </style>
+</head>
+<body>
+  <main class="card">
+    <div class="logo">FN</div>
+    <h1>FamilyNest</h1>
+    <p id="status">App file loaded. Checking Supabase library…</p>
+
+    <div id="loginBox" class="grid" style="display:none">
+      <label>Email
+        <input id="email" type="email" value="munoz.pat@outlook.com">
+      </label>
+      <label>Password
+        <input id="password" type="password">
+      </label>
+      <button id="loginBtn">Log in</button>
+    </div>
+
+    <div id="dashboard" style="display:none"></div>
+
+    <h3>Debug</h3>
+    <pre id="debug">Starting...</pre>
+  </main>
+
+  <script>
+    const debugEl = document.getElementById("debug");
+    const statusEl = document.getElementById("status");
+    function log(msg, obj) {
+      const line = obj ? msg + "\\n" + JSON.stringify(obj, null, 2) : msg;
+      debugEl.textContent += "\\n" + line;
+      console.log(msg, obj || "");
+    }
+    function fail(msg, err) {
+      statusEl.textContent = msg;
+      statusEl.className = "error";
+      log("ERROR: " + msg, { message: err?.message || String(err), stack: err?.stack || null });
+    }
+    window.addEventListener("error", e => fail("Page error: " + e.message, e.error || e.message));
+    window.addEventListener("unhandledrejection", e => fail("Promise error: " + (e.reason?.message || e.reason), e.reason));
+
+    const SUPABASE_URL = "https://nssdfhkzjoanbzgpilvz.supabase.co";
+    const SUPABASE_KEY = "sb_publishable_lKxKwLXa09lnEBK8acwwNg_hmCB3DFc";
+
+    function loadScript(src) {
+      return new Promise((resolve, reject) => {
+        const s = document.createElement("script");
+        s.src = src;
+        s.onload = resolve;
+        s.onerror = () => reject(new Error("Could not load " + src));
+        document.head.appendChild(s);
+      });
+    }
+
+    async function start() {
+      try {
+        log("HTML loaded.");
+        await loadScript("https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2");
+        log("Supabase library loaded.");
+
+        if (!window.supabase) throw new Error("Supabase global was not found after loading CDN.");
+
+        const client = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        window.familyNestClient = client;
+
+        const { data: sessionData, error: sessionError } = await client.auth.getSession();
+        if (sessionError) throw sessionError;
+
+        if (sessionData.session) {
+          statusEl.textContent = "Already logged in. Loading FamilyNest data…";
+          statusEl.className = "good";
+          await loadData(client);
+        } else {
+          statusEl.textContent = "Please log in.";
+          statusEl.className = "muted";
+          document.getElementById("loginBox").style.display = "grid";
+        }
+
+        document.getElementById("loginBtn").onclick = async () => {
+          try {
+            const email = document.getElementById("email").value.trim();
+            const password = document.getElementById("password").value;
+            statusEl.textContent = "Signing in…";
+            statusEl.className = "muted";
+            const { data, error } = await client.auth.signInWithPassword({ email, password });
+            if (error) throw error;
+            log("Login success.", { user: data.user?.id });
+            await loadData(client);
+          } catch (err) {
+            fail("Login failed: " + (err.message || err), err);
+          }
+        };
+      } catch (err) {
+        fail("Startup failed: " + (err.message || err), err);
+      }
+    }
+
+    async function loadData(client) {
+      document.getElementById("loginBox").style.display = "none";
+
+      const { data: userData, error: userError } = await client.auth.getUser();
+      if (userError) throw userError;
+      const userId = userData.user.id;
+
+      const { data: profile, error: profileError } = await client
+        .from("profiles")
+        .select("display_name,email,role,household_id")
+        .eq("id", userId)
+        .maybeSingle();
+      if (profileError) throw profileError;
+      if (!profile) throw new Error("No profile found for logged-in user id " + userId);
+
+      const householdId = profile.household_id;
+
+      const [
+        settingsRes,
+        monthsRes,
+        billsRes,
+        txRes,
+        incomeRes,
+        qtrRes,
+        sideRes,
+        debtsRes
+      ] = await Promise.all([
+        client.from("settings").select("*").eq("household_id", householdId).order("updated_at", { ascending:false }).limit(1).maybeSingle(),
+        client.from("months").select("*").eq("household_id", householdId).order("month_key"),
+        client.from("budget_lines").select("*").eq("household_id", householdId).eq("month_key", "2026-07"),
+        client.from("transactions").select("*").eq("household_id", householdId).eq("month_key", "2026-07"),
+        client.from("income_lines").select("*").eq("household_id", householdId),
+        client.from("quarterly_income").select("*").eq("household_id", householdId),
+        client.from("side_hustles").select("*").eq("household_id", householdId).eq("month_key", "2026-07"),
+        client.from("debts").select("*").eq("household_id", householdId)
+      ]);
+
+      for (const [name, res] of Object.entries({ settingsRes, monthsRes, billsRes, txRes, incomeRes, qtrRes, sideRes, debtsRes })) {
+        if (res.error) throw new Error(name + ": " + res.error.message);
+      }
+
+      const bills = billsRes.data || [];
+      const tx = txRes.data || [];
+      const income = incomeRes.data || [];
+      const qtr = qtrRes.data || [];
+      const side = sideRes.data || [];
+      const debts = debtsRes.data || [];
+
+      const reliable = income.reduce((t, r) => t + Number(r.monthly_amount || 0), 0);
+      const planned = bills.reduce((t, r) => t + Number(r.amount || 0), 0);
+      const paypalGross = side.reduce((t, r) => t + Number(r.gross_amount || 0), 0);
+      const paypalTax = side.reduce((t, r) => t + Number(r.recommended_set_aside || 0), 0);
+
+      document.getElementById("dashboard").style.display = "block";
+      document.getElementById("dashboard").innerHTML = `
+        <p class="good">Loaded FamilyNest data for ${profile.display_name}.</p>
+        <div class="metrics">
+          <div class="metric"><span>Reliable income</span><strong>$${reliable.toFixed(2)}</strong></div>
+          <div class="metric"><span>Planned bills</span><strong>$${planned.toFixed(2)}</strong></div>
+          <div class="metric"><span>Transactions</span><strong>${tx.length}</strong></div>
+          <div class="metric"><span>PayPal side hustle</span><strong>$${paypalGross.toFixed(2)}</strong><p class="muted">Set aside $${paypalTax.toFixed(2)}</p></div>
+          <div class="metric"><span>Debts</span><strong>${debts.length}</strong></div>
+          <div class="metric"><span>Months</span><strong>${(monthsRes.data || []).length}</strong></div>
+        </div>
+      `;
+
+      statusEl.textContent = "FamilyNest loaded.";
+      statusEl.className = "good";
+      log("Loaded data.", {
+        profile,
+        settings: settingsRes.data,
+        months: monthsRes.data?.length,
+        bills: bills.length,
+        transactions: tx.length,
+        income: income.length,
+        quarterly: qtr.length,
+        sideHustles: side.length,
+        debts: debts.length
+      });
+    }
+
+    start();
+  </script>
+</body>
+</html>

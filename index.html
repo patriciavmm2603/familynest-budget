@@ -363,6 +363,188 @@
         }
       }
 
+
+      /* v12 mobile app layout fix */
+      html, body {
+        max-width: 100%;
+        overflow-x: hidden;
+      }
+
+      @media (max-width: 760px) {
+        body {
+          font-size: 15px;
+        }
+
+        .app-shell,
+        .shell,
+        main,
+        .main,
+        #app {
+          width: 100%;
+          max-width: 100%;
+          overflow-x: hidden;
+        }
+
+        header,
+        .app-header,
+        .topbar,
+        .header {
+          width: 100%;
+          max-width: 100%;
+          display: grid !important;
+          grid-template-columns: 1fr !important;
+          gap: .75rem !important;
+          padding: 1rem !important;
+        }
+
+        .brand,
+        .brand-row {
+          min-width: 0;
+        }
+
+        .nav,
+        nav,
+        .tabs {
+          width: 100%;
+          max-width: 100%;
+          display: flex !important;
+          overflow-x: auto !important;
+          -webkit-overflow-scrolling: touch;
+          gap: .5rem !important;
+          padding-bottom: .35rem;
+          scrollbar-width: thin;
+        }
+
+        .nav button,
+        nav button,
+        .tabs button,
+        .tab {
+          flex: 0 0 auto;
+          white-space: nowrap;
+          font-size: .92rem !important;
+          padding: .65rem .85rem !important;
+        }
+
+        .summary-grid,
+        .dashboard-grid,
+        .cards,
+        .stat-grid,
+        .metric-grid,
+        .form-grid {
+          display: grid !important;
+          grid-template-columns: 1fr !important;
+          width: 100%;
+          max-width: 100%;
+          gap: .75rem !important;
+        }
+
+        .card,
+        .panel,
+        section,
+        .section {
+          width: 100%;
+          max-width: 100%;
+          overflow: hidden;
+        }
+
+        input,
+        select,
+        textarea,
+        button {
+          max-width: 100%;
+          font-size: 16px !important;
+        }
+
+        button,
+        .button,
+        .primary,
+        .secondary {
+          width: 100%;
+          white-space: normal;
+        }
+
+        #transactions .form-grid,
+        #csv .form-grid,
+        #csvReview .form-grid,
+        [data-view="csv"] .form-grid {
+          grid-template-columns: 1fr !important;
+        }
+
+        .table-wrap {
+          width: 100%;
+          max-width: 100%;
+          overflow-x: auto !important;
+          -webkit-overflow-scrolling: touch;
+        }
+
+        table {
+          min-width: 760px;
+        }
+
+        #cashguard table {
+          min-width: 900px;
+        }
+
+        #transactions table,
+        #csv table,
+        #csvReview table {
+          min-width: 850px;
+        }
+
+        th, td {
+          font-size: .86rem;
+          padding: .65rem .55rem !important;
+        }
+
+        .money {
+          white-space: nowrap;
+        }
+
+        .desktop-only {
+          display: none !important;
+        }
+      }
+
+      @media (max-width: 420px) {
+        body {
+          padding: 0 !important;
+        }
+
+        header,
+        .app-header,
+        .topbar,
+        .header {
+          padding: .85rem !important;
+        }
+
+        .card,
+        .panel,
+        section,
+        .section {
+          border-radius: 12px;
+        }
+
+        h1 {
+          font-size: 1.25rem !important;
+        }
+
+        h2 {
+          font-size: 1.15rem !important;
+        }
+
+        .nav button,
+        nav button,
+        .tabs button,
+        .tab {
+          font-size: .86rem !important;
+          padding: .6rem .75rem !important;
+        }
+
+        table {
+          min-width: 720px;
+        }
+      }
+
 </style>
   
   <link rel="manifest" href="/manifest.webmanifest">
@@ -398,7 +580,7 @@
           <div class="mark">FN</div>
           <div>
             <h1>FamilyNest</h1>
-            <p>Personal budget command center <span style="font-size:.72rem; opacity:.7;">v11 app</span></p>
+            <p>Personal budget command center <span style="font-size:.72rem; opacity:.7;">v12 mobile</span></p>
           </div>
         </div>
         <nav id="nav"></nav>

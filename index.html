@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>FamilyNest Budget v20 phone cache fix</title>
+    <title>FamilyNest Budget v7</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
     <style>
       :root {
@@ -364,7 +364,7 @@
       }
 
 
-      /* v20 phone cache fix app layout fix */
+      /* v21 emergency restore app layout fix */
       html, body {
         max-width: 100%;
         overflow-x: hidden;
@@ -603,7 +603,7 @@
       }
 
 
-      /* v20 phone cache fix mobile cleanup: hide nothing, only improve layout */
+      /* v21 emergency restore mobile cleanup: hide nothing, only improve layout */
       @media (max-width: 760px) {
         body {
           overflow-x: hidden !important;
@@ -696,541 +696,40 @@
         }
       }
 
-
-      /* v20 phone cache fix layout */
-      .mobile-app-bar {
-        display: none;
-      }
-
-      @media (max-width: 760px) {
-        body {
-          overflow-x: hidden !important;
-          padding-bottom: env(safe-area-inset-bottom);
-        }
-
-        .mobile-app-bar {
-          display: grid;
-          gap: .65rem;
-          position: sticky;
-          top: 0;
-          z-index: 1000;
-          background: rgba(34, 31, 27, .96);
-          backdrop-filter: blur(14px);
-          border-bottom: 1px solid var(--line);
-          padding: .75rem .85rem;
-          margin: 0 -.75rem .75rem;
-        }
-
-        .mobile-app-row {
-          display: grid;
-          grid-template-columns: 1fr auto;
-          gap: .6rem;
-          align-items: center;
-        }
-
-        .mobile-screen-select,
-        .mobile-tools-button {
-          min-height: 46px !important;
-          border-radius: 14px !important;
-          font-size: 16px !important;
-          font-weight: 900 !important;
-        }
-
-        .mobile-screen-select {
-          width: 100%;
-          background: var(--card);
-          color: var(--ink);
-          border: 1px solid var(--line);
-          padding: .7rem .8rem;
-        }
-
-        .mobile-tools-button {
-          padding: .7rem .9rem !important;
-          white-space: nowrap;
-        }
-
-        .mobile-tools-drawer {
-          display: none;
-          grid-template-columns: 1fr 1fr;
-          gap: .55rem;
-          padding-top: .2rem;
-        }
-
-        body.mobile-tools-open .mobile-tools-drawer {
-          display: grid;
-        }
-
-        .mobile-tools-drawer button,
-        .mobile-tools-drawer label {
-          width: 100% !important;
-          min-height: 46px !important;
-          border-radius: 12px !important;
-          display: inline-flex !important;
-          align-items: center;
-          justify-content: center;
-          text-align: center;
-          font-size: .86rem !important;
-          padding: .65rem .45rem !important;
-        }
-
-        /* Hide the giant desktop nav only on phone because the compact Screen dropdown replaces it. */
-        aside #nav,
-        #nav {
-          display: none !important;
-        }
-
-        /* Admin buttons move into Tools on phone. Functionality stays available. */
-        #copyMonthBtn,
-        #deleteMonthBtn,
-        #exportBtn,
-        #importBackupLabel,
-        #logoutBtn {
-          display: none !important;
-        }
-
-        .topbar {
-          display: grid !important;
-          grid-template-columns: 1fr !important;
-          gap: .75rem !important;
-          position: static !important;
-          margin: 0 0 .75rem !important;
-          padding: 0 !important;
-          background: transparent !important;
-          border: 0 !important;
-        }
-
-        .toolbar {
-          display: grid !important;
-          grid-template-columns: 1fr !important;
-          gap: .65rem !important;
-          width: 100% !important;
-          max-width: 100% !important;
-        }
-
-        .toolbar select,
-        .toolbar button,
-        .toolbar label {
-          width: 100% !important;
-          max-width: 100% !important;
-        }
-
-        input,
-        select,
-        textarea,
-        button {
-          min-height: 44px !important;
-          font-size: 16px !important;
-        }
-
-        input[type="checkbox"] {
-          width: 24px !important;
-          height: 24px !important;
-        }
-
-        .table-wrap {
-          width: 100% !important;
-          max-width: 100% !important;
-          overflow-x: auto !important;
-          -webkit-overflow-scrolling: touch;
-        }
-
-        table {
-          min-width: 760px;
-        }
-
-        #cashguard table {
-          min-width: 900px;
-        }
-      }
-
-
-      /* v19 coherent mobile redesign */
-      .fn-mobile-shell {
-        display: none;
-      }
-
-      @media (max-width: 760px) {
-        :root {
-          --mobile-bottom-height: 78px;
-        }
-
-        html,
-        body {
-          max-width: 100%;
-          overflow-x: hidden !important;
-        }
-
-        body {
-          padding-bottom: calc(var(--mobile-bottom-height) + env(safe-area-inset-bottom)) !important;
-        }
-
-        /* Keep desktop sidebar/menu for desktop only. Mobile uses bottom tabs + More. */
-        aside,
-        #nav {
-          display: none !important;
-        }
-
-        .fn-mobile-shell {
-          display: block;
-        }
-
-        .fn-mobile-top {
-          position: sticky;
-          top: 0;
-          z-index: 9000;
-          display: grid;
-          grid-template-columns: 1fr auto;
-          gap: .65rem;
-          align-items: center;
-          background: rgba(247, 244, 238, .96);
-          border-bottom: 1px solid var(--line);
-          padding: .7rem .85rem;
-          margin: 0 -.75rem .75rem;
-          backdrop-filter: blur(14px);
-        }
-
-        .fn-mobile-title {
-          display: grid;
-          gap: .08rem;
-          min-width: 0;
-        }
-
-        .fn-mobile-title strong {
-          font-size: .95rem;
-          line-height: 1.1;
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
-        }
-
-        .fn-mobile-title span {
-          color: var(--muted);
-          font-size: .74rem;
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
-        }
-
-        .fn-mobile-tools-btn {
-          border-radius: 999px !important;
-          min-height: 42px !important;
-          padding: .55rem .8rem !important;
-          font-size: .86rem !important;
-          font-weight: 950 !important;
-        }
-
-        .fn-mobile-more {
-          display: none;
-          position: fixed;
-          left: .75rem;
-          right: .75rem;
-          bottom: calc(var(--mobile-bottom-height) + .75rem + env(safe-area-inset-bottom));
-          z-index: 10001;
-          background: var(--card);
-          border: 1px solid var(--line);
-          border-radius: 18px;
-          box-shadow: 0 22px 70px rgba(0,0,0,.25);
-          padding: .85rem;
-          max-height: 70vh;
-          overflow: auto;
-        }
-
-        body.fn-mobile-more-open .fn-mobile-more {
-          display: block;
-        }
-
-        .fn-mobile-more h3 {
-          margin: 0 0 .6rem;
-          font-size: 1rem;
-        }
-
-        .fn-mobile-more-grid {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: .55rem;
-        }
-
-        .fn-mobile-more-grid button,
-        .fn-mobile-more-grid label {
-          width: 100% !important;
-          min-height: 46px !important;
-          border-radius: 12px !important;
-          padding: .6rem .5rem !important;
-          display: inline-flex !important;
-          align-items: center;
-          justify-content: center;
-          text-align: center;
-          font-size: .84rem !important;
-          font-weight: 900 !important;
-        }
-
-        .fn-mobile-bottom {
-          position: fixed;
-          left: 0;
-          right: 0;
-          bottom: 0;
-          z-index: 10000;
-          display: grid;
-          grid-template-columns: repeat(5, 1fr);
-          gap: .2rem;
-          padding: .45rem .5rem calc(.45rem + env(safe-area-inset-bottom));
-          min-height: var(--mobile-bottom-height);
-          background: rgba(255, 253, 249, .97);
-          border-top: 1px solid var(--line);
-          box-shadow: 0 -12px 34px rgba(49,39,25,.14);
-          backdrop-filter: blur(16px);
-        }
-
-        .fn-mobile-bottom button {
-          min-height: 50px !important;
-          border: 0 !important;
-          border-radius: 14px !important;
-          background: transparent !important;
-          color: var(--muted) !important;
-          display: grid !important;
-          place-items: center !important;
-          gap: .1rem !important;
-          padding: .35rem .15rem !important;
-          font-size: .72rem !important;
-          line-height: 1.05 !important;
-          font-weight: 850 !important;
-        }
-
-        .fn-mobile-bottom button.active {
-          background: var(--green-soft) !important;
-          color: var(--green) !important;
-        }
-
-        .fn-mobile-bottom .fn-icon {
-          font-size: 1.15rem;
-          line-height: 1;
-        }
-
-        /* Make page content breathe on phone. */
-        main {
-          width: 100% !important;
-          max-width: 100% !important;
-          overflow-x: hidden !important;
-          padding: .75rem !important;
-        }
-
-        .topbar {
-          display: grid !important;
-          grid-template-columns: 1fr !important;
-          gap: .7rem !important;
-          margin: 0 0 .75rem !important;
-          padding: 0 !important;
-          background: transparent !important;
-          border: 0 !important;
-          position: static !important;
-        }
-
-        .topbar h2,
-        h2 {
-          font-size: 1.25rem !important;
-          line-height: 1.15 !important;
-          margin-top: 0 !important;
-        }
-
-        .cards,
-        .summary-grid,
-        .dashboard-grid,
-        .stat-grid,
-        .metric-grid,
-        .form-grid {
-          display: grid !important;
-          grid-template-columns: 1fr !important;
-          gap: .75rem !important;
-          width: 100% !important;
-          max-width: 100% !important;
-        }
-
-        .card,
-        .panel,
-        section,
-        .section {
-          width: 100% !important;
-          max-width: 100% !important;
-          border-radius: 14px !important;
-        }
-
-        .toolbar {
-          display: grid !important;
-          grid-template-columns: 1fr !important;
-          gap: .55rem !important;
-          width: 100% !important;
-          max-width: 100% !important;
-        }
-
-        .toolbar select,
-        .toolbar button,
-        .toolbar label {
-          width: 100% !important;
-          max-width: 100% !important;
-        }
-
-        /* Admin tools live in More on phone, but still exist in DOM. */
-        #copyMonthBtn,
-        #deleteMonthBtn,
-        #exportBtn,
-        #importBackupLabel,
-        #logoutBtn {
-          display: none !important;
-        }
-
-        input,
-        select,
-        textarea,
-        button {
-          min-height: 44px !important;
-          font-size: 16px !important;
-        }
-
-        input[type="checkbox"] {
-          width: 24px !important;
-          height: 24px !important;
-        }
-
-        /* Tables: readable cards on phone, not squished spreadsheets. */
-        .table-wrap {
-          border: 0 !important;
-          background: transparent !important;
-          overflow: visible !important;
-        }
-
-        table,
-        thead,
-        tbody,
-        th,
-        td,
-        tr {
-          display: block;
-          width: 100%;
-        }
-
-        thead {
-          display: none !important;
-        }
-
-        tbody {
-          display: grid;
-          gap: .75rem;
-        }
-
-        tr {
-          background: var(--card);
-          border: 1px solid var(--line);
-          border-radius: 14px;
-          padding: .75rem;
-          box-shadow: 0 10px 26px rgba(49,39,25,.08);
-        }
-
-        td {
-          display: grid !important;
-          grid-template-columns: minmax(7rem, 38%) 1fr;
-          gap: .6rem;
-          align-items: start;
-          border-bottom: 1px dashed var(--line) !important;
-          padding: .45rem 0 !important;
-          font-size: .9rem !important;
-          text-align: left !important;
-          word-break: break-word;
-        }
-
-        td:last-child {
-          border-bottom: 0 !important;
-        }
-
-        td::before {
-          content: attr(data-label);
-          color: var(--muted);
-          font-size: .72rem;
-          font-weight: 900;
-          text-transform: uppercase;
-          letter-spacing: .04em;
-        }
-
-        td.money {
-          text-align: left !important;
-          font-variant-numeric: tabular-nums;
-          font-weight: 900;
-        }
-
-        td:empty {
-          display: none !important;
-        }
-      }
-
 </style>
   
-  <link rel="manifest" href="/manifest.webmanifest?v=20">
+  <link rel="manifest" href="/manifest.webmanifest">
   <meta name="theme-color" content="#2f6f4e">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="FamilyNest">
-  <link rel="apple-touch-icon" href="/icons/icon-192.png?v=20">
+  <link rel="apple-touch-icon" href="/icons/icon-192.png">
 
 </head>
   <body>
 
-  <noscript>
-    <div style="padding:1rem;font-family:system-ui">
-      FamilyNest needs JavaScript enabled.
-    </div>
-  </noscript>
-
-
-  <div class="fn-mobile-shell" aria-label="FamilyNest mobile navigation">
-    <div class="fn-mobile-top">
-      <div class="fn-mobile-title">
-        <strong>FamilyNest</strong>
-        <span id="fnMobileScreenLabel">Dashboard</span>
-      </div>
-      <button type="button" class="secondary fn-mobile-tools-btn">Tools</button>
-    </div>
-
-    <section class="fn-mobile-more" aria-label="More screens and tools">
-      <h3>More</h3>
-      <div class="fn-mobile-more-grid">
-        <button type="button" data-fn-mobile-view="template">Template</button>
-        <button type="button" data-fn-mobile-view="personal">Personal</button>
-        <button type="button" data-fn-mobile-view="debts">Debt</button>
-        <button type="button" data-fn-mobile-view="income">Income</button>
-        <button type="button" data-fn-mobile-view="compare">Compare</button>
-        <button type="button" data-fn-mobile-view="closeout">Closeout</button>
-        <button type="button" data-fn-mobile-action="copy-month">Create Month</button>
-        <button type="button" data-fn-mobile-action="delete-month">Delete Month</button>
-        <button type="button" data-fn-mobile-action="export">Export Backup</button>
-        <label class="secondary" style="cursor:pointer">
-          Import Backup
-          <input id="fnMobileImportBackup" type="file" accept=".json,application/json" hidden>
-        </label>
-        <button type="button" data-fn-mobile-action="logout">Log out</button>
-        <button type="button" data-fn-mobile-action="refresh">Refresh</button>
-      </div>
-    </section>
-
-    <nav class="fn-mobile-bottom" aria-label="Main mobile tabs">
-      <button type="button" data-fn-mobile-view="dashboard"><span class="fn-icon">🏠</span><span>Home</span></button>
-      <button type="button" data-fn-mobile-view="cashguard"><span class="fn-icon">🛡️</span><span>Keep</span></button>
-      <button type="button" data-fn-mobile-view="budget"><span class="fn-icon">📋</span><span>Plan</span></button>
-      <button type="button" data-fn-mobile-view="transactions"><span class="fn-icon">⇄</span><span>CSV</span></button>
-      <button type="button" class="fn-mobile-more-tab"><span class="fn-icon">⋯</span><span>More</span></button>
-    </nav>
-  </div>
-
-<div class="mobile-tools-drawer">
-      <button type="button" data-mobile-action="copy-month">Create Month</button>
-      <button type="button" data-mobile-action="delete-month">Delete Month</button>
-      <button type="button" data-mobile-action="export">Export Backup</button>
-      <label class="secondary" style="cursor:pointer">
-        Import Backup
-        <input id="mobileImportBackup" type="file" accept=".json,application/json" hidden>
-      </label>
-      <button type="button" data-mobile-action="logout">Log out</button>
-      <button type="button" data-mobile-action="refresh">Refresh</button>
-    </div>
-  </div>
+  <script>
+    (function familyNestEmergencyCacheClear() {
+      try {
+        if ("serviceWorker" in navigator) {
+          navigator.serviceWorker.getRegistrations().then(function(registrations) {
+            registrations.forEach(function(registration) {
+              registration.unregister();
+            });
+          }).catch(function(){});
+        }
+        if ("caches" in window) {
+          caches.keys().then(function(keys) {
+            keys.forEach(function(key) {
+              caches.delete(key);
+            });
+          }).catch(function(){});
+        }
+      } catch (e) {
+        console.warn("FamilyNest recovery cache clear skipped", e);
+      }
+    })();
+  </script>
 
     <div id="authScreen" class="auth-screen">
       <div class="auth-card">
@@ -1256,7 +755,7 @@
           <div class="mark">FN</div>
           <div>
             <h1>FamilyNest</h1>
-            <p>Personal budget command center <span style="font-size:.72rem; opacity:.7;">v20 phone cache fix</span></p>
+            <p>Personal budget command center <span style="font-size:.72rem; opacity:.7;">v21 emergency restore</span></p>
           </div>
         </div>
         <nav id="nav"></nav>
@@ -3978,97 +3477,5 @@
       document.querySelector("#authPassword").addEventListener("keydown", event => { if (event.key === "Enter") loginToSharedApp(); });
       startApp();
     </script>
-  
-  <script>
-    if ("serviceWorker" in navigator) {
-      window.addEventListener("load", () => {
-        navigator.serviceWorker.register("/service-worker.js?v=20").catch(error => {
-          console.warn("FamilyNest service worker registration failed:", error);
-        });
-      });
-    }
-  </script>
-
-  <script>
-    (function familyNestMobileRedesign() {
-      const labels = {
-        dashboard: "Dashboard",
-        cashguard: "Keep in Account",
-        template: "Base Template",
-        budget: "Monthly Plan",
-        transactions: "CSV Review",
-        personal: "Personal Money",
-        debts: "Debt Tracker",
-        income: "Income",
-        compare: "Compare Months",
-        closeout: "Closeout"
-      };
-
-      function clickExisting(selector) {
-        const el = document.querySelector(selector);
-        if (el) el.click();
-      }
-
-      function goToView(view) {
-        const navButton = document.querySelector(`#nav [data-view="${view}"], #nav button[data-view="${view}"], [data-view="${view}"]`);
-        if (navButton) navButton.click();
-        document.body.classList.remove("fn-mobile-more-open");
-        setTimeout(syncMobileUI, 100);
-      }
-
-      function syncMobileUI() {
-        const active = document.body.dataset.activeView || "dashboard";
-        const label = document.querySelector("#fnMobileScreenLabel");
-        if (label) label.textContent = labels[active] || "FamilyNest";
-
-        document.querySelectorAll("[data-fn-mobile-view]").forEach(button => {
-          button.classList.toggle("active", button.dataset.fnMobileView === active);
-        });
-
-      }
-
-      document.addEventListener("click", event => {
-        const viewButton = event.target.closest("[data-fn-mobile-view]");
-        if (viewButton) {
-          goToView(viewButton.dataset.fnMobileView);
-          return;
-        }
-
-        if (event.target.closest(".fn-mobile-tools-btn") || event.target.closest(".fn-mobile-more-tab")) {
-          document.body.classList.toggle("fn-mobile-more-open");
-          return;
-        }
-
-        const actionButton = event.target.closest("[data-fn-mobile-action]");
-        if (!actionButton) return;
-
-        const action = actionButton.dataset.fnMobileAction;
-        document.body.classList.remove("fn-mobile-more-open");
-
-        if (action === "copy-month") clickExisting("#copyMonthBtn");
-        if (action === "delete-month") clickExisting("#deleteMonthBtn");
-        if (action === "export") clickExisting("#exportBtn");
-        if (action === "logout") clickExisting("#logoutBtn");
-        if (action === "refresh") location.reload();
-      });
-
-      document.addEventListener("change", event => {
-        if (event.target && event.target.id === "fnMobileImportBackup") {
-          const original = document.querySelector("#importBackup");
-          if (original && event.target.files && event.target.files.length) {
-            const dt = new DataTransfer();
-            Array.from(event.target.files).forEach(file => dt.items.add(file));
-            original.files = dt.files;
-            original.dispatchEvent(new Event("change", { bubbles: true }));
-          }
-        }
-      });
-
-      const observer = new MutationObserver(syncMobileUI);
-      observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["data-active-view"] });
-      window.addEventListener("load", () => setTimeout(syncMobileUI, 250));
-    })();
-  </script>
-
 </body>
 </html>

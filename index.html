@@ -364,7 +364,7 @@
       }
 
 
-      /* v35 v18 mobile polish app layout fix */
+      /* v36 csv simplified sort app layout fix */
       html, body {
         max-width: 100%;
         overflow-x: hidden;
@@ -603,7 +603,7 @@
       }
 
 
-      /* v35 v18 mobile polish mobile cleanup: hide nothing, only improve layout */
+      /* v36 csv simplified sort mobile cleanup: hide nothing, only improve layout */
       @media (max-width: 760px) {
         body {
           overflow-x: hidden !important;
@@ -697,7 +697,7 @@
       }
 
 
-      /* v35 v18 mobile polish layout */
+      /* v36 csv simplified sort layout */
       .mobile-app-bar {
         display: none;
       }
@@ -1059,6 +1059,64 @@
         }
       }
 
+
+      /* v36 CSV Review simplified controls + table sort */
+      .sortable-th {
+        cursor: pointer !important;
+        user-select: none;
+        white-space: nowrap;
+      }
+
+      .sortable-th::after {
+        content: " ⇅";
+        font-size: .78em;
+        opacity: .45;
+      }
+
+      .sortable-th.sort-asc::after {
+        content: " ↑";
+        opacity: .9;
+      }
+
+      .sortable-th.sort-desc::after {
+        content: " ↓";
+        opacity: .9;
+      }
+
+      body[data-active-view="transactions"] .csv-v36-hidden {
+        display: none !important;
+      }
+
+      body[data-active-view="transactions"] .csv-v36-keep {
+        display: block !important;
+      }
+
+      body[data-active-view="transactions"] .csv-v36-simple-actions {
+        display: grid !important;
+        grid-template-columns: minmax(14rem, 1fr) minmax(12rem, auto);
+        gap: .75rem;
+        align-items: end;
+        margin: .75rem 0 1rem;
+      }
+
+      @media (max-width: 760px) {
+        body[data-active-view="transactions"] .csv-v36-simple-actions {
+          grid-template-columns: 1fr !important;
+          gap: .6rem !important;
+        }
+
+        body[data-active-view="transactions"] .csv-v36-simple-actions select,
+        body[data-active-view="transactions"] .csv-v36-simple-actions button {
+          width: 100% !important;
+        }
+
+        body[data-active-view="transactions"] .sortable-th {
+          position: sticky;
+          top: 0;
+          z-index: 2;
+        }
+      }
+
 </style>
   
   <link rel="manifest" href="/manifest.webmanifest">
@@ -1124,7 +1182,7 @@
           <div class="mark">FN</div>
           <div>
             <h1>FamilyNest</h1>
-            <p>Personal budget command center <span style="font-size:.72rem; opacity:.7;">v35 v18 mobile polish</span></p>
+            <p>Personal budget command center <span style="font-size:.72rem; opacity:.7;">v36 csv simplified sort</span></p>
           </div>
         </div>
         <nav id="nav"></nav>
@@ -3904,6 +3962,258 @@
       window.addEventListener("load", function () {
         setTimeout(syncScreenSelect, 250);
       });
+    })();
+  </script>
+
+
+  <script>
+    (function familyNestCsvSimplifiedSortV36() {
+      const sortState = { key: "date", dir: "desc" };
+
+      const labelTermsToHide = [
+        "search transactions",
+        "quick filter",
+        "category",
+        "sort by",
+        "bulk category",
+        "bulk owner"
+      ];
+
+      const buttonTermsToHide = [
+        "search",
+        "clear filters",
+        "apply to visible",
+        "mark selected personal",
+        "select visible",
+        "clear selection"
+      ];
+
+      function currentView() {
+        return document.body.dataset.activeView || "";
+      }
+
+      function textOf(el) {
+        return (el?.textContent || "").replace(/\s+/g, " ").trim().toLowerCase();
+      }
+
+      function findCsvRoot() {
+        // Prefer the active view content area if available, otherwise fall back to the document.
+        return document.querySelector('[data-view-panel="transactions"]:not(.hidden)')
+          || document.querySelector('#transactions:not(.hidden)')
+          || document.querySelector('main')
+          || document.body;
+      }
+
+      function hideWrapper(el) {
+        if (!el) return;
+        let target = el.closest("label, .field, .control, .form-field, .filter, .toolbar > *, .grid > *, div") || el;
+        target.classList.add("csv-v36-hidden");
+      }
+
+      function keepWrapper(el) {
+        if (!el) return;
+        let target = el.closest("label, .field, .control, .form-field, .filter, .toolbar > *, .grid > *, div") || el;
+        target.classList.remove("csv-v36-hidden");
+        target.classList.add("csv-v36-keep");
+      }
+
+      function simplifyCsvControls() {
+        if (currentView() !== "transactions") return;
+
+        const root = findCsvRoot();
+
+        // Hide labels/select groups we do not want.
+        root.querySelectorAll("label").forEach(label => {
+          const labelText = textOf(label);
+          if (labelTermsToHide.some(term => labelText.includes(term))) {
+            hideWrapper(label);
+          }
+
+          // Keep Choose a bill / Bulk bill. The user wants this to remain.
+          if (labelText.includes("bulk bill") || labelText.includes("choose a bill")) {
+            keepWrapper(label);
+          }
+        });
+
+        // Hide crowded buttons.
+        root.querySelectorAll("button").forEach(button => {
+          const labelText = textOf(button);
+          if (buttonTermsToHide.some(term => labelText === term || labelText.includes(term))) {
+            hideWrapper(button);
+          }
+
+          if (labelText.includes("apply to selected")) {
+            keepWrapper(button);
+          }
+        });
+
+        // Build a simple action row containing the bill dropdown and Apply To Selected, if they exist.
+        const billControl = Array.from(root.querySelectorAll("label")).find(label => {
+          const t = textOf(label);
+          return t.includes("bulk bill") || t.includes("choose a bill");
+        });
+        const applySelected = Array.from(root.querySelectorAll("button")).find(button => textOf(button).includes("apply to selected"));
+
+        if (billControl && applySelected && !root.querySelector(".csv-v36-simple-actions")) {
+          const row = document.createElement("div");
+          row.className = "csv-v36-simple-actions";
+          billControl.parentNode.insertBefore(row, billControl);
+          row.appendChild(billControl);
+          row.appendChild(applySelected);
+        }
+      }
+
+      function parseMoney(value) {
+        const n = Number(String(value || "").replace(/[^0-9.-]/g, ""));
+        return Number.isFinite(n) ? n : 0;
+      }
+
+      function parseDate(value) {
+        const d = new Date(String(value || "").trim());
+        const time = d.getTime();
+        return Number.isFinite(time) ? time : 0;
+      }
+
+      function valueFor(row, key) {
+        const cells = Array.from(row.children);
+        const map = {
+          date: 1,
+          description: 2,
+          bill: 3,
+          category: 4,
+          owner: 5,
+          amount: 6,
+          status: 7
+        };
+        const cell = cells[map[key]];
+        const raw = (cell?.textContent || "").trim();
+
+        if (key === "amount") return parseMoney(raw);
+        if (key === "date") return parseDate(raw);
+        return raw.toLowerCase();
+      }
+
+      function getReviewTable() {
+        const root = findCsvRoot();
+        const tables = Array.from(root.querySelectorAll("table"));
+        return tables.find(table => {
+          const headerText = textOf(table.querySelector("thead") || table);
+          return headerText.includes("date")
+            && headerText.includes("description")
+            && headerText.includes("amount")
+            && headerText.includes("status");
+        });
+      }
+
+      function sortReviewTable(key) {
+        const table = getReviewTable();
+        const tbody = table?.querySelector("tbody");
+        if (!table || !tbody) return;
+
+        if (sortState.key === key) {
+          sortState.dir = sortState.dir === "asc" ? "desc" : "asc";
+        } else {
+          sortState.key = key;
+          sortState.dir = key === "date" || key === "amount" ? "desc" : "asc";
+        }
+
+        const rows = Array.from(tbody.querySelectorAll("tr"));
+        rows.sort((a, b) => {
+          const av = valueFor(a, sortState.key);
+          const bv = valueFor(b, sortState.key);
+
+          let result = 0;
+          if (typeof av === "number" && typeof bv === "number") {
+            result = av - bv;
+          } else {
+            result = String(av).localeCompare(String(bv));
+          }
+
+          return sortState.dir === "asc" ? result : -result;
+        });
+
+        rows.forEach(row => tbody.appendChild(row));
+        updateSortHeaderState(table);
+      }
+
+      function updateSortHeaderState(table) {
+        table.querySelectorAll("th").forEach(th => {
+          th.classList.remove("sort-asc", "sort-desc");
+          if (th.dataset.v36SortKey === sortState.key) {
+            th.classList.add(sortState.dir === "asc" ? "sort-asc" : "sort-desc");
+          }
+        });
+      }
+
+      function addSortableHeaders() {
+        if (currentView() !== "transactions") return;
+
+        const table = getReviewTable();
+        if (!table || table.dataset.v36Sortable === "true") return;
+
+        const headers = Array.from(table.querySelectorAll("thead th"));
+        const keysByText = {
+          "date": "date",
+          "description": "description",
+          "bill": "bill",
+          "category": "category",
+          "owner": "owner",
+          "amount": "amount",
+          "status": "status"
+        };
+
+        headers.forEach(th => {
+          const header = textOf(th);
+          const match = Object.keys(keysByText).find(k => header.includes(k));
+          if (!match) return;
+
+          th.classList.add("sortable-th");
+          th.dataset.v36SortKey = keysByText[match];
+          th.title = "Click to sort";
+          th.addEventListener("click", () => sortReviewTable(th.dataset.v36SortKey));
+        });
+
+        table.dataset.v36Sortable = "true";
+        updateSortHeaderState(table);
+      }
+
+      function runV36() {
+        try {
+          simplifyCsvControls();
+          addSortableHeaders();
+        } catch (err) {
+          console.warn("FamilyNest v36 CSV simplifier skipped:", err);
+        }
+      }
+
+      document.addEventListener("click", event => {
+        if (event.target.closest("[data-view], .nav-btn, .mobile-screen-select")) {
+          setTimeout(runV36, 150);
+          setTimeout(runV36, 500);
+        }
+      });
+
+      document.addEventListener("change", event => {
+        if (event.target.closest(".mobile-screen-select, select, input")) {
+          setTimeout(runV36, 150);
+        }
+      });
+
+      window.addEventListener("load", () => {
+        setTimeout(runV36, 300);
+        setTimeout(runV36, 900);
+        setTimeout(runV36, 1800);
+      });
+
+      const originalRender = window.render;
+      if (typeof originalRender === "function" && !window.__familyNestV36RenderWrapped) {
+        window.__familyNestV36RenderWrapped = true;
+        window.render = function(...args) {
+          const result = originalRender.apply(this, args);
+          setTimeout(runV36, 80);
+          return result;
+        };
+      }
     })();
   </script>
 

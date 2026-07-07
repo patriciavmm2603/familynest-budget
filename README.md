@@ -1,11 +1,14 @@
-# FamilyNest v35 v18 mobile polish
+# FamilyNest v36 CSV simplified sort
 
-Starts from v18 because that was the most decent version.
+Based on v35/v18 baseline.
 
-Focused changes only:
-- Keeps real v18 app logic
-- Keeps Screen + Tools mobile navigation
-- Makes mobile spacing/header/tools cleaner
-- Keeps tables scrollable instead of converting them to cards
-- Disables service worker registration while testing
-- Avoids the risky rebuild/mobile observer that froze v32
+CSV Review changes:
+- Hides crowded search/filter controls
+- Keeps Choose a bill / Bulk bill
+- Keeps Apply To Selected
+- Keeps transaction selection checkboxes
+- Adds clickable table header sorting for Date, Description, Bill, Category, Owner, Amount, Status
+- Keeps tables scrollable
+- Does not touch Supabase/shared storage logic
+- Does not add table-card conversion
+- Service worker remains disabled while testing

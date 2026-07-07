@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>FamilyNest Budget v30 rebuild</title>
+  <meta name="theme-color" content="#2f6f4e">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="FamilyNest">
+  <link rel="apple-touch-icon" href="/icons/icon-192.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="stylesheet" href="/src/styles.css">
+  <link rel="stylesheet" href="/src/mobile.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+<div class="auth-screen" id="authScreen">
+<div class="auth-card">
+<div class="mark">FN</div>
+<h1>FamilyNest</h1>
+<p>Log in to use the shared budget app with all the original tools.</p>
+<label>Email
+          <input autocomplete="email" id="authEmail" type="email" value="munoz.pat@outlook.com"/>
+</label>
+<label>Password
+          <input autocomplete="current-password" id="authPassword" type="password"/>
+</label>
+<div class="toolbar" style="justify-content:flex-start;margin-top:.8rem">
+<button id="authLoginBtn" type="button">Log in</button>
+</div>
+<p class="auth-status" id="authStatus">Checking session…</p>
+</div>
+</div>
+<div class="app" style="display:none">
+<div aria-label="FamilyNest mobile navigation" class="fn-mobile-shell">
+<div class="fn-mobile-top">
+<div class="fn-mobile-title">
+<strong>FamilyNest</strong>
+<span id="fnMobileScreenLabel">Dashboard</span>
+</div>
+<button class="secondary fn-mobile-tools-btn" type="button">Tools</button>
+</div>
+<section aria-label="More screens and tools" class="fn-mobile-more">
+<h3>More</h3>
+<div class="fn-mobile-more-grid">
+<button data-fn-mobile-view="template" type="button">Template</button>
+<button data-fn-mobile-view="allowance" type="button">Personal</button>
+<button data-fn-mobile-view="debt" type="button">Debt</button>
+<button data-fn-mobile-view="income" type="button">Income</button>
+<button data-fn-mobile-view="compare" type="button">Compare</button>
+<button data-fn-mobile-view="closeout" type="button">Closeout</button>
+<button data-fn-mobile-action="copy-month" type="button">Create Month</button>
+<button data-fn-mobile-action="delete-month" type="button">Delete Month</button>
+<button data-fn-mobile-action="export" type="button">Export Backup</button>
+<label class="secondary fn-mobile-import-label">
+        Import Backup
+        <input accept=".json,application/json" hidden="" id="fnMobileImportBackup" type="file"/>
+</label>
+<button data-fn-mobile-action="logout" type="button">Log out</button>
+<button data-fn-mobile-action="refresh" type="button">Refresh</button>
+</div>
+</section>
+<nav aria-label="Main mobile tabs" class="fn-mobile-bottom">
+<button data-fn-mobile-view="dashboard" type="button"><span class="fn-icon">🏠</span><span>Home</span></button>
+<button data-fn-mobile-view="cashguard" type="button"><span class="fn-icon">🛡️</span><span>Keep</span></button>
+<button data-fn-mobile-view="budget" type="button"><span class="fn-icon">📋</span><span>Plan</span></button>
+<button data-fn-mobile-view="transactions" type="button"><span class="fn-icon">⇄</span><span>CSV</span></button>
+<button class="fn-mobile-more-tab" type="button"><span class="fn-icon">⋯</span><span>More</span></button>
+</nav>
+</div>
+
+<aside>
+<div class="brand">
+<div class="mark">FN</div>
+<div>
+<h1>FamilyNest</h1>
+<p>Personal budget command center <span style="font-size:.72rem; opacity:.7;">v30 rebuild</span></p>
+</div>
+</div>
+<nav id="nav"></nav>
+<div class="side-panel">
+<h3>Current month</h3>
+<p><strong id="sideMonth">June 2026</strong><br/><span id="sideSummary">Loading budget...</span></p>
+</div>
+<div class="side-panel">
+<h3>Storage</h3>
+<p><strong id="storageStatus">Browser only</strong><br/><span id="storageHint">Use Export Backup before clearing browser data.</span></p>
+</div>
+</aside>
+<main>
+<div class="topbar">
+<div>
+<h2 id="pageTitle">Dashboard</h2>
+<p id="pageSubtitle">Plan the month, upload transactions, categorize each line, and protect personal spending money.</p>
+</div>
+<div class="toolbar">
+<select aria-label="Month" id="monthSelect"></select>
+<button id="copyMonthBtn" type="button">Create Month</button>
+<button class="ghost" id="deleteMonthBtn" type="button">Revert / Delete Month</button>
+<button class="secondary" id="exportBtn" type="button">Export Backup</button>
+<label class="ghost" id="importBackupLabel" style="display:inline-flex;align-items:center;gap:.45rem;width:auto;min-height:auto;padding:.6rem .8rem;border-radius:8px;border:1px solid var(--line);color:var(--ink);background:transparent;cursor:pointer">
+              Import Backup
+              <input accept="application/json" class="hidden" id="importBackup" type="file"/>
+</label>
+<button class="ghost" id="logoutBtn" type="button">Log out</button>
+</div>
+</div>
+<div class="alert-due hidden" id="dueSoonAlert">
+<div style="font-size:1.3rem">⚠️</div>
+<div>
+<strong id="dueSoonTitle">Bills due soon</strong>
+<span id="dueSoonBody"></span>
+</div>
+</div>
+<div class="banner hidden" id="reviewBanner">
+<div>
+<strong id="reviewBannerTitle">Transactions need review</strong>
+<span>Review category and owner before trusting the monthly totals.</span>
+</div>
+<button class="secondary" id="goReviewBtn" type="button">Review Now</button>
+</div>
+<section class="view active" id="dashboard"></section>
+<section class="view" id="cashguard"></section>
+<section class="view" id="template"></section>
+<section class="view" id="budget"></section>
+<section class="view" id="transactions"></section>
+<section class="view" id="allowance"></section>
+<section class="view" id="debt"></section>
+<section class="view" id="income"></section>
+<section class="view" id="compare"></section>
+<section class="view" id="closeout"></section>
+</main>
+</div>
+<div aria-modal="true" class="modal" id="modal" role="dialog">
+<div class="dialog">
+<div class="dialog-head">
+<h3 id="modalTitle">Edit</h3>
+<button class="ghost" id="closeModal" type="button">Close</button>
+</div>
+<div id="modalBody"></div>
+</div>
+</div>
+<script src="/src/app.js"></script>
+<script src="/src/mobile.js"></script>
+</html>

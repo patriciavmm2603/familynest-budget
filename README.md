@@ -1,10 +1,9 @@
-# FamilyNest v33 stable recovery
+# FamilyNest PWA v18 real mobile
 
-Use this to recover from the unresponsive v32 page.
+Upload all files to GitHub root.
 
-This version:
-- starts from the last stable v17 source
-- keeps the original app features
-- disables service worker registration
-- adds a safe session timeout
-- does not include the new mobile rebuild layer
+Mobile changes:
+- Compact Screen dropdown replaces the huge menu on phones
+- Tools drawer holds Create Month, Delete Month, Export, Import, Log out, Refresh
+- Desktop view keeps the normal menu
+- Functionality is not removed. Mobile controls trigger the same existing app buttons.

@@ -364,7 +364,7 @@
       }
 
 
-      /* v33 stable recovery app layout fix */
+      /* v18 real mobile app layout fix */
       html, body {
         max-width: 100%;
         overflow-x: hidden;
@@ -603,7 +603,7 @@
       }
 
 
-      /* v33 stable recovery mobile cleanup: hide nothing, only improve layout */
+      /* v18 real mobile mobile cleanup: hide nothing, only improve layout */
       @media (max-width: 760px) {
         body {
           overflow-x: hidden !important;
@@ -696,6 +696,153 @@
         }
       }
 
+
+      /* v18 real mobile layout */
+      .mobile-app-bar {
+        display: none;
+      }
+
+      @media (max-width: 760px) {
+        body {
+          overflow-x: hidden !important;
+          padding-bottom: env(safe-area-inset-bottom);
+        }
+
+        .mobile-app-bar {
+          display: grid;
+          gap: .65rem;
+          position: sticky;
+          top: 0;
+          z-index: 1000;
+          background: rgba(34, 31, 27, .96);
+          backdrop-filter: blur(14px);
+          border-bottom: 1px solid var(--line);
+          padding: .75rem .85rem;
+          margin: 0 -.75rem .75rem;
+        }
+
+        .mobile-app-row {
+          display: grid;
+          grid-template-columns: 1fr auto;
+          gap: .6rem;
+          align-items: center;
+        }
+
+        .mobile-screen-select,
+        .mobile-tools-button {
+          min-height: 46px !important;
+          border-radius: 14px !important;
+          font-size: 16px !important;
+          font-weight: 900 !important;
+        }
+
+        .mobile-screen-select {
+          width: 100%;
+          background: var(--card);
+          color: var(--ink);
+          border: 1px solid var(--line);
+          padding: .7rem .8rem;
+        }
+
+        .mobile-tools-button {
+          padding: .7rem .9rem !important;
+          white-space: nowrap;
+        }
+
+        .mobile-tools-drawer {
+          display: none;
+          grid-template-columns: 1fr 1fr;
+          gap: .55rem;
+          padding-top: .2rem;
+        }
+
+        body.mobile-tools-open .mobile-tools-drawer {
+          display: grid;
+        }
+
+        .mobile-tools-drawer button,
+        .mobile-tools-drawer label {
+          width: 100% !important;
+          min-height: 46px !important;
+          border-radius: 12px !important;
+          display: inline-flex !important;
+          align-items: center;
+          justify-content: center;
+          text-align: center;
+          font-size: .86rem !important;
+          padding: .65rem .45rem !important;
+        }
+
+        /* Hide the giant desktop nav only on phone because the compact Screen dropdown replaces it. */
+        aside #nav,
+        #nav {
+          display: none !important;
+        }
+
+        /* Admin buttons move into Tools on phone. Functionality stays available. */
+        #copyMonthBtn,
+        #deleteMonthBtn,
+        #exportBtn,
+        #importBackupLabel,
+        #logoutBtn {
+          display: none !important;
+        }
+
+        .topbar {
+          display: grid !important;
+          grid-template-columns: 1fr !important;
+          gap: .75rem !important;
+          position: static !important;
+          margin: 0 0 .75rem !important;
+          padding: 0 !important;
+          background: transparent !important;
+          border: 0 !important;
+        }
+
+        .toolbar {
+          display: grid !important;
+          grid-template-columns: 1fr !important;
+          gap: .65rem !important;
+          width: 100% !important;
+          max-width: 100% !important;
+        }
+
+        .toolbar select,
+        .toolbar button,
+        .toolbar label {
+          width: 100% !important;
+          max-width: 100% !important;
+        }
+
+        input,
+        select,
+        textarea,
+        button {
+          min-height: 44px !important;
+          font-size: 16px !important;
+        }
+
+        input[type="checkbox"] {
+          width: 24px !important;
+          height: 24px !important;
+        }
+
+        .table-wrap {
+          width: 100% !important;
+          max-width: 100% !important;
+          overflow-x: auto !important;
+          -webkit-overflow-scrolling: touch;
+        }
+
+        table {
+          min-width: 760px;
+        }
+
+        #cashguard table {
+          min-width: 900px;
+        }
+      }
+
 </style>
   
   <link rel="manifest" href="/manifest.webmanifest">
@@ -707,11 +854,41 @@
 
 </head>
   <body>
+
+  <div class="mobile-app-bar" aria-label="Mobile app controls">
+    <div class="mobile-app-row">
+      <select class="mobile-screen-select" aria-label="Choose screen">
+        <option value="dashboard">Dashboard</option>
+        <option value="cashguard">Keep in Account</option>
+        <option value="template">Base Template</option>
+        <option value="budget">Monthly Plan</option>
+        <option value="transactions">CSV Review</option>
+        <option value="personal">Personal Money</option>
+        <option value="debts">Debt Tracker</option>
+        <option value="income">Income</option>
+        <option value="compare">Compare Months</option>
+        <option value="closeout">Closeout</option>
+      </select>
+      <button type="button" class="secondary mobile-tools-button">Tools</button>
+    </div>
+    <div class="mobile-tools-drawer">
+      <button type="button" data-mobile-action="copy-month">Create Month</button>
+      <button type="button" data-mobile-action="delete-month">Delete Month</button>
+      <button type="button" data-mobile-action="export">Export Backup</button>
+      <label class="secondary" style="cursor:pointer">
+        Import Backup
+        <input id="mobileImportBackup" type="file" accept=".json,application/json" hidden>
+      </label>
+      <button type="button" data-mobile-action="logout">Log out</button>
+      <button type="button" data-mobile-action="refresh">Refresh</button>
+    </div>
+  </div>
+
     <div id="authScreen" class="auth-screen">
       <div class="auth-card">
         <div class="mark">FN</div>
         <h1>FamilyNest</h1>
-        <p>Log in to use the shared budget app with all the original tools. v33 stable recovery</p>
+        <p>Log in to use the shared budget app with all the original tools.</p>
         <label>Email
           <input id="authEmail" type="email" value="munoz.pat@outlook.com" autocomplete="email">
         </label>
@@ -731,7 +908,7 @@
           <div class="mark">FN</div>
           <div>
             <h1>FamilyNest</h1>
-            <p>Personal budget command center <span style="font-size:.72rem; opacity:.7;">v33 stable recovery</span></p>
+            <p>Personal budget command center <span style="font-size:.72rem; opacity:.7;">v18 real mobile</span></p>
           </div>
         </div>
         <nav id="nav"></nav>
@@ -938,19 +1115,7 @@
 
       let state = loadState();
       let cloudReady = false, cloudSaveTimer = null, currentUser = null;
-      
-      const supabaseClient = window.supabase?.createClient
-        ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY)
-        : null;
-
-      function withTimeout(promise, ms, message) {
-        let timer;
-        const timeout = new Promise((_, reject) => {
-          timer = setTimeout(() => reject(new Error(message || "Request timed out")), ms);
-        });
-        return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
-      }
-    
+      const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
       function cloneSeedState() {
         return normalizeState(JSON.parse(JSON.stringify(SEED_STATE)));
@@ -991,19 +1156,8 @@
         const authScreen = document.querySelector("#authScreen");
         if (shell) shell.style.display = "none";
         if (authScreen) authScreen.style.display = "flex";
-
-        if (!supabaseClient) {
-          setAuthStatus("Supabase did not load. Refresh the page.", "error");
-          return;
-        }
-
         try {
-          setAuthStatus("Checking session...");
-          const { data, error } = await withTimeout(
-            supabaseClient.auth.getSession(),
-            4500,
-            "Session check timed out"
-          );
+          const { data, error } = await supabaseClient.auth.getSession();
           if (error) throw error;
           if (data.session?.user) {
             currentUser = data.session.user;
@@ -1012,7 +1166,7 @@
             setAuthStatus("Please log in.");
           }
         } catch (err) {
-          setAuthStatus("Please log in.");
+          setAuthStatus("Session check failed: " + (err.message || err), "error");
         }
       }
 
@@ -1030,17 +1184,9 @@
         const email = document.querySelector("#authEmail")?.value?.trim();
         const password = document.querySelector("#authPassword")?.value || "";
         if (!email || !password) { setAuthStatus("Enter email and password.", "error"); return; }
-        if (!supabaseClient) {
-          setAuthStatus("Supabase did not load. Refresh the page.", "error");
-          return;
-        }
         setAuthStatus("Signing in...");
         try {
-          const { data, error } = await withTimeout(
-            supabaseClient.auth.signInWithPassword({ email, password }),
-            10000,
-            "Login timed out"
-          );
+          const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
           if (error) throw error;
           currentUser = data.user;
           setAuthStatus("Signed in.", "good");
@@ -1053,15 +1199,11 @@
       async function loadCloudState() {
         if (!cloudAvailable()) { setStorageStatus("Browser only", "Log in to save to the shared database."); return; }
         try {
-          const { data, error } = await withTimeout(
-            supabaseClient
-              .from("app_state")
-              .select("state, updated_at")
-              .eq("household_id", HOUSEHOLD_ID)
-              .maybeSingle(),
-            10000,
-            "Shared budget load timed out"
-          );
+          const { data, error } = await supabaseClient
+            .from("app_state")
+            .select("state, updated_at")
+            .eq("household_id", HOUSEHOLD_ID)
+            .maybeSingle();
           if (error) throw error;
           if (data && data.state && data.state.months) {
             state = normalizeState(data.state);
@@ -3488,5 +3630,78 @@
       document.querySelector("#authPassword").addEventListener("keydown", event => { if (event.key === "Enter") loginToSharedApp(); });
       startApp();
     </script>
+  
+  <script>
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", () => {
+        navigator.serviceWorker.register("/service-worker.js").catch(error => {
+          console.warn("FamilyNest service worker registration failed:", error);
+        });
+      });
+    }
+  </script>
+
+
+  <script>
+    (function () {
+      function clickExisting(selector) {
+        const el = document.querySelector(selector);
+        if (el) el.click();
+      }
+
+      function syncScreenSelect() {
+        const select = document.querySelector(".mobile-screen-select");
+        if (!select) return;
+        const active = document.body.dataset.activeView;
+        if (active && select.value !== active) select.value = active;
+      }
+
+      document.addEventListener("change", function (event) {
+        if (event.target && event.target.classList.contains("mobile-screen-select")) {
+          const view = event.target.value;
+          const navButton = document.querySelector(`#nav [data-view="${view}"], [data-view="${view}"]`);
+          if (navButton) navButton.click();
+          document.body.classList.remove("mobile-tools-open");
+          setTimeout(syncScreenSelect, 100);
+        }
+
+        if (event.target && event.target.id === "mobileImportBackup") {
+          const original = document.querySelector("#importBackup");
+          if (original && event.target.files && event.target.files.length) {
+            const dt = new DataTransfer();
+            Array.from(event.target.files).forEach(file => dt.items.add(file));
+            original.files = dt.files;
+            original.dispatchEvent(new Event("change", { bubbles: true }));
+          }
+        }
+      });
+
+      document.addEventListener("click", function (event) {
+        if (event.target.closest(".mobile-tools-button")) {
+          document.body.classList.toggle("mobile-tools-open");
+          return;
+        }
+
+        const actionBtn = event.target.closest("[data-mobile-action]");
+        if (!actionBtn) return;
+
+        const action = actionBtn.dataset.mobileAction;
+        document.body.classList.remove("mobile-tools-open");
+
+        if (action === "copy-month") clickExisting("#copyMonthBtn");
+        if (action === "delete-month") clickExisting("#deleteMonthBtn");
+        if (action === "export") clickExisting("#exportBtn");
+        if (action === "logout") clickExisting("#logoutBtn");
+        if (action === "refresh") location.reload();
+      });
+
+      const observer = new MutationObserver(syncScreenSelect);
+      observer.observe(document.body, { attributes: true, attributeFilter: ["data-active-view"] });
+      window.addEventListener("load", function () {
+        setTimeout(syncScreenSelect, 250);
+      });
+    })();
+  </script>
+
 </body>
 </html>

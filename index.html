@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>FamilyNest Budget v31 single-file recovery</title>
+  <title>FamilyNest Budget v32 session fix</title>
   <meta name="theme-color" content="#2f6f4e">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -16,7 +16,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
   <style>
-/* FamilyNest v31 single-file recovery */
+/* FamilyNest v32 session fix */
 /* Base CSS */
 
       :root {
@@ -1028,7 +1028,7 @@
 <div class="auth-card">
 <div class="mark">FN</div>
 <h1>FamilyNest</h1>
-<p>Log in to use the shared budget app with all the original tools.</p>
+<p>Log in to use the shared budget app with all the original tools. v32 session fix</p>
 <label>Email
           <input autocomplete="email" id="authEmail" type="email" value="munoz.pat@outlook.com"/>
 </label>
@@ -1084,7 +1084,7 @@
 <div class="mark">FN</div>
 <div>
 <h1>FamilyNest</h1>
-<p>Personal budget command center <span style="font-size:.72rem; opacity:.7;">v31 single-file recovery</span></p>
+<p>Personal budget command center <span style="font-size:.72rem; opacity:.7;">v32 session fix</span></p>
 </div>
 </div>
 <nav id="nav"></nav>
@@ -1291,7 +1291,30 @@
 
       let state = loadState();
       let cloudReady = false, cloudSaveTimer = null, currentUser = null;
-      const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+      
+      const supabaseClient = window.supabase?.createClient
+        ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY)
+        : null;
+
+      function withTimeout(promise, ms, message) {
+        let timer;
+        const timeout = new Promise((_, reject) => {
+          timer = setTimeout(() => reject(new Error(message || "Request timed out")), ms);
+        });
+        return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+      }
+
+      window.addEventListener("error", event => {
+        try {
+          const authVisible = document.querySelector("#authScreen");
+          const status = document.querySelector("#authStatus");
+          if (authVisible && status && getComputedStyle(authVisible).display !== "none") {
+            status.textContent = "App error: " + (event.message || "Unknown error");
+            status.className = "auth-status error";
+          }
+        } catch {}
+      });
+    
 
       function cloneSeedState() {
         return normalizeState(JSON.parse(JSON.stringify(SEED_STATE)));
@@ -1332,8 +1355,19 @@
         const authScreen = document.querySelector("#authScreen");
         if (shell) shell.style.display = "none";
         if (authScreen) authScreen.style.display = "flex";
+
+        if (!supabaseClient) {
+          setAuthStatus("Supabase did not load. Refresh the page, or check your internet/CDN access.", "error");
+          return;
+        }
+
         try {
-          const { data, error } = await supabaseClient.auth.getSession();
+          setAuthStatus("Checking session...");
+          const { data, error } = await withTimeout(
+            supabaseClient.auth.getSession(),
+            4500,
+            "Session check timed out"
+          );
           if (error) throw error;
           if (data.session?.user) {
             currentUser = data.session.user;
@@ -1342,7 +1376,7 @@
             setAuthStatus("Please log in.");
           }
         } catch (err) {
-          setAuthStatus("Session check failed: " + (err.message || err), "error");
+          setAuthStatus("Please log in. " + (err.message || err), "");
         }
       }
 
@@ -1360,9 +1394,17 @@
         const email = document.querySelector("#authEmail")?.value?.trim();
         const password = document.querySelector("#authPassword")?.value || "";
         if (!email || !password) { setAuthStatus("Enter email and password.", "error"); return; }
+        if (!supabaseClient) {
+          setAuthStatus("Supabase did not load, so login cannot run. Refresh the page.", "error");
+          return;
+        }
         setAuthStatus("Signing in...");
         try {
-          const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+          const { data, error } = await withTimeout(
+            supabaseClient.auth.signInWithPassword({ email, password }),
+            10000,
+            "Login timed out"
+          );
           if (error) throw error;
           currentUser = data.user;
           setAuthStatus("Signed in.", "good");
@@ -1375,11 +1417,15 @@
       async function loadCloudState() {
         if (!cloudAvailable()) { setStorageStatus("Browser only", "Log in to save to the shared database."); return; }
         try {
-          const { data, error } = await supabaseClient
-            .from("app_state")
-            .select("state, updated_at")
-            .eq("household_id", HOUSEHOLD_ID)
-            .maybeSingle();
+          const { data, error } = await withTimeout(
+            supabaseClient
+              .from("app_state")
+              .select("state, updated_at")
+              .eq("household_id", HOUSEHOLD_ID)
+              .maybeSingle(),
+            10000,
+            "Shared budget load timed out"
+          );
           if (error) throw error;
           if (data && data.state && data.state.months) {
             state = normalizeState(data.state);

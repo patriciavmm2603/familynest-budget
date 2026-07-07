@@ -1,12 +1,10 @@
-# FamilyNest PWA v15 mobile optimized
+# FamilyNest PWA v17 verified safe
 
 Upload all files to GitHub root.
 
-Includes:
-- Backup of v14 created separately
-- Bottom mobile navigation: Home, Keep, Plan, CSV, More
-- More tools panel for Template, Personal, Debt, Income, Compare, Closeout, Create Month, Delete Month, Backup, Import, Log out
-- Larger touch targets
-- Mobile card views generated from tables
-- Sticky topbar/month selector
-- Keeps functionality, just reorganizes the phone experience
+This version is intentionally conservative:
+- Keeps the normal menu visible
+- Keeps Create Month / Delete Month / Export / Import / Log out available
+- Does not add the experimental bottom nav
+- Keeps all PWA files
+- Only improves mobile spacing, touch targets, and table scrolling

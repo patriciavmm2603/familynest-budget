@@ -1,11 +1,10 @@
-# FamilyNest v31 single-file recovery
+# FamilyNest v33 stable recovery
 
-Upload these files to GitHub root:
+Use this to recover from the unresponsive v32 page.
 
-- index.html
-- manifest.webmanifest
-- service-worker.js
-- icons folder
-
-This version does NOT need a src folder. CSS and JS are inside index.html so the app will not load as plain unstyled HTML.
-Service worker is intentionally not registered to avoid phone cache blank pages.
+This version:
+- starts from the last stable v17 source
+- keeps the original app features
+- disables service worker registration
+- adds a safe session timeout
+- does not include the new mobile rebuild layer

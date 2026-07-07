@@ -1,24 +1,11 @@
 <!doctype html>
 <html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>FamilyNest Budget v32 session fix</title>
-  <meta name="theme-color" content="#2f6f4e">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <meta name="apple-mobile-web-app-title" content="FamilyNest">
-  <link rel="apple-touch-icon" href="/icons/icon-192.png">
-  <link rel="manifest" href="/manifest.webmanifest">
-  
-  
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
-  <style>
-/* FamilyNest v32 session fix */
-/* Base CSS */
-
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>FamilyNest Budget v7</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+    <style>
       :root {
         color-scheme: light dark;
         --bg: #f7f4ee;
@@ -377,7 +364,7 @@
       }
 
 
-      /* v17 verified safe app layout fix */
+      /* v33 stable recovery app layout fix */
       html, body {
         max-width: 100%;
         overflow-x: hidden;
@@ -616,7 +603,7 @@
       }
 
 
-      /* v17 verified safe mobile cleanup: hide nothing, only improve layout */
+      /* v33 stable recovery mobile cleanup: hide nothing, only improve layout */
       @media (max-width: 760px) {
         body {
           overflow-x: hidden !important;
@@ -709,453 +696,113 @@
         }
       }
 
-
-
-/* Mobile CSS */
-
-/* FamilyNest v30 mobile layer.
-   Progressive enhancement: original menu stays if this JS/CSS fails. */
-
-.fn-mobile-shell {
-  display: none;
-}
-
-@media (max-width: 760px) {
-  html,
-  body {
-    max-width: 100%;
-    overflow-x: hidden;
-  }
-
-  body.fn-mobile-ready {
-    padding-bottom: calc(78px + env(safe-area-inset-bottom));
-  }
-
-  body.fn-mobile-ready aside {
-    display: none !important;
-  }
-
-  body.fn-mobile-ready .fn-mobile-shell {
-    display: block;
-  }
-
-  .fn-mobile-top {
-    position: sticky;
-    top: 0;
-    z-index: 9000;
-    display: grid;
-    grid-template-columns: 1fr auto;
-    gap: .65rem;
-    align-items: center;
-    background: rgba(247, 244, 238, .96);
-    border-bottom: 1px solid var(--line);
-    padding: .7rem .85rem;
-    margin: 0 -.75rem .75rem;
-    backdrop-filter: blur(14px);
-  }
-
-  .fn-mobile-title {
-    display: grid;
-    gap: .08rem;
-    min-width: 0;
-  }
-
-  .fn-mobile-title strong {
-    font-size: .95rem;
-    line-height: 1.1;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  .fn-mobile-title span {
-    color: var(--muted);
-    font-size: .74rem;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  .fn-mobile-tools-btn {
-    border-radius: 999px !important;
-    min-height: 42px !important;
-    padding: .55rem .8rem !important;
-    font-size: .86rem !important;
-    font-weight: 950 !important;
-  }
-
-  .fn-mobile-more {
-    display: none;
-    position: fixed;
-    left: .75rem;
-    right: .75rem;
-    bottom: calc(78px + .75rem + env(safe-area-inset-bottom));
-    z-index: 10001;
-    background: var(--card);
-    border: 1px solid var(--line);
-    border-radius: 18px;
-    box-shadow: 0 22px 70px rgba(0,0,0,.25);
-    padding: .85rem;
-    max-height: 70vh;
-    overflow: auto;
-  }
-
-  body.fn-mobile-more-open .fn-mobile-more {
-    display: block;
-  }
-
-  .fn-mobile-more h3 {
-    margin: 0 0 .6rem;
-    font-size: 1rem;
-  }
-
-  .fn-mobile-more-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: .55rem;
-  }
-
-  .fn-mobile-more-grid button,
-  .fn-mobile-more-grid label {
-    width: 100% !important;
-    min-height: 46px !important;
-    border-radius: 12px !important;
-    padding: .6rem .5rem !important;
-    display: inline-flex !important;
-    align-items: center;
-    justify-content: center;
-    text-align: center;
-    font-size: .84rem !important;
-    font-weight: 900 !important;
-    cursor: pointer;
-  }
-
-  .fn-mobile-bottom {
-    position: fixed;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    z-index: 10000;
-    display: grid;
-    grid-template-columns: repeat(5, 1fr);
-    gap: .2rem;
-    padding: .45rem .5rem calc(.45rem + env(safe-area-inset-bottom));
-    min-height: 78px;
-    background: rgba(255, 253, 249, .97);
-    border-top: 1px solid var(--line);
-    box-shadow: 0 -12px 34px rgba(49,39,25,.14);
-    backdrop-filter: blur(16px);
-  }
-
-  .fn-mobile-bottom button {
-    min-height: 50px !important;
-    border: 0 !important;
-    border-radius: 14px !important;
-    background: transparent !important;
-    color: var(--muted) !important;
-    display: grid !important;
-    place-items: center !important;
-    gap: .1rem !important;
-    padding: .35rem .15rem !important;
-    font-size: .72rem !important;
-    line-height: 1.05 !important;
-    font-weight: 850 !important;
-  }
-
-  .fn-mobile-bottom button.active {
-    background: var(--green-soft) !important;
-    color: var(--green) !important;
-  }
-
-  .fn-mobile-bottom .fn-icon {
-    font-size: 1.15rem;
-    line-height: 1;
-  }
-
-  body.fn-mobile-ready main {
-    width: 100% !important;
-    max-width: 100% !important;
-    overflow-x: hidden !important;
-    padding: .75rem !important;
-  }
-
-  body.fn-mobile-ready .topbar {
-    display: grid !important;
-    grid-template-columns: 1fr !important;
-    gap: .7rem !important;
-    margin: 0 0 .75rem !important;
-    padding: 0 !important;
-    background: transparent !important;
-    border: 0 !important;
-    position: static !important;
-  }
-
-  body.fn-mobile-ready .topbar h2,
-  body.fn-mobile-ready h2 {
-    font-size: 1.25rem !important;
-    line-height: 1.15 !important;
-    margin-top: 0 !important;
-  }
-
-  body.fn-mobile-ready .cards,
-  body.fn-mobile-ready .summary-grid,
-  body.fn-mobile-ready .dashboard-grid,
-  body.fn-mobile-ready .stat-grid,
-  body.fn-mobile-ready .metric-grid,
-  body.fn-mobile-ready .form-grid {
-    display: grid !important;
-    grid-template-columns: 1fr !important;
-    gap: .75rem !important;
-    width: 100% !important;
-    max-width: 100% !important;
-  }
-
-  body.fn-mobile-ready .card,
-  body.fn-mobile-ready .panel,
-  body.fn-mobile-ready section,
-  body.fn-mobile-ready .section {
-    width: 100% !important;
-    max-width: 100% !important;
-    border-radius: 14px !important;
-  }
-
-  body.fn-mobile-ready .toolbar {
-    display: grid !important;
-    grid-template-columns: 1fr !important;
-    gap: .55rem !important;
-    width: 100% !important;
-    max-width: 100% !important;
-  }
-
-  body.fn-mobile-ready .toolbar select,
-  body.fn-mobile-ready .toolbar button,
-  body.fn-mobile-ready .toolbar label {
-    width: 100% !important;
-    max-width: 100% !important;
-  }
-
-  body.fn-mobile-ready #copyMonthBtn,
-  body.fn-mobile-ready #deleteMonthBtn,
-  body.fn-mobile-ready #exportBtn,
-  body.fn-mobile-ready #importBackupLabel,
-  body.fn-mobile-ready #logoutBtn {
-    display: none !important;
-  }
-
-  input,
-  select,
-  textarea,
-  button {
-    min-height: 44px;
-    font-size: 16px;
-  }
-
-  input[type="checkbox"] {
-    width: 24px;
-    height: 24px;
-  }
-
-  body.fn-mobile-ready .table-wrap {
-    border: 0 !important;
-    background: transparent !important;
-    overflow: visible !important;
-  }
-
-  body.fn-mobile-ready table,
-  body.fn-mobile-ready thead,
-  body.fn-mobile-ready tbody,
-  body.fn-mobile-ready th,
-  body.fn-mobile-ready td,
-  body.fn-mobile-ready tr {
-    display: block;
-    width: 100%;
-  }
-
-  body.fn-mobile-ready thead {
-    display: none !important;
-  }
-
-  body.fn-mobile-ready tbody {
-    display: grid;
-    gap: .75rem;
-  }
-
-  body.fn-mobile-ready tr {
-    background: var(--card);
-    border: 1px solid var(--line);
-    border-radius: 14px;
-    padding: .75rem;
-    box-shadow: 0 10px 26px rgba(49,39,25,.08);
-  }
-
-  body.fn-mobile-ready td {
-    display: grid !important;
-    grid-template-columns: minmax(7rem, 38%) 1fr;
-    gap: .6rem;
-    align-items: start;
-    border-bottom: 1px dashed var(--line) !important;
-    padding: .45rem 0 !important;
-    font-size: .9rem !important;
-    text-align: left !important;
-    word-break: break-word;
-  }
-
-  body.fn-mobile-ready td:last-child {
-    border-bottom: 0 !important;
-  }
-
-  body.fn-mobile-ready td::before {
-    content: attr(data-label);
-    color: var(--muted);
-    font-size: .72rem;
-    font-weight: 900;
-    text-transform: uppercase;
-    letter-spacing: .04em;
-  }
-
-  body.fn-mobile-ready td.money {
-    text-align: left !important;
-    font-variant-numeric: tabular-nums;
-    font-weight: 900;
-  }
-}
-
-  </style>
+</style>
+  
+  <link rel="manifest" href="/manifest.webmanifest">
+  <meta name="theme-color" content="#2f6f4e">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="FamilyNest">
+  <link rel="apple-touch-icon" href="/icons/icon-192.png">
 
 </head>
-<body>
-<div class="auth-screen" id="authScreen">
-<div class="auth-card">
-<div class="mark">FN</div>
-<h1>FamilyNest</h1>
-<p>Log in to use the shared budget app with all the original tools. v32 session fix</p>
-<label>Email
-          <input autocomplete="email" id="authEmail" type="email" value="munoz.pat@outlook.com"/>
-</label>
-<label>Password
-          <input autocomplete="current-password" id="authPassword" type="password"/>
-</label>
-<div class="toolbar" style="justify-content:flex-start;margin-top:.8rem">
-<button id="authLoginBtn" type="button">Log in</button>
-</div>
-<p class="auth-status" id="authStatus">Checking session…</p>
-</div>
-</div>
-<div class="app" style="display:none">
-<div aria-label="FamilyNest mobile navigation" class="fn-mobile-shell">
-<div class="fn-mobile-top">
-<div class="fn-mobile-title">
-<strong>FamilyNest</strong>
-<span id="fnMobileScreenLabel">Dashboard</span>
-</div>
-<button class="secondary fn-mobile-tools-btn" type="button">Tools</button>
-</div>
-<section aria-label="More screens and tools" class="fn-mobile-more">
-<h3>More</h3>
-<div class="fn-mobile-more-grid">
-<button data-fn-mobile-view="template" type="button">Template</button>
-<button data-fn-mobile-view="allowance" type="button">Personal</button>
-<button data-fn-mobile-view="debt" type="button">Debt</button>
-<button data-fn-mobile-view="income" type="button">Income</button>
-<button data-fn-mobile-view="compare" type="button">Compare</button>
-<button data-fn-mobile-view="closeout" type="button">Closeout</button>
-<button data-fn-mobile-action="copy-month" type="button">Create Month</button>
-<button data-fn-mobile-action="delete-month" type="button">Delete Month</button>
-<button data-fn-mobile-action="export" type="button">Export Backup</button>
-<label class="secondary fn-mobile-import-label">
-        Import Backup
-        <input accept=".json,application/json" hidden="" id="fnMobileImportBackup" type="file"/>
-</label>
-<button data-fn-mobile-action="logout" type="button">Log out</button>
-<button data-fn-mobile-action="refresh" type="button">Refresh</button>
-</div>
-</section>
-<nav aria-label="Main mobile tabs" class="fn-mobile-bottom">
-<button data-fn-mobile-view="dashboard" type="button"><span class="fn-icon">🏠</span><span>Home</span></button>
-<button data-fn-mobile-view="cashguard" type="button"><span class="fn-icon">🛡️</span><span>Keep</span></button>
-<button data-fn-mobile-view="budget" type="button"><span class="fn-icon">📋</span><span>Plan</span></button>
-<button data-fn-mobile-view="transactions" type="button"><span class="fn-icon">⇄</span><span>CSV</span></button>
-<button class="fn-mobile-more-tab" type="button"><span class="fn-icon">⋯</span><span>More</span></button>
-</nav>
-</div>
+  <body>
+    <div id="authScreen" class="auth-screen">
+      <div class="auth-card">
+        <div class="mark">FN</div>
+        <h1>FamilyNest</h1>
+        <p>Log in to use the shared budget app with all the original tools. v33 stable recovery</p>
+        <label>Email
+          <input id="authEmail" type="email" value="munoz.pat@outlook.com" autocomplete="email">
+        </label>
+        <label>Password
+          <input id="authPassword" type="password" autocomplete="current-password">
+        </label>
+        <div class="toolbar" style="justify-content:flex-start;margin-top:.8rem">
+          <button id="authLoginBtn" type="button">Log in</button>
+        </div>
+        <p id="authStatus" class="auth-status">Checking session…</p>
+      </div>
+    </div>
 
-<aside>
-<div class="brand">
-<div class="mark">FN</div>
-<div>
-<h1>FamilyNest</h1>
-<p>Personal budget command center <span style="font-size:.72rem; opacity:.7;">v32 session fix</span></p>
-</div>
-</div>
-<nav id="nav"></nav>
-<div class="side-panel">
-<h3>Current month</h3>
-<p><strong id="sideMonth">June 2026</strong><br/><span id="sideSummary">Loading budget...</span></p>
-</div>
-<div class="side-panel">
-<h3>Storage</h3>
-<p><strong id="storageStatus">Browser only</strong><br/><span id="storageHint">Use Export Backup before clearing browser data.</span></p>
-</div>
-</aside>
-<main>
-<div class="topbar">
-<div>
-<h2 id="pageTitle">Dashboard</h2>
-<p id="pageSubtitle">Plan the month, upload transactions, categorize each line, and protect personal spending money.</p>
-</div>
-<div class="toolbar">
-<select aria-label="Month" id="monthSelect"></select>
-<button id="copyMonthBtn" type="button">Create Month</button>
-<button class="ghost" id="deleteMonthBtn" type="button">Revert / Delete Month</button>
-<button class="secondary" id="exportBtn" type="button">Export Backup</button>
-<label class="ghost" id="importBackupLabel" style="display:inline-flex;align-items:center;gap:.45rem;width:auto;min-height:auto;padding:.6rem .8rem;border-radius:8px;border:1px solid var(--line);color:var(--ink);background:transparent;cursor:pointer">
+    <div class="app" style="display:none">
+      <aside>
+        <div class="brand">
+          <div class="mark">FN</div>
+          <div>
+            <h1>FamilyNest</h1>
+            <p>Personal budget command center <span style="font-size:.72rem; opacity:.7;">v33 stable recovery</span></p>
+          </div>
+        </div>
+        <nav id="nav"></nav>
+        <div class="side-panel">
+          <h3>Current month</h3>
+          <p><strong id="sideMonth">June 2026</strong><br><span id="sideSummary">Loading budget...</span></p>
+        </div>
+        <div class="side-panel">
+          <h3>Storage</h3>
+          <p><strong id="storageStatus">Browser only</strong><br><span id="storageHint">Use Export Backup before clearing browser data.</span></p>
+        </div>
+      </aside>
+      <main>
+        <div class="topbar">
+          <div>
+            <h2 id="pageTitle">Dashboard</h2>
+            <p id="pageSubtitle">Plan the month, upload transactions, categorize each line, and protect personal spending money.</p>
+          </div>
+          <div class="toolbar">
+            <select id="monthSelect" aria-label="Month"></select>
+            <button id="copyMonthBtn" type="button">Create Month</button>
+            <button id="deleteMonthBtn" class="ghost" type="button">Revert / Delete Month</button>
+            <button id="exportBtn" class="secondary" type="button">Export Backup</button>
+            <label id="importBackupLabel" class="ghost" style="display:inline-flex;align-items:center;gap:.45rem;width:auto;min-height:auto;padding:.6rem .8rem;border-radius:8px;border:1px solid var(--line);color:var(--ink);background:transparent;cursor:pointer">
               Import Backup
-              <input accept="application/json" class="hidden" id="importBackup" type="file"/>
-</label>
-<button class="ghost" id="logoutBtn" type="button">Log out</button>
-</div>
-</div>
-<div class="alert-due hidden" id="dueSoonAlert">
-<div style="font-size:1.3rem">⚠️</div>
-<div>
-<strong id="dueSoonTitle">Bills due soon</strong>
-<span id="dueSoonBody"></span>
-</div>
-</div>
-<div class="banner hidden" id="reviewBanner">
-<div>
-<strong id="reviewBannerTitle">Transactions need review</strong>
-<span>Review category and owner before trusting the monthly totals.</span>
-</div>
-<button class="secondary" id="goReviewBtn" type="button">Review Now</button>
-</div>
-<section class="view active" id="dashboard"></section>
-<section class="view" id="cashguard"></section>
-<section class="view" id="template"></section>
-<section class="view" id="budget"></section>
-<section class="view" id="transactions"></section>
-<section class="view" id="allowance"></section>
-<section class="view" id="debt"></section>
-<section class="view" id="income"></section>
-<section class="view" id="compare"></section>
-<section class="view" id="closeout"></section>
-</main>
-</div>
-<div aria-modal="true" class="modal" id="modal" role="dialog">
-<div class="dialog">
-<div class="dialog-head">
-<h3 id="modalTitle">Edit</h3>
-<button class="ghost" id="closeModal" type="button">Close</button>
-</div>
-<div id="modalBody"></div>
-</div>
-</div>
+              <input id="importBackup" type="file" accept="application/json" class="hidden">
+            </label>
+            <button id="logoutBtn" class="ghost" type="button">Log out</button>
+          </div>
+        </div>
 
+        <div id="dueSoonAlert" class="alert-due hidden">
+          <div style="font-size:1.3rem">⚠️</div>
+          <div>
+            <strong id="dueSoonTitle">Bills due soon</strong>
+            <span id="dueSoonBody"></span>
+          </div>
+        </div>
 
+        <div id="reviewBanner" class="banner hidden">
+          <div>
+            <strong id="reviewBannerTitle">Transactions need review</strong>
+            <span>Review category and owner before trusting the monthly totals.</span>
+          </div>
+          <button id="goReviewBtn" class="secondary" type="button">Review Now</button>
+        </div>
 
-<script>
-/* FamilyNest app logic */
+        <section id="dashboard" class="view active"></section>
+        <section id="cashguard" class="view"></section>
+        <section id="template" class="view"></section>
+        <section id="budget" class="view"></section>
+        <section id="transactions" class="view"></section>
+        <section id="allowance" class="view"></section>
+        <section id="debt" class="view"></section>
+        <section id="income" class="view"></section>
+        <section id="compare" class="view"></section>
+        <section id="closeout" class="view"></section>
+      </main>
+    </div>
 
+    <div id="modal" class="modal" role="dialog" aria-modal="true">
+      <div class="dialog">
+        <div class="dialog-head">
+          <h3 id="modalTitle">Edit</h3>
+          <button id="closeModal" class="ghost" type="button">Close</button>
+        </div>
+        <div id="modalBody"></div>
+      </div>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script>
       const money = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
       const STORAGE_KEY = "familynest-budget-v1";
       const SUPABASE_URL = "https://nssdfhkzjoanbzgpilvz.supabase.co";
@@ -1303,17 +950,6 @@
         });
         return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
       }
-
-      window.addEventListener("error", event => {
-        try {
-          const authVisible = document.querySelector("#authScreen");
-          const status = document.querySelector("#authStatus");
-          if (authVisible && status && getComputedStyle(authVisible).display !== "none") {
-            status.textContent = "App error: " + (event.message || "Unknown error");
-            status.className = "auth-status error";
-          }
-        } catch {}
-      });
     
 
       function cloneSeedState() {
@@ -1357,7 +993,7 @@
         if (authScreen) authScreen.style.display = "flex";
 
         if (!supabaseClient) {
-          setAuthStatus("Supabase did not load. Refresh the page, or check your internet/CDN access.", "error");
+          setAuthStatus("Supabase did not load. Refresh the page.", "error");
           return;
         }
 
@@ -1376,7 +1012,7 @@
             setAuthStatus("Please log in.");
           }
         } catch (err) {
-          setAuthStatus("Please log in. " + (err.message || err), "");
+          setAuthStatus("Please log in.");
         }
       }
 
@@ -1395,7 +1031,7 @@
         const password = document.querySelector("#authPassword")?.value || "";
         if (!email || !password) { setAuthStatus("Enter email and password.", "error"); return; }
         if (!supabaseClient) {
-          setAuthStatus("Supabase did not load, so login cannot run. Refresh the page.", "error");
+          setAuthStatus("Supabase did not load. Refresh the page.", "error");
           return;
         }
         setAuthStatus("Signing in...");
@@ -3851,110 +3487,6 @@
       document.querySelector("#authLoginBtn").addEventListener("click", loginToSharedApp);
       document.querySelector("#authPassword").addEventListener("keydown", event => { if (event.key === "Enter") loginToSharedApp(); });
       startApp();
-    
-</script>
-<script>
-/* FamilyNest mobile layer */
-
-(function familyNestMobileLayer() {
-  const labels = {
-    dashboard: "Dashboard",
-    cashguard: "Keep in Account",
-    template: "Base Template",
-    budget: "Monthly Plan",
-    transactions: "CSV Review",
-    allowance: "Personal Money",
-    debt: "Debt Tracker",
-    income: "Income",
-    compare: "Compare Months",
-    closeout: "Closeout"
-  };
-
-  function clickExisting(selector) {
-    const el = document.querySelector(selector);
-    if (el) el.click();
-  }
-
-  function goToView(view) {
-    const navButton = document.querySelector(`#nav [data-view="${view}"], #nav button[data-view="${view}"], [data-view="${view}"]`);
-    if (navButton) navButton.click();
-    document.body.classList.remove("fn-mobile-more-open");
-    setTimeout(syncMobileUI, 80);
-  }
-
-  function syncMobileUI() {
-    document.body.classList.add("fn-mobile-ready");
-
-    const active = document.body.dataset.activeView || "dashboard";
-    const label = document.querySelector("#fnMobileScreenLabel");
-    if (label) label.textContent = labels[active] || "FamilyNest";
-
-    document.querySelectorAll("[data-fn-mobile-view]").forEach(button => {
-      button.classList.toggle("active", button.dataset.fnMobileView === active);
-    });
-
-    labelTableCells();
-  }
-
-  function labelTableCells() {
-    document.querySelectorAll("table").forEach(table => {
-      const headers = Array.from(table.querySelectorAll("thead th")).map(th => th.textContent.trim().replace(/\s+/g, " "));
-      if (!headers.length) return;
-
-      table.querySelectorAll("tbody tr").forEach(row => {
-        Array.from(row.children).forEach((cell, index) => {
-          if (!cell.getAttribute("data-label")) {
-            cell.setAttribute("data-label", headers[index] || "");
-          }
-        });
-      });
-    });
-  }
-
-  document.addEventListener("click", event => {
-    const viewButton = event.target.closest("[data-fn-mobile-view]");
-    if (viewButton) {
-      goToView(viewButton.dataset.fnMobileView);
-      return;
-    }
-
-    if (event.target.closest(".fn-mobile-tools-btn") || event.target.closest(".fn-mobile-more-tab")) {
-      document.body.classList.toggle("fn-mobile-more-open");
-      return;
-    }
-
-    const actionButton = event.target.closest("[data-fn-mobile-action]");
-    if (!actionButton) return;
-
-    const action = actionButton.dataset.fnMobileAction;
-    document.body.classList.remove("fn-mobile-more-open");
-
-    if (action === "copy-month") clickExisting("#copyMonthBtn");
-    if (action === "delete-month") clickExisting("#deleteMonthBtn");
-    if (action === "export") clickExisting("#exportBtn");
-    if (action === "logout") clickExisting("#logoutBtn");
-    if (action === "refresh") location.reload();
-  });
-
-  document.addEventListener("change", event => {
-    if (event.target && event.target.id === "fnMobileImportBackup") {
-      const original = document.querySelector("#importBackup");
-      if (original && event.target.files && event.target.files.length) {
-        const dt = new DataTransfer();
-        Array.from(event.target.files).forEach(file => dt.items.add(file));
-        original.files = dt.files;
-        original.dispatchEvent(new Event("change", { bubbles: true }));
-      }
-    }
-  });
-
-  const observer = new MutationObserver(syncMobileUI);
-  observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["data-active-view"] });
-
-  window.addEventListener("load", () => setTimeout(syncMobileUI, 250));
-  window.addEventListener("resize", () => setTimeout(syncMobileUI, 150));
-})();
-
-</script>
-
+    </script>
+</body>
 </html>

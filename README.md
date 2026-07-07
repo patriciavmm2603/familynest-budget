@@ -1,10 +1,11 @@
-# FamilyNest PWA v21 emergency restore
+# FamilyNest v31 single-file recovery
 
-Upload all files to GitHub root.
+Upload these files to GitHub root:
 
-Purpose:
-- Restore the last conservative working app layout
-- Clear old browser/PWA caches
-- Unregister the service worker so the blank cached version stops loading
+- index.html
+- manifest.webmanifest
+- service-worker.js
+- icons folder
 
-After this loads again, we can reintroduce mobile improvements one small step at a time.
+This version does NOT need a src folder. CSS and JS are inside index.html so the app will not load as plain unstyled HTML.
+Service worker is intentionally not registered to avoid phone cache blank pages.

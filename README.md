@@ -1,10 +1,18 @@
-# FamilyNest PWA v21 emergency restore
+# FamilyNest v30 rebuild
 
-Upload all files to GitHub root.
+This rebuild splits the app into separate files:
 
-Purpose:
-- Restore the last conservative working app layout
-- Clear old browser/PWA caches
-- Unregister the service worker so the blank cached version stops loading
+- index.html
+- src/styles.css
+- src/mobile.css
+- src/app.js
+- src/mobile.js
+- manifest.webmanifest
+- icons/
+- service-worker.js
 
-After this loads again, we can reintroduce mobile improvements one small step at a time.
+Important:
+- The service worker is intentionally NOT registered yet to avoid the blank-page cache issue.
+- Upload the whole folder contents to GitHub root.
+- After Vercel redeploys, test with:
+  https://familynest-budget.vercel.app?v=30

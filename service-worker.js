@@ -1,17 +1,6 @@
-self.addEventListener("install", event => {
-  self.skipWaiting();
-});
-
-self.addEventListener("activate", event => {
-  event.waitUntil(
-    caches.keys()
-      .then(keys => Promise.all(keys.map(key => caches.delete(key))))
-      .then(() => self.registration.unregister())
-      .then(() => self.clients.matchAll())
-      .then(clients => Promise.all(clients.map(client => client.navigate(client.url))))
-  );
-});
-
+// FamilyNest v30 rebuild
+// Intentionally not registered yet. This avoids stale PWA cache causing blank pages.
+// Once the rebuilt app is stable, a safe network-first service worker can be enabled.
 self.addEventListener("fetch", event => {
   event.respondWith(fetch(event.request));
 });

@@ -364,7 +364,7 @@
       }
 
 
-      /* v12 mobile app layout fix */
+      /* v15 mobile optimized app layout fix */
       html, body {
         max-width: 100%;
         overflow-x: hidden;
@@ -545,6 +545,314 @@
         }
       }
 
+
+      /* v15 mobile optimized fix: keep month/admin tools out of every tab */
+      body:not([data-active-view="dashboard"]) #copyMonthBtn,
+      body:not([data-active-view="dashboard"]) #deleteMonthBtn,
+      body:not([data-active-view="dashboard"]) #exportBtn,
+      body:not([data-active-view="dashboard"]) #importBackupLabel,
+      body:not([data-active-view="dashboard"]) #logoutBtn {
+        display: none !important;
+      }
+
+      body:not([data-active-view="dashboard"]) .toolbar {
+        display: grid !important;
+        grid-template-columns: 1fr !important;
+      }
+
+      /* v14 phone navigation: wrap tabs instead of cutting off sideways */
+      @media (max-width: 760px) {
+        aside {
+          width: 100% !important;
+          max-width: 100% !important;
+          overflow: hidden !important;
+        }
+
+        #nav {
+          display: grid !important;
+          grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+          gap: .55rem !important;
+          width: 100% !important;
+          max-width: 100% !important;
+          overflow: visible !important;
+          padding: .75rem 0 !important;
+        }
+
+        #nav .nav-btn {
+          width: 100% !important;
+          min-width: 0 !important;
+          max-width: 100% !important;
+          text-align: center !important;
+          justify-content: center !important;
+          white-space: normal !important;
+          line-height: 1.15 !important;
+          padding: .7rem .55rem !important;
+          font-size: .84rem !important;
+        }
+
+        .topbar {
+          display: grid !important;
+          grid-template-columns: 1fr !important;
+          gap: .75rem !important;
+        }
+
+        .toolbar {
+          width: 100% !important;
+          max-width: 100% !important;
+          display: grid !important;
+          grid-template-columns: 1fr !important;
+          gap: .65rem !important;
+        }
+
+        .toolbar select,
+        .toolbar button,
+        .toolbar label {
+          width: 100% !important;
+          max-width: 100% !important;
+        }
+
+        main {
+          width: 100% !important;
+          max-width: 100% !important;
+          overflow-x: hidden !important;
+        }
+      }
+
+
+      /* v15 mobile optimized app navigation and cards */
+      .mobile-bottom-nav,
+      .mobile-tools-panel {
+        display: none;
+      }
+
+      @media (max-width: 760px) {
+        body {
+          padding-bottom: 88px !important;
+        }
+
+        /* Keep the desktop/sidebar nav available but less dominant */
+        aside #nav {
+          display: none !important;
+        }
+
+        .mobile-bottom-nav {
+          position: fixed;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          z-index: 9999;
+          display: grid;
+          grid-template-columns: repeat(5, 1fr);
+          gap: .25rem;
+          padding: .45rem .5rem calc(.45rem + env(safe-area-inset-bottom));
+          background: rgba(255, 253, 249, .96);
+          border-top: 1px solid var(--line);
+          box-shadow: 0 -12px 30px rgba(49, 39, 25, .12);
+          backdrop-filter: blur(12px);
+        }
+
+        .mobile-bottom-nav button {
+          width: 100% !important;
+          border: 0;
+          border-radius: 14px;
+          background: transparent;
+          color: var(--muted);
+          padding: .45rem .2rem !important;
+          font-size: .72rem !important;
+          line-height: 1.1;
+          font-weight: 850;
+          display: grid;
+          place-items: center;
+          gap: .15rem;
+          min-height: 48px;
+        }
+
+        .mobile-bottom-nav button.active {
+          background: rgba(47, 111, 78, .12);
+          color: var(--green);
+        }
+
+        .mobile-bottom-nav .icon {
+          font-size: 1.1rem;
+          line-height: 1;
+        }
+
+        .mobile-tools-panel {
+          display: none;
+          position: fixed;
+          left: .75rem;
+          right: .75rem;
+          bottom: calc(78px + env(safe-area-inset-bottom));
+          z-index: 10000;
+          background: var(--card);
+          border: 1px solid var(--line);
+          border-radius: 18px;
+          box-shadow: 0 18px 60px rgba(49, 39, 25, .22);
+          padding: .9rem;
+        }
+
+        body.mobile-tools-open .mobile-tools-panel {
+          display: block;
+        }
+
+        .mobile-tools-panel h3 {
+          margin: 0 0 .65rem;
+          font-size: 1rem;
+        }
+
+        .mobile-tools-grid {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: .55rem;
+        }
+
+        .mobile-tools-grid button,
+        .mobile-tools-grid label {
+          min-height: 48px;
+          width: 100% !important;
+          display: inline-flex !important;
+          align-items: center;
+          justify-content: center;
+          text-align: center;
+          padding: .65rem .5rem !important;
+          border-radius: 12px !important;
+          font-size: .84rem !important;
+        }
+
+        .mobile-tools-close {
+          margin-top: .65rem;
+          width: 100% !important;
+        }
+
+        /* More useful topbar on phone */
+        .topbar {
+          position: sticky;
+          top: 0;
+          z-index: 20;
+          background: rgba(247, 244, 238, .97);
+          backdrop-filter: blur(10px);
+          border-bottom: 1px solid var(--line);
+          margin: -.75rem -.75rem .75rem !important;
+          padding: .75rem !important;
+        }
+
+        .toolbar {
+          display: grid !important;
+          grid-template-columns: 1fr !important;
+          gap: .55rem !important;
+        }
+
+        /* Daily/admin buttons live in More on phone */
+        #copyMonthBtn,
+        #deleteMonthBtn,
+        #exportBtn,
+        #importBackupLabel,
+        #logoutBtn {
+          display: none !important;
+        }
+
+        /* Better touch targets */
+        input[type="checkbox"] {
+          width: 24px !important;
+          height: 24px !important;
+        }
+
+        select,
+        input,
+        textarea,
+        button {
+          min-height: 44px;
+        }
+
+        /* Mobile card view: keep tables for desktop but add app-friendly row cards */
+        .mobile-card-list {
+          display: grid;
+          gap: .75rem;
+          margin-top: .75rem;
+        }
+
+        .mobile-row-card {
+          background: var(--card);
+          border: 1px solid var(--line);
+          border-radius: 16px;
+          padding: .85rem;
+          box-shadow: 0 10px 28px rgba(49, 39, 25, .06);
+        }
+
+        .mobile-row-card .row-top {
+          display: flex;
+          justify-content: space-between;
+          gap: .75rem;
+          align-items: flex-start;
+        }
+
+        .mobile-row-card .row-title {
+          font-weight: 950;
+          color: var(--ink);
+          min-width: 0;
+          word-break: break-word;
+        }
+
+        .mobile-row-card .row-money {
+          font-weight: 950;
+          white-space: nowrap;
+        }
+
+        .mobile-row-card .row-meta {
+          margin-top: .45rem;
+          display: flex;
+          flex-wrap: wrap;
+          gap: .4rem;
+          color: var(--muted);
+          font-size: .82rem;
+        }
+
+        .mobile-row-card .row-actions {
+          margin-top: .65rem;
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: .5rem;
+          align-items: center;
+        }
+
+        .mobile-row-card .row-actions select,
+        .mobile-row-card .row-actions button,
+        .mobile-row-card .row-actions label {
+          width: 100% !important;
+        }
+
+        .mobile-only-cards {
+          display: block;
+        }
+
+        .desktop-table-on-mobile {
+          display: none !important;
+        }
+
+        .filter-collapse {
+          border: 1px solid var(--line);
+          border-radius: 14px;
+          padding: .65rem;
+          background: rgba(255,255,255,.45);
+        }
+
+        .filter-collapse summary {
+          cursor: pointer;
+          font-weight: 900;
+          color: var(--ink);
+        }
+
+        .filter-collapse .form-grid {
+          margin-top: .75rem;
+        }
+      }
+
+      @media (min-width: 761px) {
+        .mobile-only-cards {
+          display: none !important;
+        }
+      }
+
 </style>
   
   <link rel="manifest" href="/manifest.webmanifest">
@@ -580,7 +888,7 @@
           <div class="mark">FN</div>
           <div>
             <h1>FamilyNest</h1>
-            <p>Personal budget command center <span style="font-size:.72rem; opacity:.7;">v12 mobile</span></p>
+            <p>Personal budget command center <span style="font-size:.72rem; opacity:.7;">v15 mobile optimized</span></p>
           </div>
         </div>
         <nav id="nav"></nav>
@@ -604,7 +912,7 @@
             <button id="copyMonthBtn" type="button">Create Month</button>
             <button id="deleteMonthBtn" class="ghost" type="button">Revert / Delete Month</button>
             <button id="exportBtn" class="secondary" type="button">Export Backup</button>
-            <label class="ghost" style="display:inline-flex;align-items:center;gap:.45rem;width:auto;min-height:auto;padding:.6rem .8rem;border-radius:8px;border:1px solid var(--line);color:var(--ink);background:transparent;cursor:pointer">
+            <label id="importBackupLabel" class="ghost" style="display:inline-flex;align-items:center;gap:.45rem;width:auto;min-height:auto;padding:.6rem .8rem;border-radius:8px;border:1px solid var(--line);color:var(--ink);background:transparent;cursor:pointer">
               Import Backup
               <input id="importBackup" type="file" accept="application/json" class="hidden">
             </label>
@@ -1148,6 +1456,7 @@
       }
 
       function renderShell() {
+        document.body.dataset.activeView = state.activeView;
         document.querySelector("#nav").innerHTML = navItems.map(([id, label]) =>
           `<button type="button" class="nav-btn ${state.activeView === id ? "active" : ""}" data-view="${id}">${label}</button>`
         ).join("");
@@ -3311,6 +3620,186 @@
       });
     }
   </script>
+
+
+  <script>
+    function familyNestMobileClick(selector) {
+      const el = document.querySelector(selector);
+      if (el) el.click();
+    }
+
+    function familyNestSetMobileView(view) {
+      document.body.classList.remove("mobile-tools-open");
+      const btn = document.querySelector(`#nav [data-view="${view}"], #nav button[data-view="${view}"], [data-view="${view}"]`);
+      if (btn) {
+        btn.click();
+        setTimeout(familyNestSyncMobileNav, 150);
+      }
+    }
+
+    function familyNestSyncMobileNav() {
+      const active = document.body.dataset.activeView || "";
+      document.querySelectorAll(".mobile-bottom-nav [data-mobile-view]").forEach(btn => {
+        btn.classList.toggle("active", btn.dataset.mobileView === active);
+      });
+    }
+
+    document.addEventListener("click", event => {
+      const viewBtn = event.target.closest("[data-mobile-view]");
+      if (viewBtn) {
+        familyNestSetMobileView(viewBtn.dataset.mobileView);
+        return;
+      }
+
+      if (event.target.closest("#mobileMoreBtn")) {
+        document.body.classList.toggle("mobile-tools-open");
+        familyNestSyncMobileNav();
+        return;
+      }
+
+      if (event.target.closest(".mobile-tools-close")) {
+        document.body.classList.remove("mobile-tools-open");
+        return;
+      }
+
+      const actionBtn = event.target.closest("[data-mobile-action]");
+      if (actionBtn) {
+        const action = actionBtn.dataset.mobileAction;
+        document.body.classList.remove("mobile-tools-open");
+        if (action === "copy-month") familyNestMobileClick("#copyMonthBtn");
+        if (action === "delete-month") familyNestMobileClick("#deleteMonthBtn");
+        if (action === "export") familyNestMobileClick("#exportBtn");
+        if (action === "logout") familyNestMobileClick("#logoutBtn");
+        if (action === "refresh") location.reload();
+      }
+    });
+
+    document.addEventListener("change", event => {
+      if (event.target && event.target.id === "mobileImportBackup") {
+        const original = document.querySelector("#importBackup");
+        if (original && event.target.files && event.target.files.length) {
+          const dt = new DataTransfer();
+          Array.from(event.target.files).forEach(file => dt.items.add(file));
+          original.files = dt.files;
+          original.dispatchEvent(new Event("change", { bubbles: true }));
+        }
+      }
+    });
+
+    const familyNestMobileObserver = new MutationObserver(() => familyNestSyncMobileNav());
+    familyNestMobileObserver.observe(document.body, { attributes: true, attributeFilter: ["data-active-view", "class"] });
+    window.addEventListener("load", familyNestSyncMobileNav);
+  </script>
+
+
+  <script>
+    function familyNestBuildMobileCards() {
+      if (window.innerWidth > 760) return;
+
+      document.querySelectorAll(".table-wrap").forEach((wrap, wrapIndex) => {
+        if (wrap.dataset.mobileCardsBuilt === "true") return;
+
+        const table = wrap.querySelector("table");
+        if (!table) return;
+
+        const headers = Array.from(table.querySelectorAll("thead th")).map(th => th.textContent.trim().replace(/\s+/g, " "));
+        const rows = Array.from(table.querySelectorAll("tbody tr"));
+        if (!headers.length || !rows.length) return;
+
+        wrap.classList.add("desktop-table-on-mobile");
+
+        const list = document.createElement("div");
+        list.className = "mobile-card-list mobile-only-cards";
+        list.dataset.generatedFromTable = String(wrapIndex);
+
+        rows.slice(0, 200).forEach(row => {
+          const cells = Array.from(row.children);
+          const values = cells.map(td => td.textContent.trim().replace(/\s+/g, " "));
+          const card = document.createElement("div");
+          card.className = "mobile-row-card";
+
+          const titleIndex = Math.max(0, headers.findIndex(h => /item|description|payee|merchant|name/i.test(h)));
+          const moneyIndex = Math.max(0, headers.findIndex(h => /amount|money|kept|remaining|paid|gross/i.test(h)));
+          const title = values[titleIndex] || values[0] || "Item";
+          const money = moneyIndex >= 0 ? values[moneyIndex] : "";
+
+          const top = document.createElement("div");
+          top.className = "row-top";
+          top.innerHTML = `<div class="row-title"></div><div class="row-money"></div>`;
+          top.querySelector(".row-title").textContent = title;
+          top.querySelector(".row-money").textContent = money;
+
+          const meta = document.createElement("div");
+          meta.className = "row-meta";
+          headers.forEach((h, idx) => {
+            if (idx === titleIndex || idx === moneyIndex) return;
+            const v = values[idx];
+            if (!v) return;
+            const pill = document.createElement("span");
+            pill.className = "pill";
+            pill.textContent = `${h}: ${v}`;
+            meta.appendChild(pill);
+          });
+
+          const actions = document.createElement("div");
+          actions.className = "row-actions";
+          cells.forEach((td, idx) => {
+            if (td.querySelector("input, select, button, label")) {
+              const clone = td.cloneNode(true);
+              actions.appendChild(clone);
+            }
+          });
+
+          card.appendChild(top);
+          if (meta.children.length) card.appendChild(meta);
+          if (actions.children.length) card.appendChild(actions);
+          list.appendChild(card);
+        });
+
+        wrap.insertAdjacentElement("afterend", list);
+        wrap.dataset.mobileCardsBuilt = "true";
+      });
+    }
+
+    const familyNestCardsObserver = new MutationObserver(() => {
+      clearTimeout(window.__familyNestCardsTimer);
+      window.__familyNestCardsTimer = setTimeout(familyNestBuildMobileCards, 150);
+    });
+    familyNestCardsObserver.observe(document.body, { childList: true, subtree: true });
+    window.addEventListener("resize", () => setTimeout(familyNestBuildMobileCards, 150));
+    window.addEventListener("load", () => setTimeout(familyNestBuildMobileCards, 300));
+  </script>
+
+
+  <nav class="mobile-bottom-nav" aria-label="Mobile navigation">
+    <button type="button" data-mobile-view="dashboard"><span class="icon">🏠</span><span>Home</span></button>
+    <button type="button" data-mobile-view="cashguard"><span class="icon">🛡️</span><span>Keep</span></button>
+    <button type="button" data-mobile-view="budget"><span class="icon">📋</span><span>Plan</span></button>
+    <button type="button" data-mobile-view="transactions"><span class="icon">⇄</span><span>CSV</span></button>
+    <button type="button" id="mobileMoreBtn"><span class="icon">⋯</span><span>More</span></button>
+  </nav>
+
+  <section class="mobile-tools-panel" aria-label="More tools">
+    <h3>More tools</h3>
+    <div class="mobile-tools-grid">
+      <button type="button" data-mobile-view="template">Template</button>
+      <button type="button" data-mobile-view="personal">Personal</button>
+      <button type="button" data-mobile-view="debts">Debt</button>
+      <button type="button" data-mobile-view="income">Income</button>
+      <button type="button" data-mobile-view="compare">Compare</button>
+      <button type="button" data-mobile-view="closeout">Closeout</button>
+      <button type="button" data-mobile-action="copy-month">Create Month</button>
+      <button type="button" data-mobile-action="delete-month">Delete Month</button>
+      <button type="button" data-mobile-action="export">Export Backup</button>
+      <label class="secondary" style="cursor:pointer">
+        Import Backup
+        <input id="mobileImportBackup" type="file" accept=".json,application/json" hidden>
+      </label>
+      <button type="button" data-mobile-action="logout">Log out</button>
+      <button type="button" data-mobile-action="refresh">Refresh</button>
+    </div>
+    <button type="button" class="secondary mobile-tools-close">Close</button>
+  </section>
 
 </body>
 </html>

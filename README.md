@@ -1,10 +1,10 @@
-# FamilyNest PWA v17 verified safe
+# FamilyNest PWA v19 mobile redesign
 
 Upload all files to GitHub root.
 
-This version is intentionally conservative:
-- Keeps the normal menu visible
-- Keeps Create Month / Delete Month / Export / Import / Log out available
-- Does not add the experimental bottom nav
-- Keeps all PWA files
-- Only improves mobile spacing, touch targets, and table scrolling
+Mobile design:
+- Bottom tabs for Home, Keep, Plan, CSV, More
+- More drawer includes the remaining screens and admin tools
+- Tables become labeled cards on phone
+- Desktop keeps the normal navigation
+- Uses the real FamilyNest app logic and Supabase storage

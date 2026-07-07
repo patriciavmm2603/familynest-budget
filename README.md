@@ -1,18 +1,11 @@
-# FamilyNest v30 rebuild
+# FamilyNest v31 single-file recovery
 
-This rebuild splits the app into separate files:
+Upload these files to GitHub root:
 
 - index.html
-- src/styles.css
-- src/mobile.css
-- src/app.js
-- src/mobile.js
 - manifest.webmanifest
-- icons/
 - service-worker.js
+- icons folder
 
-Important:
-- The service worker is intentionally NOT registered yet to avoid the blank-page cache issue.
-- Upload the whole folder contents to GitHub root.
-- After Vercel redeploys, test with:
-  https://familynest-budget.vercel.app?v=30
+This version does NOT need a src folder. CSS and JS are inside index.html so the app will not load as plain unstyled HTML.
+Service worker is intentionally not registered to avoid phone cache blank pages.

@@ -364,7 +364,7 @@
       }
 
 
-      /* v18 real mobile app layout fix */
+      /* v35 v18 mobile polish app layout fix */
       html, body {
         max-width: 100%;
         overflow-x: hidden;
@@ -603,7 +603,7 @@
       }
 
 
-      /* v18 real mobile mobile cleanup: hide nothing, only improve layout */
+      /* v35 v18 mobile polish mobile cleanup: hide nothing, only improve layout */
       @media (max-width: 760px) {
         body {
           overflow-x: hidden !important;
@@ -697,7 +697,7 @@
       }
 
 
-      /* v18 real mobile layout */
+      /* v35 v18 mobile polish layout */
       .mobile-app-bar {
         display: none;
       }
@@ -843,6 +843,222 @@
         }
       }
 
+
+      /* v35 final mobile polish from v18 baseline */
+      @media (max-width: 760px) {
+        html,
+        body {
+          max-width: 100%;
+          overflow-x: hidden !important;
+        }
+
+        body {
+          padding-bottom: 0 !important;
+        }
+
+        .app {
+          width: 100% !important;
+          max-width: 100% !important;
+          overflow-x: hidden !important;
+        }
+
+        main {
+          padding: .75rem !important;
+          width: 100% !important;
+          max-width: 100% !important;
+          overflow-x: hidden !important;
+        }
+
+        .mobile-app-bar {
+          display: grid !important;
+          position: sticky !important;
+          top: 0 !important;
+          z-index: 1000 !important;
+          gap: .55rem !important;
+          margin: -.75rem -.75rem .75rem !important;
+          padding: .65rem .75rem !important;
+          background: rgba(247, 244, 238, .96) !important;
+          border-bottom: 1px solid var(--line) !important;
+          backdrop-filter: blur(14px);
+        }
+
+        .mobile-app-row {
+          display: grid !important;
+          grid-template-columns: minmax(0, 1fr) auto !important;
+          gap: .5rem !important;
+          align-items: center !important;
+        }
+
+        .mobile-screen-select,
+        .mobile-tools-button {
+          min-height: 44px !important;
+          border-radius: 12px !important;
+          font-size: 16px !important;
+          font-weight: 850 !important;
+        }
+
+        .mobile-screen-select {
+          width: 100% !important;
+          background: var(--card) !important;
+          color: var(--ink) !important;
+          border: 1px solid var(--line) !important;
+          padding: .65rem .75rem !important;
+        }
+
+        .mobile-tools-button {
+          padding: .65rem .85rem !important;
+          white-space: nowrap !important;
+        }
+
+        .mobile-tools-drawer {
+          display: none !important;
+          grid-template-columns: 1fr 1fr !important;
+          gap: .5rem !important;
+          padding-top: .1rem !important;
+        }
+
+        body.mobile-tools-open .mobile-tools-drawer {
+          display: grid !important;
+        }
+
+        .mobile-tools-drawer button,
+        .mobile-tools-drawer label {
+          width: 100% !important;
+          min-height: 44px !important;
+          border-radius: 12px !important;
+          display: inline-flex !important;
+          align-items: center !important;
+          justify-content: center !important;
+          text-align: center !important;
+          padding: .6rem .45rem !important;
+          font-size: .84rem !important;
+          line-height: 1.1 !important;
+        }
+
+        aside,
+        aside #nav,
+        #nav {
+          display: none !important;
+        }
+
+        #copyMonthBtn,
+        #deleteMonthBtn,
+        #exportBtn,
+        #importBackupLabel,
+        #logoutBtn {
+          display: none !important;
+        }
+
+        .topbar {
+          display: grid !important;
+          grid-template-columns: 1fr !important;
+          gap: .65rem !important;
+          margin: 0 0 .75rem !important;
+          padding: 0 !important;
+          background: transparent !important;
+          border: 0 !important;
+          position: static !important;
+        }
+
+        .topbar h2,
+        h2 {
+          font-size: 1.25rem !important;
+          line-height: 1.15 !important;
+          margin-top: 0 !important;
+        }
+
+        .toolbar {
+          display: grid !important;
+          grid-template-columns: 1fr !important;
+          gap: .55rem !important;
+          width: 100% !important;
+          max-width: 100% !important;
+        }
+
+        .toolbar select,
+        .toolbar button,
+        .toolbar label {
+          width: 100% !important;
+          max-width: 100% !important;
+        }
+
+        .cards,
+        .summary-grid,
+        .dashboard-grid,
+        .stat-grid,
+        .metric-grid,
+        .form-grid {
+          display: grid !important;
+          grid-template-columns: 1fr !important;
+          gap: .75rem !important;
+          width: 100% !important;
+          max-width: 100% !important;
+        }
+
+        .card,
+        .panel,
+        section,
+        .section {
+          width: 100% !important;
+          max-width: 100% !important;
+          border-radius: 14px !important;
+        }
+
+        input,
+        select,
+        textarea,
+        button {
+          min-height: 44px !important;
+          font-size: 16px !important;
+        }
+
+        input[type="checkbox"] {
+          width: 24px !important;
+          height: 24px !important;
+        }
+
+        /* v35 keeps tables scrollable. No card converter. */
+        .table-wrap {
+          width: 100% !important;
+          max-width: 100% !important;
+          overflow-x: auto !important;
+          -webkit-overflow-scrolling: touch !important;
+          border-radius: 12px !important;
+        }
+
+        table {
+          min-width: 720px !important;
+        }
+
+        #cashguard table,
+        #transactions table,
+        #budget table {
+          min-width: 860px !important;
+        }
+
+        th,
+        td {
+          padding: .58rem .55rem !important;
+          font-size: .82rem !important;
+          line-height: 1.2 !important;
+        }
+
+        th {
+          position: sticky;
+          top: 0;
+          z-index: 1;
+        }
+
+        #authScreen {
+          padding: 1rem !important;
+        }
+
+        #authScreen h1 {
+          font-size: 2rem !important;
+          line-height: 1.05 !important;
+        }
+      }
+
 </style>
   
   <link rel="manifest" href="/manifest.webmanifest">
@@ -908,7 +1124,7 @@
           <div class="mark">FN</div>
           <div>
             <h1>FamilyNest</h1>
-            <p>Personal budget command center <span style="font-size:.72rem; opacity:.7;">v18 real mobile</span></p>
+            <p>Personal budget command center <span style="font-size:.72rem; opacity:.7;">v35 v18 mobile polish</span></p>
           </div>
         </div>
         <nav id="nav"></nav>
@@ -3630,19 +3846,7 @@
       document.querySelector("#authPassword").addEventListener("keydown", event => { if (event.key === "Enter") loginToSharedApp(); });
       startApp();
     </script>
-  
-  <script>
-    if ("serviceWorker" in navigator) {
-      window.addEventListener("load", () => {
-        navigator.serviceWorker.register("/service-worker.js").catch(error => {
-          console.warn("FamilyNest service worker registration failed:", error);
-        });
-      });
-    }
-  </script>
-
-
-  <script>
+<script>
     (function () {
       function clickExisting(selector) {
         const el = document.querySelector(selector);

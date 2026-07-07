@@ -1,9 +1,11 @@
-# FamilyNest PWA v18 real mobile
+# FamilyNest v35 v18 mobile polish
 
-Upload all files to GitHub root.
+Starts from v18 because that was the most decent version.
 
-Mobile changes:
-- Compact Screen dropdown replaces the huge menu on phones
-- Tools drawer holds Create Month, Delete Month, Export, Import, Log out, Refresh
-- Desktop view keeps the normal menu
-- Functionality is not removed. Mobile controls trigger the same existing app buttons.
+Focused changes only:
+- Keeps real v18 app logic
+- Keeps Screen + Tools mobile navigation
+- Makes mobile spacing/header/tools cleaner
+- Keeps tables scrollable instead of converting them to cards
+- Disables service worker registration while testing
+- Avoids the risky rebuild/mobile observer that froze v32

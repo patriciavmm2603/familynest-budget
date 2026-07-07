@@ -1,4 +1,4 @@
-const CACHE_NAME = "familynest-pwa-v19";
+const CACHE_NAME = "familynest-pwa-v20-phone-cache-fix";
 const APP_SHELL = [
   "/",
   "/index.html",
@@ -10,36 +10,52 @@ const APP_SHELL = [
 self.addEventListener("install", event => {
   self.skipWaiting();
   event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => cache.addAll(APP_SHELL))
+    caches.open(CACHE_NAME).then(cache => cache.addAll(APP_SHELL)).catch(() => null)
   );
 });
 
 self.addEventListener("activate", event => {
   event.waitUntil(
-    caches.keys().then(keys =>
-      Promise.all(keys.filter(key => key !== CACHE_NAME).map(key => caches.delete(key)))
-    ).then(() => self.clients.claim())
+    caches.keys()
+      .then(keys => Promise.all(keys.filter(key => key !== CACHE_NAME).map(key => caches.delete(key))))
+      .then(() => self.clients.claim())
   );
 });
 
 self.addEventListener("fetch", event => {
   const request = event.request;
-
   if (request.method !== "GET") return;
 
-  // Do not cache Supabase API/auth calls. Always use the network for shared data.
-  if (request.url.includes("supabase.co")) {
+  const url = new URL(request.url);
+
+  // Never cache Supabase/Auth/API calls.
+  if (url.hostname.includes("supabase.co")) {
     event.respondWith(fetch(request));
     return;
   }
 
+  // For navigation/page loads, always try network first so phones do not get stuck on an old app.
+  if (request.mode === "navigate" || request.destination === "document") {
+    event.respondWith(
+      fetch(request, { cache: "no-store" })
+        .then(response => {
+          const copy = response.clone();
+          caches.open(CACHE_NAME).then(cache => cache.put("/index.html", copy)).catch(() => null);
+          return response;
+        })
+        .catch(() => caches.match("/index.html").then(cached => cached || caches.match("/")))
+    );
+    return;
+  }
+
+  // For icons/manifest/static files: network first, cache fallback.
   event.respondWith(
     fetch(request)
       .then(response => {
         const copy = response.clone();
-        caches.open(CACHE_NAME).then(cache => cache.put(request, copy));
+        caches.open(CACHE_NAME).then(cache => cache.put(request, copy)).catch(() => null);
         return response;
       })
-      .catch(() => caches.match(request).then(cached => cached || caches.match("/index.html")))
+      .catch(() => caches.match(request))
   );
 });

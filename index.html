@@ -364,7 +364,7 @@
       }
 
 
-      /* v36 csv simplified sort app layout fix */
+      /* v37 personal money fix app layout fix */
       html, body {
         max-width: 100%;
         overflow-x: hidden;
@@ -603,7 +603,7 @@
       }
 
 
-      /* v36 csv simplified sort mobile cleanup: hide nothing, only improve layout */
+      /* v37 personal money fix mobile cleanup: hide nothing, only improve layout */
       @media (max-width: 760px) {
         body {
           overflow-x: hidden !important;
@@ -697,7 +697,7 @@
       }
 
 
-      /* v36 csv simplified sort layout */
+      /* v37 personal money fix layout */
       .mobile-app-bar {
         display: none;
       }
@@ -1137,8 +1137,8 @@
         <option value="template">Base Template</option>
         <option value="budget">Monthly Plan</option>
         <option value="transactions">CSV Review</option>
-        <option value="personal">Personal Money</option>
-        <option value="debts">Debt Tracker</option>
+        <option value="allowance">Personal Money</option>
+        <option value="debt">Debt Tracker</option>
         <option value="income">Income</option>
         <option value="compare">Compare Months</option>
         <option value="closeout">Closeout</option>
@@ -1182,7 +1182,7 @@
           <div class="mark">FN</div>
           <div>
             <h1>FamilyNest</h1>
-            <p>Personal budget command center <span style="font-size:.72rem; opacity:.7;">v36 csv simplified sort</span></p>
+            <p>Personal budget command center <span style="font-size:.72rem; opacity:.7;">v37 personal money fix</span></p>
           </div>
         </div>
         <nav id="nav"></nav>
@@ -3042,7 +3042,19 @@
         }));
       }
 
-      function isPersonalTransaction(txn) { return txn.reconciled && Number(txn.amount||0) < 0 && (txn.category === "Personal" || txn.asset === "Personal"); }
+      function isPersonalTransaction(txn) {
+        const category = String(txn.category || "").trim();
+        const asset = String(txn.asset || "").trim();
+        const hasAssignedBill = Boolean(txn.billId);
+
+        // Personal Money should only count transactions intentionally marked as Personal.
+        // A normal bill/subscription can have owner = Alec/Patricia or asset = Personal,
+        // but if it is assigned to a bill or categorized as something else, it is not allowance spending.
+        return Boolean(txn.reconciled)
+          && Number(txn.amount || 0) < 0
+          && category === "Personal"
+          && !hasAssignedBill;
+      }
       function personalUsedByOwner(month, owner) { return Math.abs(sum(month.transactions.filter(t => isPersonalTransaction(t) && t.owner === owner), t => t.amount)); }
       function actualPersonalSpending(month) { return Math.abs(sum(month.transactions.filter(isPersonalTransaction), t => t.amount)); }
 

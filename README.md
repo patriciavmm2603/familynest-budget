@@ -1,14 +1,10 @@
-# FamilyNest v36 CSV simplified sort
+# FamilyNest v37 personal money fix
 
-Based on v35/v18 baseline.
+Based on v36 / v18 baseline.
 
-CSV Review changes:
-- Hides crowded search/filter controls
-- Keeps Choose a bill / Bulk bill
-- Keeps Apply To Selected
-- Keeps transaction selection checkboxes
-- Adds clickable table header sorting for Date, Description, Bill, Category, Owner, Amount, Status
-- Keeps tables scrollable
-- Does not touch Supabase/shared storage logic
-- Does not add table-card conversion
-- Service worker remains disabled while testing
+Fix:
+- Personal Money now only counts transactions intentionally categorized as Personal.
+- Normal bills/subscriptions assigned to Alec or Patricia no longer show in Personal Money.
+- Assigned bill transactions are excluded from Personal Money even if their asset is Personal.
+- CSV Review simplified/sort from v36 is kept.
+- Service worker remains disabled while testing.

@@ -4,6 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Kingdom Builder</title>
+  <!-- v44 actual income rollup -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
     <style>
       :root {
@@ -1864,6 +1865,48 @@
         const rows = sideHustleMonthlyRollup(year).filter(row => row.monthNum <= throughMonth);
         return { year, throughMonth, gross: sum(rows, r => r.gross), setAside: sum(rows, r => r.setAside), net: sum(rows, r => r.net), count: sum(rows, r => r.count), rows };
       }
+      function isActualStatementIncome(txn) {
+        return Boolean(txn && txn.reconciled)
+          && Number(txn.amount || 0) > 0
+          && String(txn.category || "").trim() === "Income"
+          && !isPaypalSideGig(txn);
+      }
+      function actualStatementIncomeRows(month = currentMonth()) {
+        return (month.transactions || []).filter(isActualStatementIncome);
+      }
+      function actualStatementIncomeTotal(month = currentMonth()) {
+        return sum(actualStatementIncomeRows(month), txn => Number(txn.amount || 0));
+      }
+      function actualStatementIncomeByOwner(month = currentMonth()) {
+        const out = {};
+        actualStatementIncomeRows(month).forEach(txn => {
+          const owner = txn.owner || "Unassigned";
+          out[owner] = (out[owner] || 0) + Number(txn.amount || 0);
+        });
+        return out;
+      }
+      function actualIncomeMetricCard(total, rows) {
+        const byOwner = actualStatementIncomeByOwner();
+        const ownerText = Object.entries(byOwner)
+          .sort((a, b) => b[1] - a[1])
+          .map(([owner, value]) => `${escapeHtml(owner)} ${money.format(value)}`)
+          .join(" · ");
+        const lineText = rows.length
+          ? `${rows.length} reconciled statement income line${rows.length === 1 ? "" : "s"}${ownerText ? " · " + ownerText : ""}.`
+          : "No reconciled statement income lines yet.";
+        return `<div class="card metric">
+          <div class="label">Actual income from statements</div>
+          <div class="value green">${money.format(total || 0)}</div>
+          <div class="hint">${lineText} Excludes PayPal side hustles.</div>
+          <button type="button" class="secondary" data-jump="income" style="margin-top:.75rem">Open Income</button>
+        </div>`;
+      }
+      function actualIncomeRowsTable(rows) {
+        if (!rows.length) return `<div class="empty">No reconciled statement income yet. In CSV Review, categorize bank deposits as Income to show them here.</div>`;
+        return `<div class="table-wrap"><table><thead><tr><th>Date</th><th>Description</th><th>Owner</th><th>Account</th><th class="money">Amount</th></tr></thead><tbody>
+          ${rows.map(txn => `<tr><td>${escapeHtml(txn.date)}</td><td><strong>${escapeHtml(txn.description || "")}</strong></td><td>${ownerPill(txn.owner || "Unassigned")}</td><td>${escapeHtml(txn.account || "")}</td><td class="money" style="color:var(--green)">${money.format(txn.amount || 0)}</td></tr>`).join("")}
+        </tbody></table></div>`;
+      }
       function contributionReceived(month = currentMonth()) { return sum(month.contributions || [], row => row.received); }
       function unreconciledCount(month = currentMonth()) { return month.transactions.filter(t => !t.reconciled || !t.category || !t.owner || t.category === "Uncategorized").length; }
       function monthOptions() { return Object.keys(state.months).sort(); }
@@ -1972,6 +2015,8 @@
         const sideHustleSetAside = paypalSideGigSetAside(month);
         const sideHustleNet = paypalSideGigNet(month);
         const sideHustleYtd = paypalSideHustleYtdTotals();
+        const actualIncomeRows = actualStatementIncomeRows(month);
+        const actualIncomeTotal = actualStatementIncomeTotal(month);
         const incomeForView = reliable + confirmedExtra;
         const available = incomeForView - totalPlanned;
         const safeLeftAfterPlan = incomeForView - totalPaidOrSpent - stillPlanned;
@@ -1999,7 +2044,8 @@
 
           `<div class="section-title" style="margin:.25rem 0 .15rem"><h3>Money coming in</h3><span>Only reliable + active quarterly money is used for planning</span></div>
           <div class="cards">
-            ${metric("Reliable income", reliable, ownerFilter === "Everyone" ? "Regular income + active quarterly money." : "Regular + active quarterly money for " + ownerFilter + ".")}
+            ${metric("Reliable income", reliable, ownerFilter === "Everyone" ? "Planned regular income + active quarterly money." : "Planned regular + active quarterly money for " + ownerFilter + ".")}
+            ${actualIncomeMetricCard(actualIncomeTotal, actualIncomeRows)}
             ${quarterlyMoneyMetricCard(activeQuarterTotal, quarterMonthActive, activeQuarterRows.length)}
             ${sideHustleMetricCard(sideHustleGross, sideHustleSetAside, sideHustleNet, paypalSideGigRows(month).length, sideHustleYtd)}
           </div>
@@ -3419,10 +3465,13 @@
         const paypalSetAside = paypalSideGigSetAside(month);
         const paypalNet = paypalSideGigNet(month);
         const paypalYtd = paypalSideHustleYtdTotals();
+        const actualIncomeRows = actualStatementIncomeRows(month);
+        const actualIncomeTotal = actualStatementIncomeTotal(month);
 
         document.querySelector("#income").innerHTML = [
           `<div class="cards">
-            ${metric("Total reliable income", total, "Regular + quarter money for this month")}
+            ${metric("Total reliable income", total, "Planned regular + quarter money for this month")}
+            ${metric("Actual income from statements", actualIncomeTotal, actualIncomeRows.length + " reconciled Income line" + (actualIncomeRows.length === 1 ? "" : "s") + ". Excludes PayPal side hustles.", "green")}
             ${metric("Quarterly money", quarterTotal, isQuarterlyIncomeMonth() ? "Active for this month." : "Only active in Jan, Apr, Jul, Oct.")}
             ${metric("Patricia", patriciaMonthly, "Patricia total")}
             ${metric("Alec", sum(regularIncomeRows().filter(r => r.owner === "Alec"), r => r.monthly) + sum(quarterRows.filter(r => r.owner === "Alec"), r => r.amount), "Alec total")}
@@ -3440,6 +3489,11 @@
             <h3>Income vs planned bills</h3>
             <div class="legend" id="incLegend"></div>
             <div style="position:relative;width:100%;height:200px"><canvas id="incomeBarChart" role="img" aria-label="Bar chart comparing income to planned bills">Income versus planned spending comparison.</canvas></div>
+          </div>`,
+
+          `<div class="card">
+            <div class="section-title"><h3>Actual income from statements</h3><span>Reconciled CSV deposits categorized as Income, excluding PayPal side hustles</span></div>
+            ${actualIncomeRowsTable(actualIncomeRows)}
           </div>`,
 
           `<div class="split">

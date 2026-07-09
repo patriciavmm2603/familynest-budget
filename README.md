@@ -1,13 +1,16 @@
-# Kingdom Builder v43 header wordmark fix
+# Kingdom Builder v44 actual income rollup
 
-Based on v42/v41.
+Based on v43.
 
-Fix:
-- Applies the nicer Kingdom Builder wordmark to the actual visible app header.
-- Keeps header icon removed.
-- No app logic changes.
+Adds:
+- Dashboard card: Actual income from statements
+- Income tab card: Actual income from statements
+- Income tab audit table showing reconciled CSV deposits categorized as Income
+- Excludes PayPal side hustles from this actual income rollup
 
 Keeps:
+- Header wordmark styling
+- Header icon removed
 - Storage card removed
 - subtitle removed
 - Personal Money fix

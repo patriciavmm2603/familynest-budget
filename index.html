@@ -364,7 +364,7 @@
       }
 
 
-      /* v38 Kingdom Builder app layout fix */
+      /* v39 icon everywhere app layout fix */
       html, body {
         max-width: 100%;
         overflow-x: hidden;
@@ -603,7 +603,7 @@
       }
 
 
-      /* v38 Kingdom Builder mobile cleanup: hide nothing, only improve layout */
+      /* v39 icon everywhere mobile cleanup: hide nothing, only improve layout */
       @media (max-width: 760px) {
         body {
           overflow-x: hidden !important;
@@ -697,7 +697,7 @@
       }
 
 
-      /* v38 Kingdom Builder layout */
+      /* v39 icon everywhere layout */
       .mobile-app-bar {
         display: none;
       }
@@ -1118,7 +1118,7 @@
       }
 
 
-      /* v38 Kingdom Builder branding cleanup */
+      /* v39 icon everywhere branding cleanup */
       .brand p,
       #storageStatus,
       #storageHint {
@@ -1129,6 +1129,41 @@
         margin-bottom: 0 !important;
       }
 
+
+      /* v39 visible logo icon override */
+      .mark.logo-mark {
+        padding: 0 !important;
+        overflow: hidden !important;
+        background: transparent !important;
+        border: 0 !important;
+        box-shadow: none !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        width: 46px !important;
+        height: 46px !important;
+        border-radius: 12px !important;
+        flex: 0 0 auto !important;
+      }
+
+      .mark.logo-mark img {
+        width: 100% !important;
+        height: 100% !important;
+        object-fit: cover !important;
+        border-radius: 12px !important;
+        display: block !important;
+      }
+
+      .auth-card .mark.logo-mark {
+        width: 58px !important;
+        height: 58px !important;
+        border-radius: 14px !important;
+      }
+
+      .auth-card .mark.logo-mark img {
+        border-radius: 14px !important;
+      }
+
 </style>
   
   <link rel="manifest" href="/manifest.webmanifest">
@@ -1137,6 +1172,10 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="Kingdom Builder">
   <link rel="apple-touch-icon" href="/icons/icon-192.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
+  <link rel="icon" type="image/png" sizes="512x512" href="/icons/icon-512.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon.png">
+
 
 </head>
   <body>
@@ -1172,7 +1211,7 @@
 
     <div id="authScreen" class="auth-screen">
       <div class="auth-card">
-        <div class="mark">KB</div>
+        <div class="mark logo-mark"><img src="/icons/icon-192.png" alt="Kingdom Builder"></div>
         <h1>Kingdom Builder</h1>
         <p>Log in to use Kingdom Builder with all the original tools.</p>
         <label>Email
@@ -1191,7 +1230,7 @@
     <div class="app" style="display:none">
       <aside>
         <div class="brand">
-          <div class="mark">KB</div>
+          <div class="mark logo-mark"><img src="/icons/icon-192.png" alt="Kingdom Builder"></div>
           <div>
             <h1>Kingdom Builder</h1>
             

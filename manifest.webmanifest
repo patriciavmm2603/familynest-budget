@@ -1,7 +1,7 @@
 {
-  "name": "FamilyNest Budget",
-  "short_name": "FamilyNest",
-  "description": "Shared family budget and reconciliation app.",
+  "name": "Kingdom Builder",
+  "short_name": "Kingdom",
+  "description": "Faith-based shared budget and stewardship planner.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

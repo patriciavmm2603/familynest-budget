@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>FamilyNest Budget v7</title>
+    <title>Kingdom Builder</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
     <style>
       :root {
@@ -364,7 +364,7 @@
       }
 
 
-      /* v37 personal money fix app layout fix */
+      /* v38 Kingdom Builder app layout fix */
       html, body {
         max-width: 100%;
         overflow-x: hidden;
@@ -603,7 +603,7 @@
       }
 
 
-      /* v37 personal money fix mobile cleanup: hide nothing, only improve layout */
+      /* v38 Kingdom Builder mobile cleanup: hide nothing, only improve layout */
       @media (max-width: 760px) {
         body {
           overflow-x: hidden !important;
@@ -697,7 +697,7 @@
       }
 
 
-      /* v37 personal money fix layout */
+      /* v38 Kingdom Builder layout */
       .mobile-app-bar {
         display: none;
       }
@@ -1117,13 +1117,25 @@
         }
       }
 
+
+      /* v38 Kingdom Builder branding cleanup */
+      .brand p,
+      #storageStatus,
+      #storageHint {
+        display: none !important;
+      }
+
+      .brand h1 {
+        margin-bottom: 0 !important;
+      }
+
 </style>
   
   <link rel="manifest" href="/manifest.webmanifest">
   <meta name="theme-color" content="#2f6f4e">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <meta name="apple-mobile-web-app-title" content="FamilyNest">
+  <meta name="apple-mobile-web-app-title" content="Kingdom Builder">
   <link rel="apple-touch-icon" href="/icons/icon-192.png">
 
 </head>
@@ -1160,9 +1172,9 @@
 
     <div id="authScreen" class="auth-screen">
       <div class="auth-card">
-        <div class="mark">FN</div>
-        <h1>FamilyNest</h1>
-        <p>Log in to use the shared budget app with all the original tools.</p>
+        <div class="mark">KB</div>
+        <h1>Kingdom Builder</h1>
+        <p>Log in to use Kingdom Builder with all the original tools.</p>
         <label>Email
           <input id="authEmail" type="email" value="munoz.pat@outlook.com" autocomplete="email">
         </label>
@@ -1179,20 +1191,16 @@
     <div class="app" style="display:none">
       <aside>
         <div class="brand">
-          <div class="mark">FN</div>
+          <div class="mark">KB</div>
           <div>
-            <h1>FamilyNest</h1>
-            <p>Personal budget command center <span style="font-size:.72rem; opacity:.7;">v37 personal money fix</span></p>
+            <h1>Kingdom Builder</h1>
+            
           </div>
         </div>
         <nav id="nav"></nav>
         <div class="side-panel">
           <h3>Current month</h3>
           <p><strong id="sideMonth">June 2026</strong><br><span id="sideSummary">Loading budget...</span></p>
-        </div>
-        <div class="side-panel">
-          <h3>Storage</h3>
-          <p><strong id="storageStatus">Browser only</strong><br><span id="storageHint">Use Export Backup before clearing browser data.</span></p>
         </div>
       </aside>
       <main>
@@ -1449,7 +1457,7 @@
         const authScreen = document.querySelector("#authScreen");
         if (authScreen) authScreen.style.display = "none";
         if (shell) shell.style.display = "grid";
-        setStorageStatus("Loading shared app", "Getting FamilyNest from Supabase...");
+        setStorageStatus("Loading shared app", "Getting Kingdom Builder from Supabase...");
         await loadCloudState();
         render();
       }
@@ -1489,12 +1497,12 @@
           state = cloneSeedState();
           localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
           cloudReady = true;
-          setStorageStatus("Shared storage", "First shared save created from your FamilyNest backup.");
+          setStorageStatus("Shared storage", "First shared save created from your Kingdom Builder backup.");
           await saveCloudState();
         } catch (err) {
           cloudReady = false;
           setStorageStatus("Setup needed", "Run the app_state SQL in Supabase, then refresh. " + (err.message || err));
-          alert("FamilyNest shared storage could not load. Most likely the app_state table is missing. Run the SQL setup file in Supabase, then refresh.\n\n" + (err.message || err));
+          alert("Kingdom Builder shared storage could not load. Most likely the app_state table is missing. Run the SQL setup file in Supabase, then refresh.\n\n" + (err.message || err));
         }
       }
 
@@ -4194,7 +4202,7 @@
           simplifyCsvControls();
           addSortableHeaders();
         } catch (err) {
-          console.warn("FamilyNest v36 CSV simplifier skipped:", err);
+          console.warn("Kingdom Builder v36 CSV simplifier skipped:", err);
         }
       }
 

@@ -364,7 +364,7 @@
       }
 
 
-      /* v42 wordmark app layout fix */
+      /* v43 header wordmark fix app layout fix */
       html, body {
         max-width: 100%;
         overflow-x: hidden;
@@ -603,7 +603,7 @@
       }
 
 
-      /* v42 wordmark mobile cleanup: hide nothing, only improve layout */
+      /* v43 header wordmark fix mobile cleanup: hide nothing, only improve layout */
       @media (max-width: 760px) {
         body {
           overflow-x: hidden !important;
@@ -697,7 +697,7 @@
       }
 
 
-      /* v42 wordmark layout */
+      /* v43 header wordmark fix layout */
       .mobile-app-bar {
         display: none;
       }
@@ -1118,7 +1118,7 @@
       }
 
 
-      /* v42 wordmark branding cleanup */
+      /* v43 header wordmark fix branding cleanup */
       .brand p,
       #storageStatus,
       #storageHint {
@@ -1199,6 +1199,76 @@
         }
       }
 
+
+      /* v43 actual header wordmark fix */
+      .brand {
+        display: flex !important;
+        align-items: center !important;
+        gap: 0 !important;
+        min-width: max-content !important;
+      }
+
+      .kb-header-wordmark {
+        display: inline-flex !important;
+        align-items: baseline !important;
+        gap: .32rem !important;
+        margin: 0 !important;
+        white-space: nowrap !important;
+        line-height: 1 !important;
+        font-family: Georgia, "Times New Roman", ui-serif, serif !important;
+      }
+
+      .kb-kingdom {
+        font-size: 1.55rem !important;
+        font-weight: 900 !important;
+        color: #2f6f4e !important;
+        letter-spacing: -.045em !important;
+        text-shadow:
+          0 1px 0 rgba(255,255,255,.9),
+          0 2px 8px rgba(47,111,78,.14) !important;
+      }
+
+      .kb-builder {
+        font-size: .9rem !important;
+        font-weight: 900 !important;
+        color: #b7861f !important;
+        letter-spacing: .08em !important;
+        text-transform: uppercase !important;
+        text-shadow:
+          0 1px 0 rgba(255,255,255,.95),
+          0 2px 8px rgba(183,134,31,.16) !important;
+      }
+
+      .kb-header-wordmark::after {
+        content: "";
+        width: .42rem;
+        height: .42rem;
+        margin-left: .04rem;
+        border-radius: 999px;
+        background: linear-gradient(135deg, #d9b24c, #83aa65);
+        box-shadow: 0 1px 4px rgba(39,31,18,.16);
+        transform: translateY(-.06rem);
+      }
+
+      @media (max-width: 760px) {
+        .kb-header-wordmark {
+          gap: .22rem !important;
+        }
+
+        .kb-kingdom {
+          font-size: 1.25rem !important;
+        }
+
+        .kb-builder {
+          font-size: .72rem !important;
+          letter-spacing: .045em !important;
+        }
+
+        .kb-header-wordmark::after {
+          display: none !important;
+        }
+      }
+
 </style>
   
   <link rel="manifest" href="/manifest.webmanifest">
@@ -1246,7 +1316,7 @@
 
     <div id="authScreen" class="auth-screen">
       <div class="auth-card">
-        <h1 class="kb-wordmark" aria-label="Kingdom Builder"><span class="kb-word-kingdom">Kingdom</span><span class="kb-word-builder">Builder</span></h1>
+        <h1 class="kb-header-wordmark" aria-label="Kingdom Builder"><span class="kb-kingdom">Kingdom</span><span class="kb-builder">Builder</span></h1>
         <p>Log in to use Kingdom Builder with all the original tools.</p>
         <label>Email
           <input id="authEmail" type="email" value="munoz.pat@outlook.com" autocomplete="email">
@@ -1265,7 +1335,7 @@
       <aside>
         <div class="brand">
           <div>
-            <h1>Kingdom Builder</h1>
+            <h1 class="kb-header-wordmark" aria-label="Kingdom Builder"><span class="kb-kingdom">Kingdom</span><span class="kb-builder">Builder</span></h1>
             
           </div>
         </div>

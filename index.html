@@ -364,7 +364,7 @@
       }
 
 
-      /* v39 icon everywhere app layout fix */
+      /* v42 wordmark app layout fix */
       html, body {
         max-width: 100%;
         overflow-x: hidden;
@@ -603,7 +603,7 @@
       }
 
 
-      /* v39 icon everywhere mobile cleanup: hide nothing, only improve layout */
+      /* v42 wordmark mobile cleanup: hide nothing, only improve layout */
       @media (max-width: 760px) {
         body {
           overflow-x: hidden !important;
@@ -697,7 +697,7 @@
       }
 
 
-      /* v39 icon everywhere layout */
+      /* v42 wordmark layout */
       .mobile-app-bar {
         display: none;
       }
@@ -1118,7 +1118,7 @@
       }
 
 
-      /* v39 icon everywhere branding cleanup */
+      /* v42 wordmark branding cleanup */
       .brand p,
       #storageStatus,
       #storageHint {
@@ -1130,38 +1130,73 @@
       }
 
 
-      /* v39 visible logo icon override */
-      .mark.logo-mark {
-        padding: 0 !important;
-        overflow: hidden !important;
-        background: transparent !important;
-        border: 0 !important;
-        box-shadow: none !important;
-        display: inline-flex !important;
+
+
+      /* v42 Kingdom Builder wordmark */
+      .brand {
         align-items: center !important;
-        justify-content: center !important;
-        width: 46px !important;
-        height: 46px !important;
-        border-radius: 12px !important;
-        flex: 0 0 auto !important;
       }
 
-      .mark.logo-mark img {
-        width: 100% !important;
-        height: 100% !important;
-        object-fit: cover !important;
-        border-radius: 12px !important;
-        display: block !important;
+      .kb-wordmark {
+        display: inline-flex !important;
+        align-items: baseline !important;
+        gap: .38rem !important;
+        margin: 0 !important;
+        white-space: nowrap !important;
+        letter-spacing: -.035em !important;
+        line-height: 1 !important;
+        font-family: Georgia, "Times New Roman", ui-serif, serif !important;
       }
 
-      .auth-card .mark.logo-mark {
-        width: 58px !important;
-        height: 58px !important;
-        border-radius: 14px !important;
+      .kb-word-kingdom {
+        font-size: clamp(1.45rem, 2.1vw, 2rem) !important;
+        font-weight: 900 !important;
+        color: var(--green) !important;
+        text-shadow:
+          0 1px 0 rgba(255,255,255,.85),
+          0 2px 8px rgba(47,111,78,.12) !important;
       }
 
-      .auth-card .mark.logo-mark img {
-        border-radius: 14px !important;
+      .kb-word-builder {
+        font-size: clamp(1.02rem, 1.35vw, 1.35rem) !important;
+        font-weight: 800 !important;
+        letter-spacing: .06em !important;
+        text-transform: uppercase !important;
+        color: #b7861f !important;
+        text-shadow:
+          0 1px 0 rgba(255,255,255,.95),
+          0 2px 8px rgba(183,134,31,.16) !important;
+      }
+
+      .kb-wordmark::after {
+        content: "";
+        display: inline-block;
+        width: .48rem;
+        height: .48rem;
+        margin-left: .08rem;
+        border-radius: 999px;
+        background: linear-gradient(135deg, #d9b24c, #8fb36a);
+        box-shadow: 0 1px 4px rgba(39,31,18,.14);
+        transform: translateY(-.08rem);
+      }
+
+      @media (max-width: 760px) {
+        .kb-wordmark {
+          gap: .28rem !important;
+        }
+
+        .kb-word-kingdom {
+          font-size: 1.35rem !important;
+        }
+
+        .kb-word-builder {
+          font-size: .88rem !important;
+          letter-spacing: .045em !important;
+        }
+
+        .kb-wordmark::after {
+          display: none !important;
+        }
       }
 
 </style>
@@ -1171,10 +1206,10 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="Kingdom Builder">
-  <link rel="apple-touch-icon" href="/icons/icon-192.png">
-  <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
-  <link rel="icon" type="image/png" sizes="512x512" href="/icons/icon-512.png">
-  <link rel="icon" type="image/png" sizes="32x32" href="/favicon.png">
+  <link rel="apple-touch-icon" href="/icons/kingdom-builder-icon-192.png?v=40">
+  <link rel="icon" type="image/png" sizes="192x192" href="/icons/kingdom-builder-icon-192.png?v=40">
+  <link rel="icon" type="image/png" sizes="512x512" href="/icons/kingdom-builder-icon-512.png?v=40">
+  <link rel="icon" type="image/png" sizes="32x32" href="/kingdom-builder-favicon.png?v=40">
 
 
 </head>
@@ -1211,8 +1246,7 @@
 
     <div id="authScreen" class="auth-screen">
       <div class="auth-card">
-        <div class="mark logo-mark"><img src="/icons/icon-192.png" alt="Kingdom Builder"></div>
-        <h1>Kingdom Builder</h1>
+        <h1 class="kb-wordmark" aria-label="Kingdom Builder"><span class="kb-word-kingdom">Kingdom</span><span class="kb-word-builder">Builder</span></h1>
         <p>Log in to use Kingdom Builder with all the original tools.</p>
         <label>Email
           <input id="authEmail" type="email" value="munoz.pat@outlook.com" autocomplete="email">
@@ -1230,7 +1264,6 @@
     <div class="app" style="display:none">
       <aside>
         <div class="brand">
-          <div class="mark logo-mark"><img src="/icons/icon-192.png" alt="Kingdom Builder"></div>
           <div>
             <h1>Kingdom Builder</h1>
             

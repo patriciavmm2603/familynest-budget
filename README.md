@@ -1,13 +1,15 @@
-# Kingdom Builder v39 icon everywhere
+# Kingdom Builder v42 wordmark
 
-Based on v38.
+Based on v41 no header icon.
 
-Changes:
-- Uses the cute coin/sprout/cross icon in the visible app header
-- Uses the same icon on the login screen
-- Uses the same icon for installed app/shortcut icons
-- Adds favicon/browser tab icon
-- Keeps Kingdom Builder naming
-- Keeps v37/v38 logic fixes: Personal Money fix, CSV simplified sort, Keep in Account checkbox, Supabase shared storage
-- Storage card remains removed
-- Service worker remains disabled while testing
+Change:
+- Keeps header icon removed.
+- Styles the visible "Kingdom Builder" header text as a polished green/gold wordmark.
+- Does not use image icons in the header.
+- Keeps Storage card removed.
+- Keeps subtitle removed.
+- Keeps Personal Money fix.
+- Keeps CSV simplified sort.
+- Keeps Keep in Account checkbox.
+- Keeps Supabase/shared storage.
+- Service worker remains disabled while testing.

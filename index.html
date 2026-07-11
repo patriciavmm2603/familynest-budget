@@ -1271,7 +1271,7 @@
       }
 
 
-      /* v45 personal split */
+      /* v47 expanded Bible gate */
       .split-badge {
         display: inline-flex;
         gap: .25rem;
@@ -1314,6 +1314,63 @@
         .split-row {
           grid-template-columns: 1fr;
         }
+      }
+
+
+      /* v46 Bible verse gate */
+      .bible-gate {
+        position: fixed;
+        inset: 0;
+        z-index: 5000;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        padding: 1rem;
+        background: rgba(39,31,18,.42);
+        backdrop-filter: blur(8px);
+      }
+      .bible-gate.active { display: flex; }
+      .bible-gate-card {
+        width: min(36rem, 100%);
+        max-height: min(88vh, 52rem);
+        overflow: auto;
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        box-shadow: 0 24px 80px rgba(39,31,18,.22);
+        padding: 1.2rem;
+      }
+      .bible-gate-card h3 { margin: 0 0 .45rem; font-size: 1.35rem; }
+      .bible-gate-card p { margin: .3rem 0; color: var(--muted); line-height: 1.45; }
+      .bible-verse-box {
+        margin: .9rem 0;
+        padding: .9rem;
+        border-radius: 12px;
+        background: var(--green-soft);
+        border: 1px solid color-mix(in srgb, var(--green) 35%, var(--line));
+        color: var(--green);
+      }
+      .bible-verse-box strong { display: block; margin-bottom: .25rem; }
+      .bible-check {
+        display: flex;
+        align-items: flex-start;
+        gap: .55rem;
+        margin: .85rem 0;
+        font-weight: 800;
+        color: var(--ink);
+      }
+      .bible-check input { width: 22px; height: 22px; margin-top: .05rem; }
+      .bible-gate-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: .6rem;
+        margin-top: 1rem;
+        flex-wrap: wrap;
+      }
+      @media (max-width: 760px) {
+        .bible-gate-card { padding: 1rem; border-radius: 16px; }
+        .bible-gate-actions { display: grid; grid-template-columns: 1fr; }
+        .bible-gate-actions button { width: 100%; }
       }
 
 </style>
@@ -1438,6 +1495,42 @@
         <section id="compare" class="view"></section>
         <section id="closeout" class="view"></section>
       </main>
+    </div>
+
+
+    <div id="bibleGate" class="bible-gate" role="dialog" aria-modal="true" aria-labelledby="bibleGateTitle">
+      <div class="bible-gate-card">
+        <h3 id="bibleGateTitle">Before you move forward</h3>
+        <p>Take a second to remember why we are doing this. This is not just budgeting. It is stewardship.</p>
+        <div class="bible-verse-box">
+          <strong>Matthew 6:33</strong>
+          Seek first the kingdom of God and His righteousness, and all these things will be added to you.
+        </div>
+        <div class="bible-verse-box">
+          <strong>Proverbs 21:5</strong>
+          The plans of the diligent lead surely to abundance, but everyone who is hasty comes only to poverty.
+        </div>
+        <div class="bible-verse-box">
+          <strong>Luke 14:28</strong>
+          Which of you, desiring to build a tower, does not first sit down and count the cost?
+        </div>
+        <div class="bible-verse-box">
+          <strong>2 Corinthians 9:7</strong>
+          God loves a cheerful giver.
+        </div>
+        <div class="bible-verse-box">
+          <strong>1 Timothy 6:6</strong>
+          Godliness with contentment is great gain.
+        </div>
+        <label class="bible-check">
+          <input id="bibleGateCheck" type="checkbox">
+          <span>I read this and want to steward this money with wisdom.</span>
+        </label>
+        <div class="bible-gate-actions">
+          <button id="bibleGateCancel" class="secondary" type="button">Stay here</button>
+          <button id="bibleGateContinue" type="button" disabled>Continue</button>
+        </div>
+      </div>
     </div>
 
     <div id="modal" class="modal" role="dialog" aria-modal="true">
@@ -1588,6 +1681,82 @@
       let cloudReady = false, cloudSaveTimer = null, currentUser = null;
       const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
+
+      // ── BIBLE GATE ───────────────────────────────────────────────────────────
+      const BIBLE_GATE_SESSION_KEY = "kingdom-builder-bible-gate-read-v1";
+      let pendingBibleGateView = "";
+
+      function bibleGateAlreadyRead() {
+        try { return sessionStorage.getItem(BIBLE_GATE_SESSION_KEY) === "yes"; }
+        catch { return false; }
+      }
+
+      function markBibleGateRead() {
+        try { sessionStorage.setItem(BIBLE_GATE_SESSION_KEY, "yes"); }
+        catch {}
+      }
+
+      function closeBibleGate() {
+        const gate = document.querySelector("#bibleGate");
+        const check = document.querySelector("#bibleGateCheck");
+        const continueBtn = document.querySelector("#bibleGateContinue");
+        if (gate) gate.classList.remove("active");
+        if (check) check.checked = false;
+        if (continueBtn) continueBtn.disabled = true;
+        pendingBibleGateView = "";
+      }
+
+      function openBibleGate(targetView) {
+        pendingBibleGateView = targetView;
+        const gate = document.querySelector("#bibleGate");
+        const check = document.querySelector("#bibleGateCheck");
+        const continueBtn = document.querySelector("#bibleGateContinue");
+        if (!gate || !check || !continueBtn) {
+          state.activeView = targetView;
+          render();
+          return;
+        }
+        check.checked = false;
+        continueBtn.disabled = true;
+        gate.classList.add("active");
+        setTimeout(() => check.focus(), 50);
+      }
+
+      function setupBibleGate() {
+        const check = document.querySelector("#bibleGateCheck");
+        const continueBtn = document.querySelector("#bibleGateContinue");
+        const cancelBtn = document.querySelector("#bibleGateCancel");
+
+        if (check && continueBtn && !check.dataset.boundBibleGate) {
+          check.dataset.boundBibleGate = "true";
+          check.addEventListener("change", () => { continueBtn.disabled = !check.checked; });
+        }
+
+        if (continueBtn && !continueBtn.dataset.boundBibleGate) {
+          continueBtn.dataset.boundBibleGate = "true";
+          continueBtn.addEventListener("click", () => {
+            if (!check?.checked) return;
+            const target = pendingBibleGateView;
+            markBibleGateRead();
+            closeBibleGate();
+            if (target) {
+              state.activeView = target;
+              render();
+              saveState();
+            }
+          });
+        }
+
+        if (cancelBtn && !cancelBtn.dataset.boundBibleGate) {
+          cancelBtn.dataset.boundBibleGate = "true";
+          cancelBtn.addEventListener("click", closeBibleGate);
+        }
+      }
+
+      function shouldShowBibleGate(targetView) {
+        return Boolean(targetView && targetView !== state.activeView && !bibleGateAlreadyRead());
+      }
+
       function cloneSeedState() {
         return normalizeState(JSON.parse(JSON.stringify(SEED_STATE)));
       }
@@ -1623,6 +1792,7 @@
       }
 
       async function startApp() {
+        setupBibleGate();
         const shell = document.querySelector(".app");
         const authScreen = document.querySelector("#authScreen");
         if (shell) shell.style.display = "none";
@@ -1993,7 +2163,16 @@
         document.querySelector("#nav").innerHTML = navItems.map(([id, label]) =>
           `<button type="button" class="nav-btn ${state.activeView === id ? "active" : ""}" data-view="${id}">${label}</button>`
         ).join("");
-        document.querySelectorAll(".nav-btn").forEach(btn => btn.addEventListener("click", () => { state.activeView = btn.dataset.view; saveState(); render(); }));
+        document.querySelectorAll(".nav-btn").forEach(btn => btn.addEventListener("click", () => {
+          const targetView = btn.dataset.view;
+          if (shouldShowBibleGate(targetView)) {
+            openBibleGate(targetView);
+            return;
+          }
+          state.activeView = targetView;
+          saveState();
+          render();
+        }));
         const select = document.querySelector("#monthSelect");
         select.innerHTML = monthOptions().map(key => `<option value="${key}"${key === state.activeMonth ? " selected" : ""}>${state.months[key].label}</option>`).join("");
         select.onchange = () => { state.activeMonth = select.value; saveState(); render(); };

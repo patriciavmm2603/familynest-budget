@@ -1,21 +1,22 @@
-# Kingdom Builder v45 personal split
+# Kingdom Builder v47 expanded Bible gate
 
-Based on v44.
+Based on v46.
 
-Adds:
-- Split Personal button on reconciled Personal transactions in CSV Review
-- Split Personal Transaction modal with 50/50 and custom Patricia/Alec amounts
-- Saves split on the transaction as personalSplit
-- Personal Money now counts split shares for each person
-- Personal transaction table shows split details and per-person amount when filtered
+Changes:
+- Replaces the 2 original Bible verses with 5 stewardship / kingdom-building verses:
+  - Matthew 6:33
+  - Proverbs 21:5
+  - Luke 14:28
+  - 2 Corinthians 9:7
+  - 1 Timothy 6:6
+- Keeps the checkbox gate before switching tabs
+- Makes the Bible gate card scrollable if needed on smaller screens
 
 Keeps:
+- v45 Personal Money split feature
 - v44 actual income from statements rollup
-- header wordmark
-- header icon removed
+- Header wordmark
 - Storage card removed
-- subtitle removed
-- Personal Money fix for normal bills/subscriptions
 - CSV simplified sort
 - Keep in Account checkbox
 - Supabase shared storage

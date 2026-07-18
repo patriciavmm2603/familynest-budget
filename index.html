@@ -1271,7 +1271,7 @@
       }
 
 
-      /* v49 real mobile budget */
+      /* v50 held-style tabs */
       .split-badge {
         display: inline-flex;
         gap: .25rem;
@@ -1374,449 +1374,234 @@
       }
 
 
-      /* v49 real mobile budget layout */
-      .kb-mobile-budget-app { display: none; }
+      /* v50 Held-style navigation refresh */
+      .kb-bottom-nav {
+        display: none;
+      }
+
+      .nav-btn {
+        transition: background .16s ease, color .16s ease, transform .16s ease;
+      }
+
+      .nav-btn:hover {
+        transform: translateY(-1px);
+      }
+
+      @media (min-width: 761px) {
+        aside {
+          background: rgba(255,253,248,.96) !important;
+          box-shadow: 0 12px 34px rgba(66,85,80,.10);
+        }
+
+        #nav {
+          gap: .38rem !important;
+        }
+
+        #nav .nav-btn {
+          border-radius: 999px !important;
+          padding: .7rem .9rem !important;
+          color: var(--muted) !important;
+          font-weight: 850 !important;
+        }
+
+        #nav .nav-btn.active {
+          background: var(--green-soft) !important;
+          color: var(--green) !important;
+          box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--green) 20%, transparent);
+        }
+      }
 
       @media (max-width: 760px) {
-        :root {
-          --kb-app-green: #32c35b;
-          --kb-app-green-dark: #169b3f;
-          --kb-app-navy: #06466f;
-          --kb-app-bg: #f4f6f8;
-          --kb-app-line: #e7edf1;
-        }
-
-        html, body {
-          background: var(--kb-app-bg) !important;
-          overflow-x: hidden !important;
-        }
-
         body {
           padding: 0 !important;
+          overflow-x: hidden !important;
+          background: var(--bg) !important;
+        }
+
+        .app {
+          display: block !important;
+          padding-bottom: 5.6rem !important;
         }
 
         .mobile-app-bar {
           display: none !important;
         }
 
-        .app {
-          display: block !important;
-          min-height: 100vh !important;
-          background: var(--kb-app-bg) !important;
-          padding-bottom: 5.7rem !important;
-        }
-
+        /* Keep the real tab list visible as pretty horizontal tabs near the top */
         aside {
-          position: fixed !important;
-          left: 0 !important;
-          right: 0 !important;
-          bottom: 0 !important;
-          top: auto !important;
+          position: sticky !important;
+          top: 0 !important;
+          z-index: 1500 !important;
           height: auto !important;
-          z-index: 3000 !important;
-          padding: .48rem .35rem calc(.48rem + env(safe-area-inset-bottom)) !important;
-          background: rgba(250,252,253,.97) !important;
-          border-top: 1px solid rgba(0,0,0,.08) !important;
-          border-bottom: 0 !important;
+          overflow: visible !important;
           border-right: 0 !important;
-          box-shadow: 0 -8px 28px rgba(10, 30, 50, .08) !important;
-          backdrop-filter: blur(18px) !important;
+          border-bottom: 1px solid var(--line) !important;
+          padding: .75rem .85rem .65rem !important;
+          background: rgba(255,253,248,.96) !important;
+          backdrop-filter: blur(14px) !important;
+          box-shadow: 0 10px 28px rgba(66,85,80,.10) !important;
           display: block !important;
-          overflow: hidden !important;
         }
 
-        aside .brand,
+        aside .brand {
+          margin: 0 0 .6rem !important;
+          display: flex !important;
+        }
+
         aside .side-panel {
           display: none !important;
         }
 
         #nav {
           display: flex !important;
-          gap: .05rem !important;
+          gap: .45rem !important;
+          overflow-x: auto !important;
+          overflow-y: hidden !important;
           width: 100% !important;
           max-width: 100% !important;
-          overflow-x: auto !important;
-          padding: 0 !important;
+          padding: .12rem 0 .2rem !important;
           -webkit-overflow-scrolling: touch !important;
           scrollbar-width: none !important;
         }
 
-        #nav::-webkit-scrollbar { display: none !important; }
+        #nav::-webkit-scrollbar {
+          display: none !important;
+        }
 
         #nav .nav-btn,
         #nav button {
-          flex: 0 0 4.9rem !important;
-          width: 4.9rem !important;
-          min-width: 4.9rem !important;
-          min-height: 4rem !important;
-          display: grid !important;
-          place-items: center !important;
-          align-content: center !important;
-          gap: .18rem !important;
-          padding: .25rem .15rem !important;
+          flex: 0 0 auto !important;
+          width: auto !important;
+          min-width: max-content !important;
+          min-height: 42px !important;
           border: 0 !important;
-          border-radius: 18px !important;
+          border-radius: 999px !important;
+          padding: .72rem .95rem !important;
           background: transparent !important;
-          color: #b2bbc2 !important;
-          font-size: .68rem !important;
-          font-weight: 750 !important;
-          line-height: 1.05 !important;
-          white-space: normal !important;
+          color: var(--muted) !important;
+          font-size: .88rem !important;
+          font-weight: 850 !important;
+          white-space: nowrap !important;
+          line-height: 1 !important;
           text-align: center !important;
         }
 
-        #nav .nav-btn::before {
-          display: block;
-          font-size: 1.45rem;
-          line-height: 1;
-          color: currentColor;
-          font-weight: 900;
-        }
-
-        #nav .nav-btn[data-view="dashboard"]::before { content: "⌂"; }
-        #nav .nav-btn[data-view="budget"]::before { content: "▰"; }
-        #nav .nav-btn[data-view="transactions"]::before { content: "$"; }
-        #nav .nav-btn[data-view="cashguard"]::before { content: "☂"; }
-        #nav .nav-btn[data-view="income"]::before { content: "↗"; }
-        #nav .nav-btn[data-view="allowance"]::before { content: "◉"; }
-        #nav .nav-btn[data-view="debt"]::before { content: "▦"; }
-        #nav .nav-btn[data-view="template"]::before { content: "☷"; }
-        #nav .nav-btn[data-view="compare"]::before { content: "≋"; }
-        #nav .nav-btn[data-view="closeout"]::before { content: "✓"; }
-
         #nav .nav-btn.active {
-          color: var(--kb-app-navy) !important;
-          background: transparent !important;
+          background: var(--green-soft) !important;
+          color: var(--green) !important;
+          box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--green) 20%, transparent) !important;
         }
 
         main {
           width: 100% !important;
           max-width: 100% !important;
           min-width: 0 !important;
-          padding: 0 1rem 1.5rem !important;
           overflow-x: hidden !important;
-          background: var(--kb-app-bg) !important;
+          padding: 1rem .85rem 1.25rem !important;
         }
 
-        body[data-active-view="budget"] main {
-          padding: 0 0 1.5rem !important;
-        }
-
-        body[data-active-view="budget"] .topbar,
-        body[data-active-view="budget"] #dueSoonAlert,
-        body[data-active-view="budget"] #reviewBanner {
-          display: none !important;
-        }
-
-        body[data-active-view="budget"] #budget.view.active {
-          display: block !important;
-          gap: 0 !important;
-        }
-
-        body[data-active-view="budget"] .kb-budget-desktop {
-          display: none !important;
-        }
-
-        body[data-active-view="budget"] .kb-mobile-budget-app {
-          display: block !important;
-          min-height: 100vh;
-          background: var(--kb-app-bg);
-          color: #20252d;
-        }
-
-        .kb-mobile-budget-header {
-          position: sticky;
-          top: 0;
-          z-index: 2400;
-          background: var(--kb-app-green);
-          color: #fff;
-          padding: calc(.85rem + env(safe-area-inset-top)) 1rem 1rem;
-        }
-
-        .kb-mobile-budget-header-row {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 1rem;
-        }
-
-        .kb-mobile-month {
-          border: 0;
-          background: transparent;
-          color: #fff;
-          font-size: clamp(2.6rem, 12vw, 3.45rem);
-          line-height: 1;
-          font-weight: 900;
-          letter-spacing: -.055em;
-          padding: 0;
-          text-align: left;
-        }
-
-        .kb-mobile-month::after {
-          content: "⌄";
-          font-size: 1.35rem;
-          margin-left: .4rem;
-          opacity: .85;
-          vertical-align: .25rem;
-        }
-
-        .kb-mobile-header-actions {
-          display: flex;
-          align-items: center;
-          gap: .85rem;
-          font-size: 2.15rem;
-          line-height: 1;
-          font-weight: 300;
-        }
-
-        .kb-mobile-header-actions button {
-          background: transparent !important;
-          border: 0 !important;
-          color: #fff !important;
-          min-height: auto !important;
+        .topbar {
+          margin: 0 0 1rem !important;
           padding: 0 !important;
-          border-radius: 0 !important;
-          font-size: 2.15rem !important;
-          font-weight: 300 !important;
-        }
-
-        .kb-mobile-segment {
-          display: grid;
-          grid-template-columns: repeat(3, 1fr);
-          gap: 0;
-          margin-top: 1.15rem;
-          background: var(--kb-app-green-dark);
-          border-radius: 12px;
-          padding: .18rem;
-          box-shadow: inset 0 0 0 2px rgba(0,0,0,.06);
-        }
-
-        .kb-mobile-segment button {
-          min-height: 3rem;
+          position: static !important;
+          display: grid !important;
+          gap: .8rem !important;
           background: transparent !important;
-          color: #fff !important;
           border: 0 !important;
-          border-radius: 10px !important;
-          font-size: 1.18rem !important;
-          font-weight: 750 !important;
+          box-shadow: none !important;
         }
 
-        .kb-mobile-segment button.active {
-          background: rgba(255,255,255,.14) !important;
-          box-shadow: inset 0 0 0 2px rgba(0,0,0,.08);
+        .topbar h2 {
+          font-size: 2rem !important;
+          letter-spacing: -.04em !important;
         }
 
-        .kb-mobile-left {
-          background: #fff;
-          text-align: center;
-          padding: 1.35rem 1rem;
-          font-size: 1.35rem;
-          color: #333b44;
-          box-shadow: 0 1px 0 rgba(0,0,0,.04);
+        .topbar p {
+          font-size: .95rem !important;
         }
 
-        .kb-mobile-left strong {
-          color: #159846;
-          font-weight: 900;
+        .topbar .toolbar {
+          display: grid !important;
+          grid-template-columns: 1fr 1fr !important;
+          gap: .55rem !important;
+          justify-content: stretch !important;
         }
 
-        .kb-mobile-budget-body {
-          padding: 1.15rem 1rem 1rem;
+        .topbar .toolbar select {
+          grid-column: 1 / -1 !important;
         }
 
-        .kb-mobile-summary-grid {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 1rem;
-          margin-bottom: 1rem;
-        }
-
-        .kb-mobile-summary-card,
-        .kb-mobile-section-card {
-          background: #fff;
-          border-radius: 28px;
-          box-shadow: 0 10px 28px rgba(10,30,50,.06);
-          border: 0;
-        }
-
-        .kb-mobile-summary-card {
-          min-height: 9rem;
-          padding: 1.15rem;
-          display: grid;
-          align-content: center;
-        }
-
-        .kb-mobile-icon-ring {
-          width: 4rem;
-          height: 4rem;
-          display: grid;
-          place-items: center;
-          border-radius: 999px;
-          border: .55rem solid #d9dee3;
-          color: #9ba5ad;
-          font-weight: 900;
-          margin-bottom: .9rem;
-        }
-
-        .kb-mobile-summary-label {
-          color: #4b535d;
-          font-size: 1.05rem;
-          line-height: 1.15;
-        }
-
-        .kb-mobile-summary-value {
-          margin-top: .45rem;
-          color: #171a20;
-          font-size: 2rem;
-          line-height: 1;
-          font-weight: 900;
-          letter-spacing: -.05em;
-        }
-
-        .kb-mobile-cashflow-icon {
-          color: var(--kb-app-navy);
-          font-size: 3rem;
-          line-height: 1;
-          font-weight: 900;
-          margin-bottom: .75rem;
-        }
-
-        .kb-mobile-premium {
-          display: inline-flex;
-          align-items: center;
-          gap: .25rem;
-          background: var(--kb-app-green);
-          color: #fff;
-          border-radius: 999px;
-          padding: .28rem .65rem;
-          font-size: .85rem;
-          font-weight: 900;
-          margin-left: .35rem;
-        }
-
-        .kb-mobile-outline-button {
-          margin-top: .8rem;
-          display: inline-flex;
-          justify-content: center;
-          width: 100%;
-          border: 2px solid var(--kb-app-navy) !important;
-          color: var(--kb-app-navy) !important;
-          background: #fff !important;
-          border-radius: 12px !important;
-          font-weight: 900 !important;
-          min-height: 2.7rem !important;
-        }
-
-        .kb-mobile-section-card {
-          padding: 1.25rem;
-          margin-bottom: 1rem;
-        }
-
-        .kb-mobile-section-head {
-          display: flex;
-          align-items: baseline;
-          justify-content: space-between;
-          gap: 1rem;
-          margin-bottom: 1rem;
-        }
-
-        .kb-mobile-section-title {
-          font-size: 1.55rem;
-          font-weight: 900;
-          letter-spacing: -.035em;
-          color: #1c222a;
-        }
-
-        .kb-mobile-section-mode {
-          font-size: 1.25rem;
-          color: #555d66;
-        }
-
-        .kb-mobile-budget-item {
-          display: grid;
-          grid-template-columns: 1fr auto;
-          gap: 1rem;
-          align-items: center;
-          padding: .85rem 0;
-          border-bottom: 5px solid #edf1f4;
-        }
-
-        .kb-mobile-budget-item:last-child {
-          border-bottom: 0;
-        }
-
-        .kb-mobile-budget-name {
-          font-size: 1.35rem;
-          color: #20252d;
-          line-height: 1.1;
-        }
-
-        .kb-mobile-budget-amount {
-          font-size: 1.35rem;
-          color: #20252d;
-          white-space: nowrap;
-        }
-
-        .kb-mobile-add-item {
-          margin-top: .75rem;
-          padding: 0;
-          background: transparent !important;
-          color: #067eae !important;
-          border: 0 !important;
-          font-size: 1.15rem !important;
-          font-weight: 750 !important;
-          min-height: auto !important;
-          text-align: left !important;
-        }
-
-        .kb-mobile-empty {
-          color: #7b858e;
-          font-size: 1rem;
-          padding: .6rem 0;
-        }
-
-        .kb-mobile-overflow {
-          color: #067eae;
-          font-size: 1.6rem;
-          line-height: 1;
-          font-weight: 900;
-        }
-
-        /* Keep every other screen usable but softer on mobile */
-        body:not([data-active-view="budget"]) .topbar {
-          position: sticky !important;
-          top: 0 !important;
-          z-index: 2200 !important;
-          margin: 0 -1rem 1rem !important;
-          padding: calc(.85rem + env(safe-area-inset-top)) 1rem 1rem !important;
-          background: var(--kb-app-green) !important;
-          color: #fff !important;
-          border-bottom: 0 !important;
-        }
-
-        body:not([data-active-view="budget"]) .topbar h2 {
-          color: #fff !important;
-          font-size: 2.35rem !important;
-          line-height: 1 !important;
-          letter-spacing: -.045em !important;
-        }
-
-        body:not([data-active-view="budget"]) .topbar p {
-          color: rgba(255,255,255,.88) !important;
-        }
-
-        body:not([data-active-view="budget"]) .topbar .toolbar {
-          background: transparent !important;
+        .topbar .toolbar button,
+        .topbar .toolbar label,
+        .topbar .toolbar select {
+          width: 100% !important;
+          border-radius: 14px !important;
+          min-height: 44px !important;
         }
 
         .card,
-        .chart-card {
-          border-radius: 24px !important;
+        .chart-card,
+        .banner,
+        .alert-due {
+          border-radius: 22px !important;
+          box-shadow: 0 12px 30px rgba(66,85,80,.09) !important;
         }
 
-        .dialog,
-        .bible-gate-card {
-          border-radius: 24px !important;
+        .cards {
+          grid-template-columns: 1fr !important;
+        }
+
+        .section-title {
+          align-items: flex-start !important;
+        }
+
+        .table-wrap {
+          border-radius: 18px !important;
+          -webkit-overflow-scrolling: touch !important;
+        }
+
+        /* Bottom quick nav like Held, without removing the full top tabs */
+        .kb-bottom-nav {
+          display: grid !important;
+          grid-template-columns: repeat(5, 1fr) !important;
+          position: fixed !important;
+          left: 10px !important;
+          right: 10px !important;
+          bottom: 10px !important;
+          z-index: 2600 !important;
+          background: rgba(255,253,248,.96) !important;
+          border: 1px solid var(--line) !important;
+          box-shadow: 0 14px 34px rgba(66,85,80,.14) !important;
+          border-radius: 20px !important;
+          padding: 7px !important;
+          gap: 4px !important;
+          backdrop-filter: blur(12px) !important;
+        }
+
+        .kb-bottom-nav button {
+          border: 0 !important;
+          background: transparent !important;
+          color: var(--muted) !important;
+          border-radius: 13px !important;
+          padding: 9px 4px !important;
+          min-height: 46px !important;
+          display: grid !important;
+          place-items: center !important;
+          font-size: .73rem !important;
+          font-weight: 800 !important;
+          line-height: 1.05 !important;
+        }
+
+        .kb-bottom-nav button.active {
+          background: var(--green-soft) !important;
+          color: var(--green) !important;
+        }
+
+        .kb-bottom-nav button .kb-nav-icon {
+          display: block;
+          font-size: 1.15rem;
+          line-height: 1;
+          margin-bottom: .15rem;
         }
       }
 
@@ -1835,6 +1620,10 @@
 
 </head>
   <body>
+
+
+  <nav id="mobileBottomNav" class="kb-bottom-nav" aria-label="Mobile bottom navigation"></nav>
+
 
   <div class="mobile-app-bar" aria-label="Mobile app controls">
     <div class="mobile-app-row">
@@ -2605,6 +2394,40 @@
         document.getElementById("dueSoonBody").textContent = alertRows.map(b => b.payee + " · " + money.format(b.amount) + " · " + b.timing).join(" · ");
       }
 
+
+      function bottomNavLabel(id, label) {
+        const map = {
+          dashboard: ["⌂", "Today"],
+          budget: ["▰", "Budget"],
+          transactions: ["$", "Txns"],
+          income: ["↗", "Income"],
+          cashguard: ["☂", "Guard"]
+        };
+        return map[id] || ["•", label];
+      }
+
+      function renderMobileBottomNav() {
+        const node = document.querySelector("#mobileBottomNav");
+        if (!node) return;
+        const quick = ["dashboard", "budget", "transactions", "income", "cashguard"];
+        node.innerHTML = quick.map(id => {
+          const found = navItems.find(([view]) => view === id);
+          if (!found) return "";
+          const [icon, label] = bottomNavLabel(id, found[1]);
+          return `<button type="button" class="${state.activeView === id ? "active" : ""}" data-bottom-view="${id}"><span class="kb-nav-icon">${icon}</span><span>${escapeHtml(label)}</span></button>`;
+        }).join("");
+        node.querySelectorAll("[data-bottom-view]").forEach(btn => btn.addEventListener("click", () => {
+          const targetView = btn.dataset.bottomView;
+          if (shouldShowBibleGate(targetView)) {
+            openBibleGate(targetView);
+            return;
+          }
+          state.activeView = targetView;
+          saveState();
+          render();
+        }));
+      }
+
       function renderShell() {
         document.body.dataset.activeView = state.activeView;
         document.querySelector("#nav").innerHTML = navItems.map(([id, label]) =>
@@ -2620,6 +2443,7 @@
           saveState();
           render();
         }));
+        renderMobileBottomNav();
         const select = document.querySelector("#monthSelect");
         select.innerHTML = monthOptions().map(key => `<option value="${key}"${key === state.activeMonth ? " selected" : ""}>${state.months[key].label}</option>`).join("");
         select.onchange = () => { state.activeMonth = select.value; saveState(); render(); };
@@ -3213,105 +3037,6 @@
       }
 
       // ── BUDGET ───────────────────────────────────────────────────────────────
-
-      function mobileBudgetMode() {
-        return state.mobileBudgetMode || "planned";
-      }
-
-      function mobileBudgetModeLabel(mode = mobileBudgetMode()) {
-        if (mode === "spent") return "Spent";
-        if (mode === "remaining") return "Remaining";
-        return "Planned";
-      }
-
-      function mobileBudgetLineValue(row, mode = mobileBudgetMode()) {
-        if (mode === "spent") return Number(row.paidAmount || 0);
-        if (mode === "remaining") return Number(row.remainingAmount ?? row.amount ?? 0);
-        return Number(row.amount || 0);
-      }
-
-      function mobileBudgetCategoryGroups(rows) {
-        const activeRows = activeBudgetLines(rows || []);
-        const groups = new Map();
-        activeRows.forEach(row => {
-          const category = row.category || "Other";
-          if (!groups.has(category)) groups.set(category, []);
-          groups.get(category).push(row);
-        });
-        return [...groups.entries()].sort((a, b) => {
-          const order = ["Giving","Savings","Housing","Home","Utilities","Transportation","Food","Groceries","Restaurants","Medical","Credit Cards","Debt","Entertainment","Personal"];
-          const ai = order.findIndex(label => String(a[0]).toLowerCase().includes(label.toLowerCase()));
-          const bi = order.findIndex(label => String(b[0]).toLowerCase().includes(label.toLowerCase()));
-          return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi) || String(a[0]).localeCompare(String(b[0]));
-        });
-      }
-
-      function renderMobileBudgetSection(category, rows, mode = mobileBudgetMode()) {
-        const visible = rows.slice().sort((a, b) => Number(b.amount || 0) - Number(a.amount || 0)).slice(0, 6);
-        return `<div class="kb-mobile-section-card">
-          <div class="kb-mobile-section-head">
-            <div class="kb-mobile-section-title">${escapeHtml(category)}</div>
-            <div class="kb-mobile-section-mode">${mobileBudgetModeLabel(mode)}</div>
-          </div>
-          ${visible.length ? visible.map(row => `<div class="kb-mobile-budget-item">
-            <button class="kb-mobile-budget-name" type="button" data-edit-budget="${row.id}" style="text-align:left;background:transparent;color:inherit;border:0;padding:0;min-height:auto;font-weight:inherit">${escapeHtml(row.payee || "Budget item")}</button>
-            <div class="kb-mobile-budget-amount">${money.format(mobileBudgetLineValue(row, mode))}</div>
-          </div>`).join("") : `<div class="kb-mobile-empty">No items yet.</div>`}
-          <button type="button" class="kb-mobile-add-item" data-action="addBudget">Add Item</button>
-        </div>`;
-      }
-
-      function renderMobileBudgetView(month, rows, totals) {
-        const mode = mobileBudgetMode();
-        const incomePlanned = incomeTotal();
-        const leftToBudget = incomePlanned - Number(totals.planned || 0);
-        const modeTotal = mode === "spent" ? totals.matched : mode === "remaining" ? totals.remaining : totals.planned;
-        const groups = mobileBudgetCategoryGroups(rows);
-        const incomeRows = regularIncomeRows();
-        return `<div class="kb-mobile-budget-app">
-          <div class="kb-mobile-budget-header">
-            <div class="kb-mobile-budget-header-row">
-              <button type="button" class="kb-mobile-month" data-mobile-action="open-month">${escapeHtml(month.label || state.activeMonth)}</button>
-              <div class="kb-mobile-header-actions">
-                <button type="button" data-mobile-budget-sort title="Sort">⇅</button>
-                <button type="button" data-action="addBudget" title="Add">＋</button>
-              </div>
-            </div>
-            <div class="kb-mobile-segment" role="tablist" aria-label="Budget view">
-              ${["planned","spent","remaining"].map(key => `<button type="button" class="${mode === key ? "active" : ""}" data-mobile-budget-mode="${key}">${mobileBudgetModeLabel(key)}</button>`).join("")}
-            </div>
-          </div>
-          <div class="kb-mobile-left"><strong>${money.format(leftToBudget)}</strong> left to budget</div>
-          <div class="kb-mobile-budget-body">
-            <div class="kb-mobile-summary-grid">
-              <div class="kb-mobile-summary-card">
-                <div class="kb-mobile-icon-ring">$</div>
-                <div class="kb-mobile-summary-label">${mobileBudgetModeLabel(mode)} total</div>
-                <div class="kb-mobile-summary-value">${money.format(modeTotal)}</div>
-              </div>
-              <div class="kb-mobile-summary-card">
-                <div class="kb-mobile-cashflow-icon">↻$</div>
-                <div><span class="kb-mobile-premium">✦ Premium</span></div>
-                <div class="kb-mobile-summary-label" style="margin-top:.75rem">Monthly<br>Cash Flow</div>
-                <button type="button" class="kb-mobile-outline-button" data-jump="dashboard">Set Up</button>
-              </div>
-            </div>
-            <div class="kb-mobile-section-card">
-              <div class="kb-mobile-section-head">
-                <div class="kb-mobile-section-title">Income</div>
-                <div class="kb-mobile-section-mode">${mode === "spent" ? "Received" : "Planned"}</div>
-              </div>
-              ${incomeRows.length ? incomeRows.slice(0, 5).map(row => `<div class="kb-mobile-budget-item">
-                <button class="kb-mobile-budget-name" type="button" data-jump="income" style="text-align:left;background:transparent;color:inherit;border:0;padding:0;min-height:auto;font-weight:inherit">${escapeHtml(row.source || row.name || row.owner || "Income")}</button>
-                <div class="kb-mobile-budget-amount">${money.format(mode === "spent" ? 0 : row.monthly)}</div>
-              </div>`).join("") : `<div class="kb-mobile-empty">No planned income yet.</div>`}
-              <button type="button" class="kb-mobile-add-item" data-jump="income">Add Income</button>
-            </div>
-            ${groups.length ? groups.map(([category, groupRows]) => renderMobileBudgetSection(category, groupRows, mode)).join("") : `<div class="kb-mobile-section-card"><div class="kb-mobile-section-title">Budget</div><div class="kb-mobile-empty">No budget items yet.</div><button type="button" class="kb-mobile-add-item" data-action="addBudget">Add Item</button></div>`}
-          </div>
-        </div>`;
-      }
-
       function renderBudget() {
         const month = currentMonth();
         applyBillPaymentStatuses(month);
@@ -3319,10 +3044,8 @@
         const rows = sortBudgetLines(filteredBudgetLinesForPlan(month));
         const totals = budgetRunningTotals(rows);
         const incomeForPct = incomeTotal() || 1;
-        const mobileBudgetHtml = renderMobileBudgetView(month, allBudgetLines(month), totals);
         document.querySelector("#budget").innerHTML = [
-          mobileBudgetHtml,
-          `<div class="kb-budget-desktop"><div class="card"><div class="section-title"><h3>Budget lines</h3><span>${rows.length} lines</span></div>
+          `<div class="card"><div class="section-title"><h3>Budget lines</h3><span>${rows.length} lines</span></div>
           <div class="toolbar" style="justify-content:flex-start;margin-bottom:.8rem">
             <button type="button" data-action="addBudget">＋ Add Line</button>
             <button type="button" class="secondary" data-action="clearBudgetFilters">✕ Clear Filters</button>
@@ -3360,7 +3083,7 @@
           rows.length ? rows.map(row =>
             `<tr><td class="paid-check"><input type="checkbox" data-toggle-budget-paid="${row.id}" ${row.manualPaid || (row.status === "Paid" && Number(row.remainingAmount || 0) <= 0) ? "checked" : ""} aria-label="Mark ${escapeHtml(row.payee)} paid"></td><td>${ownerPill(row.owner)}</td><td>${escapeHtml(row.dueDay)}</td><td><strong>${escapeHtml(row.payee)}</strong></td><td>${escapeHtml(row.category)}</td><td>${budgetStatusPill(row)}</td><td>${row.notes ? escapeHtml(row.notes) : `<span class="muted">—</span>`}</td><td class="money">${money.format(row.amount)}</td><td class="money">${money.format(row.paidAmount || 0)}</td><td class="money">${remainingPill(row.remainingAmount ?? row.amount ?? 0)}</td><td class="pct">${Math.round(Number(row.amount || 0) / incomeForPct * 100)}%</td><td class="right"><button class="ghost" type="button" data-edit-budget="${row.id}">Edit</button></td></tr>`
           ).join("") : `<tr><td colspan="12"><div class="empty">No lines are visible with the current filters.</div></td></tr>`,
-          `</tbody></table></div></div></div>`
+          `</tbody></table></div></div>`
         ].join("");
         bindBudgetActions();
       }
@@ -3469,22 +3192,7 @@
       }
 
       function bindBudgetActions() {
-        document.querySelectorAll("[data-action='addBudget']").forEach(btn => btn.addEventListener("click", () => openBudgetModal()));
-        document.querySelectorAll("[data-mobile-budget-mode]").forEach(btn => btn.addEventListener("click", () => {
-          state.mobileBudgetMode = btn.dataset.mobileBudgetMode;
-          renderBudget();
-          saveState();
-        }));
-        document.querySelectorAll("[data-mobile-budget-sort]").forEach(btn => btn.addEventListener("click", () => {
-          const next = state.budgetSort === "Planned high-low" ? "Due day soonest" : "Planned high-low";
-          state.budgetSort = next;
-          renderBudget();
-          saveState();
-        }));
-        document.querySelector("[data-mobile-action='open-month']")?.addEventListener("click", () => {
-          const select = document.querySelector("#monthSelect");
-          if (select) { select.focus(); select.click?.(); }
-        });
+        document.querySelector("[data-action='addBudget']")?.addEventListener("click", () => openBudgetModal());
         const budgetSearchInput = document.querySelector("[name='budgetSearch']");
         if (budgetSearchInput) {
           const runBudgetSearch = () => { state.budgetSearch = budgetSearchInput.value; renderBudget(); saveState(); };

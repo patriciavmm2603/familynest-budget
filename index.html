@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Kingdom Builder</title>
-  <!-- v80 mortgage reserve month shift -->
+  <!-- v81 fix csv amount sort -->
   <!-- v44 actual income rollup -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
     <style>
@@ -1790,6 +1790,9 @@
 
 
       /* v80: Mortgage reserve month-shift model - current month savings are next month reserve; prior month reserve can apply this month */
+
+
+      /* v81: CSV Review sort now finds columns by header text; Amount sorts numerically after Income Type column */
 
 </style>
   
@@ -5489,8 +5492,15 @@
       }
 
       function parseMoney(value) {
-        const n = Number(String(value || "").replace(/[^0-9.-]/g, ""));
-        return Number.isFinite(n) ? n : 0;
+        const raw = String(value || "").trim();
+        const isAccountingNegative = /^\(.*\)$/.test(raw);
+        const cleaned = raw
+          .replace(/[−–—]/g, "-")
+          .replace(/\((.*)\)/, "$1")
+          .replace(/[^0-9.-]/g, "");
+        const n = Number(cleaned);
+        if (!Number.isFinite(n)) return 0;
+        return isAccountingNegative ? -Math.abs(n) : n;
       }
 
       function parseDate(value) {
@@ -5499,18 +5509,34 @@
         return Number.isFinite(time) ? time : 0;
       }
 
+      function csvSortColumnIndex(row, key) {
+        const table = row.closest("table");
+        if (!table) return -1;
+
+        const headers = Array.from(table.querySelectorAll("thead th"));
+        const normalized = text => String(text || "").trim().toLowerCase();
+
+        const direct = headers.findIndex(th => th.dataset.v36SortKey === key);
+        if (direct >= 0) return direct;
+
+        const aliases = {
+          date: ["date"],
+          description: ["description", "memo", "merchant"],
+          bill: ["bill"],
+          category: ["category"],
+          incomeType: ["income type"],
+          owner: ["owner"],
+          amount: ["amount"],
+          status: ["status"]
+        }[key] || [key];
+
+        return headers.findIndex(th => aliases.some(alias => normalized(th.textContent).includes(alias)));
+      }
+
       function valueFor(row, key) {
         const cells = Array.from(row.children);
-        const map = {
-          date: 1,
-          description: 2,
-          bill: 3,
-          category: 4,
-          owner: 5,
-          amount: 6,
-          status: 7
-        };
-        const cell = cells[map[key]];
+        const index = csvSortColumnIndex(row, key);
+        const cell = cells[index];
         const raw = (cell?.textContent || "").trim();
 
         if (key === "amount") return parseMoney(raw);
@@ -5582,6 +5608,7 @@
           "description": "description",
           "bill": "bill",
           "category": "category",
+          "income type": "incomeType",
           "owner": "owner",
           "amount": "amount",
           "status": "status"

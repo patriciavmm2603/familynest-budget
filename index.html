@@ -1271,7 +1271,7 @@
       }
 
 
-      /* v69 spending uncovered bills */
+      /* v70 fix personal money count */
       .split-badge {
         display: inline-flex;
         gap: .25rem;
@@ -1756,6 +1756,9 @@
 
 
       /* v69: Spending section shows reserved + uncovered instead of raw left-to-pay panic number */
+
+
+      /* v70: Fix Personal Money counting after vault rule; category Personal counts again */
 
 </style>
   
@@ -4178,17 +4181,16 @@
       }
 
             function isPersonalTransaction(txn) {
-        const category = String(txn.category || "").trim() && !isVaultMovementTxn(txn);
-        const asset = String(txn.asset || "").trim();
+        const category = String(txn.category || "").trim();
         const hasAssignedBill = Boolean(txn.billId);
 
-        // Personal Money should only count transactions intentionally marked as Personal.
-        // A normal bill/subscription can have owner = Alec/Patricia or asset = Personal,
-        // but if it is assigned to a bill or categorized as something else, it is not allowance spending.
+        // If you intentionally categorized it as Personal, it counts as Personal Money.
+        // Household bills and vault/reserve movements stay out.
         return Boolean(txn.reconciled)
           && Number(txn.amount || 0) < 0
-          && category === "Personal"
-          && !hasAssignedBill;
+          && category.toLowerCase() === "personal"
+          && !hasAssignedBill
+          && !isVaultMovementTxn(txn);
       }
       function personalUsedByOwner(month, owner) { return sum(month.transactions.filter(isPersonalTransaction), txn => personalAmountForOwner(txn, owner)); }
       function actualPersonalSpending(month) { return sum(month.transactions.filter(isPersonalTransaction), txn => personalAmountTotal(txn)); }

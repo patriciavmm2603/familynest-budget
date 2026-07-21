@@ -1271,7 +1271,7 @@
       }
 
 
-      /* v72 stop reserve guessing */
+      /* v73 mortgage reserve next month */
       .split-badge {
         display: inline-flex;
         gap: .25rem;
@@ -1765,6 +1765,9 @@
 
 
       /* v72: Stop guessing reserve bucket from mortgage/PennyMac text; only explicit reserve categories drive dashboard buckets */
+
+
+      /* v73: Mortgage/PennyMac reserve is treated as next-month mortgage reserve, not current-month reserve */
 
 </style>
   
@@ -2704,6 +2707,17 @@
       function isCurrentMonthBillReserveTxn(txn) {
         if (!txn || !txn.reconciled || Number(txn.amount || 0) >= 0) return false;
         const category = String(txn.category || "").trim().toLowerCase();
+        const text = [
+          txn.category,
+          txn.subcategory,
+          txn.description,
+          txn.notes,
+          txn.name,
+          txn.merchant
+        ].join(" ").toLowerCase();
+
+        // In this budget flow, mortgage/PennyMac reserve is for next month, not this month.
+        if (/(mortgage|pennymac)/.test(text)) return false;
 
         // This only counts when the user intentionally marks it for bills still due this month.
         return category === "this month bill reserve / vault";
@@ -2744,9 +2758,16 @@
             txn.merchant
           ].join(" ").toLowerCase();
 
-          // Exact category is preferred. Notes like "next month mortgage" also count.
-          return category === "next month mortgage reserve / vault"
-            || /(next month|next-month).*mortgage/.test(text)
+          // Exact category is preferred.
+          if (category === "next month mortgage reserve / vault") return true;
+
+          // Backward-compatible safety:
+          // If an older reserve category was used for mortgage/PennyMac,
+          // treat it as next-month mortgage reserve because Patricia's mortgage reserve flow is for next month.
+          if ((category === "this month bill reserve / vault" || category === "transfer / vault movement")
+              && /(mortgage|pennymac)/.test(text)) return true;
+
+          return /(next month|next-month).*mortgage/.test(text)
             || /mortgage.*(next month|next-month)/.test(text);
         });
       }
@@ -2985,14 +3006,14 @@
           <div class="cards kb-simple-dashboard-cards">
             ${metric("Planned bills", plannedBills, "Total bills planned for this month, not including Personal Money.")}
             ${metric("Already paid", matchedBills, "Bills already matched or marked paid from the monthly plan.", "green")}
-            ${metric("Current-month bill reserve", currentReservedForBills, "Only transactions explicitly marked This Month Bill Reserve / Vault.", currentReservedForBills > 0 ? "green" : "yellow")}
-            ${metric("Next month mortgage reserve", nextMonthMortgageReserve, "Use Next Month Mortgage Reserve / Vault for money already set aside for next month’s mortgages.", nextMonthMortgageReserve > 0 ? "green" : "yellow")}
+            ${metric("Reserved for bills still due this month", currentReservedForBills, "Only non-mortgage money intentionally reserved for bills still due this month.", currentReservedForBills > 0 ? "green" : "yellow")}
+            ${metric("Next month mortgage reserve", nextMonthMortgageReserve, "Money set aside now for next month’s mortgage payments.", nextMonthMortgageReserve > 0 ? "green" : "yellow")}
             ${metric("Uncovered bills", uncoveredBills, "This month’s bills left to pay minus only explicit current-month reserves.", uncoveredBills > 0 ? "yellow" : "green")}
             ${metric("Personal Money total", personalSpent, personalSpent > personalBudget ? `Budgeted ${money.format(personalBudget)} · Spent ${money.format(personalSpent)} · Deficit ${money.format(personalSpent - personalBudget)}` : `Budgeted ${money.format(personalBudget)} · Spent ${money.format(personalSpent)} · Surplus ${money.format(personalBudget - personalSpent)}`, personalSpent > personalBudget ? "red" : "green")}
           </div>
 
           <div class="section-title" style="margin:.25rem 0 .15rem"><h3>Month Outlook</h3><span>What is still coming, what is still unpaid, and whether we are okay</span></div>
-          <p class="muted small"><strong>Vault rule:</strong> only explicit current-month reserves reduce uncovered bills. Next-month mortgage reserves are shown separately and are not new income.</p>
+          <p class="muted small"><strong>Vault rule:</strong> mortgage reserve is for next month and shows separately. Only non-mortgage reserves for bills still due this month reduce uncovered bills.</p>
           <div class="cards kb-simple-dashboard-cards">
             ${metric("Expected income left", expectedIncomeLeft, expectedIncomeLeftText)}
             ${metric("Bills left to pay", stillReserved, "Bills still unpaid for this budget month.")}

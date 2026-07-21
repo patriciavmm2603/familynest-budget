@@ -1271,7 +1271,7 @@
       }
 
 
-      /* v58 other income wording */
+      /* v59 dashboard spending summary */
       .split-badge {
         display: inline-flex;
         gap: .25rem;
@@ -1723,6 +1723,9 @@
 
 
       /* v58: Other Income wording clarified as vault/non-job/non-side-hustle money */
+
+
+      /* v59: Dashboard Spending section shows planned, paid, left to pay, and Personal Money deficit/surplus */
 
 </style>
   
@@ -2729,11 +2732,12 @@
             ${metric("Side hustle gross", sideHustleGross, `${actualSideRows.length || paypalSideGigRows(month).length} side hustle deposit${(actualSideRows.length || paypalSideGigRows(month).length) === 1 ? "" : "s"}. ${sideHint}`)}
           </div>
 
-          <div class="section-title" style="margin:.25rem 0 .15rem"><h3>Spending</h3><span>Family spending is separated from Personal Money</span></div>
+          <div class="section-title" style="margin:.25rem 0 .15rem"><h3>Spending</h3><span>Planned, paid, left to pay, and Personal Money status</span></div>
           <div class="cards kb-simple-dashboard-cards">
-            ${metric("Family spending", familySpent, "Reconciled spending that is not Personal Money.")}
-            ${metric("Personal spending", personalSpent, `${money.format(personalRemaining)} personal money remaining from ${money.format(personalBudget)} budgeted.`)}
-            ${metric("Planned bills", plannedBills, `${money.format(matchedBills)} matched/paid · ${money.format(stillReserved)} still reserved.`)}
+            ${metric("Planned bills", plannedBills, "Total bills planned for this month, not including Personal Money.")}
+            ${metric("Already paid", matchedBills, "Bills already matched or marked paid from the monthly plan.", "green")}
+            ${metric("Left to pay", stillReserved, "Planned bills still unpaid/reserved.", stillReserved > 0 ? "yellow" : "green")}
+            ${metric("Personal Money total", personalSpent, personalSpent > personalBudget ? `Budgeted ${money.format(personalBudget)} · Spent ${money.format(personalSpent)} · Deficit ${money.format(personalSpent - personalBudget)}` : `Budgeted ${money.format(personalBudget)} · Spent ${money.format(personalSpent)} · Surplus ${money.format(personalBudget - personalSpent)}`, personalSpent > personalBudget ? "red" : "green")}
           </div>
 
           <div class="section-title" style="margin:.25rem 0 .15rem"><h3>What is left</h3><span>Shows jobs-only cushion and total planned cushion</span></div>

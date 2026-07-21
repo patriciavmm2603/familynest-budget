@@ -1271,7 +1271,7 @@
       }
 
 
-      /* v59 dashboard spending summary */
+      /* v60 month outlook */
       .split-badge {
         display: inline-flex;
         gap: .25rem;
@@ -1726,6 +1726,9 @@
 
 
       /* v59: Dashboard Spending section shows planned, paid, left to pay, and Personal Money deficit/surplus */
+
+
+      /* v60: Month Outlook replaces confusing jobs-only gap/breathing room cards */
 
 </style>
   
@@ -2679,7 +2682,51 @@
       function reliableJobIncomeTotal() { return sum(reliableJobIncomeRows(), row => row.monthly); }
       function otherPlannedIncomeTotal(monthKey = state.activeMonth) { return sum(otherPlannedIncomeRows(), row => row.monthly) + quarterlyIncomeTotal(monthKey); }
 
-            function renderDashboard() {
+            function monthKeyCompare(a, b) {
+        return String(a || "").localeCompare(String(b || ""));
+      }
+
+      function activeMonthStatus() {
+        const now = new Date();
+        const currentKey = now.getFullYear() + "-" + String(now.getMonth() + 1).padStart(2, "0");
+        if (state.activeMonth > currentKey) return "future";
+        if (state.activeMonth < currentKey) return "past";
+        return "current";
+      }
+
+      function firstDayNumber(value) {
+        const text = String(value || "");
+        const match = text.match(/\b([1-9]|[12][0-9]|3[01])\b/);
+        return match ? Number(match[1]) : null;
+      }
+
+      function expectedPaychecksLeft(month = currentMonth()) {
+        const status = activeMonthStatus();
+        if (status === "past") return [];
+        const today = new Date().getDate();
+        return (month.paychecks || []).filter(row => {
+          const day = firstDayNumber(row.expectedDay || row.label || row.notes);
+          if (status === "future") return Number(row.amount || 0) > 0;
+          if (!day) return Number(row.amount || 0) > 0;
+          return day >= today && Number(row.amount || 0) > 0;
+        });
+      }
+
+      function expectedPaychecksLeftTotal(month = currentMonth()) {
+        return sum(expectedPaychecksLeft(month), row => Number(row.amount || 0));
+      }
+
+      function expectedPaychecksLeftLabel(month = currentMonth()) {
+        const rows = expectedPaychecksLeft(month);
+        if (!rows.length) return "No future paycheck buckets found for this month.";
+        return rows.map(row => {
+          const day = firstDayNumber(row.expectedDay || row.label || row.notes);
+          const when = day ? "around the " + day : (row.expectedDay || row.frequency || "expected");
+          return `${escapeHtml(row.owner || "Income")} ${escapeHtml(row.label || "paycheck")} ${money.format(Number(row.amount || 0))} ${escapeHtml(when)}`;
+        }).join(" · ");
+      }
+
+      function renderDashboard() {
         const month = currentMonth();
         applyBillPaymentStatuses(month);
 
@@ -2709,10 +2756,12 @@
         const matchedBills = sum(familyBudgetLines, row => Number(row.paidAmount || 0));
         const stillReserved = Math.max(0, plannedBills - matchedBills);
         const count = unreconciledCount(month);
-        const plannedAvailable = plannedJobIncome + plannedOtherIncome;
-        const plannedTotal = plannedBills + personalBudget;
-        const jobsOnlyGap = plannedJobIncome - plannedTotal;
-        const breathingRoom = plannedAvailable - plannedTotal;
+        const expectedLeftRows = expectedPaychecksLeft(month);
+        const expectedIncomeLeft = expectedPaychecksLeftTotal(month);
+        const expectedIncomeLeftText = expectedPaychecksLeftLabel(month);
+        const personalDeficit = Math.max(0, personalSpent - personalBudget);
+        const personalSurplus = Math.max(0, personalBudget - personalSpent);
+        const monthCushionAfterExpected = expectedIncomeLeft - stillReserved - personalDeficit;
         const actualNet = actualJobTotal + actualOtherTotal + actualSideTotal - familySpent - personalSpent;
 
         const plannedJobText = plannedJobRows.length
@@ -2740,11 +2789,13 @@
             ${metric("Personal Money total", personalSpent, personalSpent > personalBudget ? `Budgeted ${money.format(personalBudget)} · Spent ${money.format(personalSpent)} · Deficit ${money.format(personalSpent - personalBudget)}` : `Budgeted ${money.format(personalBudget)} · Spent ${money.format(personalSpent)} · Surplus ${money.format(personalBudget - personalSpent)}`, personalSpent > personalBudget ? "red" : "green")}
           </div>
 
-          <div class="section-title" style="margin:.25rem 0 .15rem"><h3>What is left</h3><span>Shows jobs-only cushion and total planned cushion</span></div>
+          <div class="section-title" style="margin:.25rem 0 .15rem"><h3>Month Outlook</h3><span>Looks at what is still expected, not like the month is already over</span></div>
           <div class="cards kb-simple-dashboard-cards">
-            ${metric("Jobs-only gap / cushion", jobsOnlyGap, "Reliable job income − planned bills − personal money.", jobsOnlyGap < 0 ? "red" : "green")}
-            ${metric("Breathing room with other income", breathingRoom, "Reliable job income + planned other income − planned bills − personal money.", breathingRoom < 0 ? "red" : "green")}
-            ${metric("Actual net from statements", actualNet, "Actual job + other + side hustle income − family spending − personal spending.", actualNet < 0 ? "red" : "green")}
+            ${metric("Expected income left", expectedIncomeLeft, expectedIncomeLeftText)}
+            ${metric("Bills left to pay", stillReserved, "Planned bills still unpaid/reserved.")}
+            ${metric("Personal Money status", personalDeficit > 0 ? -personalDeficit : personalSurplus, personalDeficit > 0 ? `Over personal budget by ${money.format(personalDeficit)}.` : `Still under personal budget by ${money.format(personalSurplus)}.`, personalDeficit > 0 ? "red" : "green")}
+            ${metric("Cushion after expected income", monthCushionAfterExpected, "Expected income left − bills left to pay − personal deficit.", monthCushionAfterExpected < 0 ? "red" : "green")}
+            ${metric("Actual statement result", actualNet, "Actual reviewed deposits minus actual reviewed spending so far.", actualNet < 0 ? "red" : "green")}
             ${metric("Needs review", count, "Imported transactions that still need category/owner/income type review.", count > 0 ? "red" : "")}
           </div>
 

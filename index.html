@@ -1271,7 +1271,7 @@
       }
 
 
-      /* v51 personal mobile nav */
+      /* v52 simple dashboard */
       .split-badge {
         display: inline-flex;
         gap: .25rem;
@@ -1629,6 +1629,73 @@
         .kb-bottom-nav button {
           font-size: .61rem !important;
           min-height: 44px !important;
+        }
+      }
+
+
+      /* v52 simplified Dashboard: no owner filter, no graphs, no duplicate dashboard sections */
+      .kb-simple-list {
+        display: grid;
+        gap: .65rem;
+      }
+
+      .kb-simple-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        padding: .8rem .9rem;
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        background: var(--bg);
+      }
+
+      .kb-simple-row span {
+        color: var(--ink);
+        font-weight: 750;
+      }
+
+      .kb-simple-row strong {
+        white-space: nowrap;
+      }
+
+      .kb-action-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: .7rem;
+      }
+
+      .kb-action-grid button {
+        min-height: 3.5rem;
+        border-radius: 16px;
+      }
+
+      .kb-dashboard-intro p {
+        line-height: 1.55;
+      }
+
+      @media (max-width: 980px) {
+        .kb-dashboard-split {
+          grid-template-columns: 1fr !important;
+        }
+      }
+
+      @media (max-width: 760px) {
+        .kb-simple-dashboard-cards {
+          grid-template-columns: 1fr !important;
+        }
+
+        .kb-simple-dashboard-cards .metric {
+          min-height: auto !important;
+        }
+
+        .kb-simple-row {
+          border-radius: 16px;
+          padding: .85rem;
+        }
+
+        .kb-action-grid {
+          grid-template-columns: 1fr !important;
         }
       }
 
@@ -2519,138 +2586,139 @@
       function renderDashboard() {
         const month = currentMonth();
         applyBillPaymentStatuses(month);
-        const ownerFilter = state.dashboardOwnerFilter || "Everyone";
-        const filteredBudgetLines = dashboardBudgetLines(month, ownerFilter);
-        const filteredIncomeRows = regularIncomeRows().filter(row => ownerFilter === "Everyone" || row.owner === ownerFilter);
+
+        const familyBudgetLines = dashboardBudgetLines(month, "Everyone");
+        const regularReliable = regularIncomeTotal();
         const activeQuarterRows = activeQuarterlyIncomeRows();
-        const activeQuarterTotal = sum(activeQuarterRows.filter(row => ownerFilter === "Everyone" || row.owner === ownerFilter), row => row.amount);
-        const quarterMonthActive = isQuarterlyIncomeMonth(state.activeMonth);
-        const regularReliable = sum(filteredIncomeRows, row => row.monthly);
+        const activeQuarterTotal = sum(activeQuarterRows, row => row.amount);
         const reliable = regularReliable + activeQuarterTotal;
-        const planned = sum(filteredBudgetLines, row => row.amount);
-        const personalBudget = dashboardPersonalBudget(month, ownerFilter);
-        const totalPlanned = planned + personalBudget;
-        const paidBills = sum(filteredBudgetLines, line => line.paidAmount || 0);
-        const personalSpent = dashboardPersonalSpent(month, ownerFilter);
-        const totalPaidOrSpent = paidBills + personalSpent;
-        const stillPlanned = Math.max(0, totalPlanned - totalPaidOrSpent);
-        const confirmedExtra = ownerFilter === "Everyone" ? contributionReceived(month) : 0;
+
         const sideHustleGross = paypalSideGigGross(month);
         const sideHustleSetAside = paypalSideGigSetAside(month);
         const sideHustleNet = paypalSideGigNet(month);
-        const sideHustleYtd = paypalSideHustleYtdTotals();
+        const sideHustleRows = paypalSideGigRows(month);
+
         const actualIncomeRows = actualStatementIncomeRows(month);
         const actualIncomeTotal = actualStatementIncomeTotal(month);
-        const incomeForView = reliable + confirmedExtra;
-        const available = incomeForView - totalPlanned;
-        const safeLeftAfterPlan = incomeForView - totalPaidOrSpent - stillPlanned;
-        const keepInfo = keepInAccountInfo(month, ownerFilter);
+
+        const familySpendRows = (month.transactions || []).filter(txn =>
+          Boolean(txn.reconciled) &&
+          Number(txn.amount || 0) < 0 &&
+          !isPersonalTransaction(txn)
+        );
+        const familySpent = Math.abs(sum(familySpendRows, txn => Number(txn.amount || 0)));
+
+        const personalRows = (month.transactions || []).filter(isPersonalTransaction);
+        const personalSpent = actualPersonalSpending(month);
+        const personalBudget = dashboardPersonalBudget(month, "Everyone");
+        const personalRemaining = Math.max(0, personalBudget - personalSpent);
+
+        const plannedBills = sum(familyBudgetLines, row => Number(row.amount || 0));
+        const matchedBills = sum(familyBudgetLines, row => Number(row.paidAmount || 0));
+        const stillReserved = Math.max(0, plannedBills - matchedBills);
+        const keepInfo = keepInAccountInfo(month, "Everyone");
         const count = unreconciledCount(month);
 
-        // Build chart data by category
-        const byCat = {};
-        filteredBudgetLines.forEach(line => { byCat[line.category] = (byCat[line.category] || 0) + Number(line.amount || 0); });
-        const catEntries = Object.entries(byCat).sort((a, b) => b[1] - a[1]).slice(0, 8);
+        const incomeAvailableForPlan = reliable;
+        const plannedTotalWithoutSideHustle = plannedBills + personalBudget;
+        const breathingRoom = incomeAvailableForPlan - plannedTotalWithoutSideHustle;
+        const actualOutflow = familySpent + personalSpent;
+        const actualNetFromStatements = actualIncomeTotal - actualOutflow;
 
-        // Build chart data by owner
-        const byOwner = {};
-        filteredBudgetLines.forEach(line => { byOwner[line.owner] = (byOwner[line.owner] || 0) + Number(line.amount || 0); });
+        const topFamilyCategories = Object.entries(familySpendRows.reduce((acc, txn) => {
+          const category = txn.category || "Uncategorized";
+          acc[category] = (acc[category] || 0) + Math.abs(Number(txn.amount || 0));
+          return acc;
+        }, {})).sort((a, b) => b[1] - a[1]).slice(0, 6);
 
-        const filterHint = ownerFilter === "Everyone" ? "Whole family view" : ownerFilter + " only";
+        const recentFamilyRows = familySpendRows.slice().sort((a, b) => String(b.date || "").localeCompare(String(a.date || ""))).slice(0, 8);
+        const recentPersonalRows = personalRows.slice().sort((a, b) => String(b.date || "").localeCompare(String(a.date || ""))).slice(0, 8);
 
-        document.querySelector("#dashboard").innerHTML = [
-          `<div class="card"><div class="section-title"><h3>Dashboard filter</h3><span>${escapeHtml(filterHint)}</span></div>
-          <div class="toolbar" style="justify-content:flex-start">
-            ${["Everyone","Patricia","Alec","Shared"].map(owner => `<button class="${ownerFilter === owner ? "" : "secondary"}" type="button" data-dashboard-owner="${owner}">${owner}</button>`).join("")}
-          </div></div>`,
+        const simpleRowsTable = (rows, emptyText) => rows.length ? `<div class="table-wrap"><table><thead><tr><th>Date</th><th>Description</th><th>Category</th><th>Owner</th><th class="money">Amount</th></tr></thead><tbody>${rows.map(txn => `<tr><td>${escapeHtml(txn.date || "")}</td><td><strong>${escapeHtml(txn.description || txn.name || "Transaction")}</strong></td><td>${escapeHtml(txn.category || "")}</td><td>${escapeHtml(txn.owner || "Shared")}</td><td class="money">${money.format(Math.abs(Number(txn.amount || 0)))}</td></tr>`).join("")}</tbody></table></div>` : `<div class="empty">${escapeHtml(emptyText)}</div>`;
 
-          renderQuarterlyIncomeNotice(activeQuarterTotal, activeQuarterRows.length, quarterMonthActive),
-
-          `<div class="section-title" style="margin:.25rem 0 .15rem"><h3>Money coming in</h3><span>Only reliable + active quarterly money is used for planning</span></div>
-          <div class="cards">
-            ${metric("Reliable income", reliable, ownerFilter === "Everyone" ? "Planned regular income + active quarterly money." : "Planned regular + active quarterly money for " + ownerFilter + ".")}
-            ${actualIncomeMetricCard(actualIncomeTotal, actualIncomeRows)}
-            ${quarterlyMoneyMetricCard(activeQuarterTotal, quarterMonthActive, activeQuarterRows.length)}
-            ${sideHustleMetricCard(sideHustleGross, sideHustleSetAside, sideHustleNet, paypalSideGigRows(month).length, sideHustleYtd)}
+        document.querySelector("#dashboard").innerHTML = `
+          <div class="card kb-dashboard-intro">
+            <div class="section-title">
+              <h3>Month at a glance</h3>
+              <span>${escapeHtml(month.label || state.activeMonth)} · no Patricia/Alec filter here</span>
+            </div>
+            <p class="muted" style="margin:0">Dashboard is now grouped by money type: income, family spending, and personal spending. Patricia/Alec details still live in Income, Personal Money, and Monthly Plan.</p>
           </div>
 
-          <div class="section-title" style="margin:.25rem 0 .15rem"><h3>Monthly plan</h3><span>Bills, personal money, and cash guard</span></div>
-          <div class="cards">
-            ${metric("Planned bills", planned, filteredBudgetLines.length + " bill lines · " + filterHint)}
-            ${personalMoneyMetricCard(personalBudget, personalSpent)}
-            ${metric("Keep in account", keepInfo.keepInAccount, `${money.format(keepInfo.billsTotal)} bills + ${money.format(keepInfo.flexTotal)} prorated + ${money.format(keepInfo.buffer)} buffer. Open the Keep in Account tab for the list.`)}
+          ${renderQuarterlyIncomeNotice(activeQuarterTotal, activeQuarterRows.length, isQuarterlyIncomeMonth(state.activeMonth))}
+
+          <div class="section-title" style="margin:.25rem 0 .15rem">
+            <h3>Income</h3>
+            <span>Side hustle stays separate from reliable income</span>
+          </div>
+          <div class="cards kb-simple-dashboard-cards">
+            ${metric("Reliable income", reliable, "Regular reliable income + active quarterly income for this month.")}
+            ${metric("Actual income from statements", actualIncomeTotal, `${actualIncomeRows.length} reconciled income deposit${actualIncomeRows.length === 1 ? "" : "s"} categorized as Income, excluding PayPal side hustles.`)}
+            ${metric("Side hustle gross", sideHustleGross, `${sideHustleRows.length} PayPal side hustle item${sideHustleRows.length === 1 ? "" : "s"}. Tracked separately from reliable income.`)}
+            ${metric("Side hustle set aside", sideHustleSetAside, `Estimated tax/savings set-aside. Net side hustle: ${money.format(sideHustleNet)}.`)}
           </div>
 
-          <div class="section-title" style="margin:.25rem 0 .15rem"><h3>What is left</h3><span>Side hustle is tracked separately here</span></div>
-          <div class="cards">
-            ${metric("Breathing room", available, available >= 0 ? "After bills and personal money." : "Plan is over reliable income.", available < 0 ? "red" : "")}
-            ${metric("Safe leftover after plan", safeLeftAfterPlan, "Expected income − used − still reserved.", safeLeftAfterPlan < 0 ? "red" : "")}
-          </div>`,
+          <div class="section-title" style="margin:.25rem 0 .15rem">
+            <h3>Spending</h3>
+            <span>Family spending is separated from Personal Money</span>
+          </div>
+          <div class="cards kb-simple-dashboard-cards">
+            ${metric("Family spending", familySpent, "Reconciled spending that is not Personal Money.")}
+            ${metric("Personal spending", personalSpent, `${money.format(personalRemaining)} personal money remaining from ${money.format(personalBudget)} budgeted.`)}
+            ${metric("Planned bills", plannedBills, `${money.format(matchedBills)} matched/paid · ${money.format(stillReserved)} still reserved.`)}
+            ${metric("Keep in account", keepInfo.keepInAccount, "Amount that should stay in the joint account before the next paycheck.")}
+          </div>
 
-          // SPENDING BY CATEGORY CHART
-          `<div class="chart-card">
-            <h3>Spending by category</h3>
-            <div class="legend" id="catLegend"></div>
-            <div style="position:relative;width:100%;height:220px"><canvas id="catChart" role="img" aria-label="Bar chart of planned spending by category">Spending by category for ${escapeHtml(month.label)}.</canvas></div>
-          </div>`,
+          <div class="section-title" style="margin:.25rem 0 .15rem">
+            <h3>What is left</h3>
+            <span>Reliable income is the planning base; side hustle is extra and separate</span>
+          </div>
+          <div class="cards kb-simple-dashboard-cards">
+            ${metric("Breathing room", breathingRoom, "Reliable income − planned bills − personal money.", breathingRoom < 0 ? "red" : "green")}
+            ${metric("Actual net from statements", actualNetFromStatements, "Actual statement income − family spending − personal spending.", actualNetFromStatements < 0 ? "red" : "green")}
+            ${metric("Needs review", count, "Imported transactions that still need category/owner review.", count > 0 ? "red" : "")}
+          </div>
 
-          // INCOME vs BILLS split chart
-          `<div class="split" style="margin-bottom:1rem">
-            <div class="chart-card" style="margin-bottom:0">
-              <h3>Bills by owner</h3>
-              <div class="legend" id="ownerLegend"></div>
-              <div style="position:relative;width:100%;height:200px"><canvas id="ownerChart" role="img" aria-label="Donut chart of planned spending by owner">Bills by owner.</canvas></div>
+          <div class="split kb-dashboard-split">
+            <div class="card">
+              <div class="section-title"><h3>Family spending by category</h3><span>No graph, just the truth</span></div>
+              ${topFamilyCategories.length ? `<div class="kb-simple-list">${topFamilyCategories.map(([category, amount]) => `<div class="kb-simple-row"><span>${escapeHtml(category)}</span><strong>${money.format(amount)}</strong></div>`).join("")}</div>` : `<div class="empty">No reconciled family spending yet.</div>`}
+              <div class="toolbar" style="justify-content:flex-start;margin-top:1rem"><button type="button" class="secondary" data-jump="transactions">Open CSV Review</button></div>
             </div>
-            <div class="chart-card" style="margin-bottom:0">
-              <h3>Income vs planned</h3>
-              <div class="legend" id="incVsPlanLegend"></div>
-              <div style="position:relative;width:100%;height:200px"><canvas id="incVsPlanChart" role="img" aria-label="Bar chart comparing income to planned bills">Income versus planned spending.</canvas></div>
+            <div class="card">
+              <div class="section-title"><h3>Quick actions</h3><span>Open the detailed pages only when needed</span></div>
+              <div class="kb-action-grid">
+                <button type="button" data-jump="income">Income</button>
+                <button type="button" data-jump="allowance">Personal Money</button>
+                <button type="button" data-jump="budget">Monthly Plan</button>
+                <button type="button" data-jump="cashguard">Keep in Account</button>
+              </div>
             </div>
-          </div>`,
+          </div>
 
-          count ? `<div class="banner"><div><strong>${count} imported lines still need a home</strong><span>Do the review before calling the month clean.</span></div><button type="button" class="secondary" data-jump="transactions">Go to Review</button></div>` : ""
-        ].join("");
+          <div class="split kb-dashboard-split">
+            <div class="card">
+              <div class="section-title"><h3>Recent family spending</h3><span>Not personal</span></div>
+              ${simpleRowsTable(recentFamilyRows, "No reconciled non-personal spending yet.")}
+            </div>
+            <div class="card">
+              <div class="section-title"><h3>Recent personal spending</h3><span>Only category = Personal</span></div>
+              ${simpleRowsTable(recentPersonalRows, "No reconciled Personal Money spending yet.")}
+            </div>
+          </div>
 
-        // Draw category chart
-        destroyChart("catChart");
-        chartInstances["catChart"] = new Chart(document.getElementById("catChart"), {
-          type: "bar",
-          data: {
-            labels: catEntries.map(([k]) => k),
-            datasets: [{ label: "Planned", data: catEntries.map(([,v]) => v), backgroundColor: catEntries.map((_, i) => CHART_COLORS[i % CHART_COLORS.length]), borderRadius: 4, borderSkipped: false }]
-          },
-          options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => " " + money.format(ctx.raw) } } }, scales: { x: { ticks: { color: "#888", font: { size: 10 } }, grid: { display: false } }, y: { ticks: { color: "#888", font: { size: 10 }, callback: v => "$" + Math.round(v / 1000) + "k" }, grid: { color: "rgba(128,128,128,0.12)" } } } }
-        });
-        document.getElementById("catLegend").innerHTML = catEntries.map(([k, v], i) =>
-          `<span><span class="legend-dot" style="background:${CHART_COLORS[i % CHART_COLORS.length]}"></span>${escapeHtml(k)} ${money.format(v)}</span>`
-        ).join("");
+          ${count ? `<div class="banner"><div><strong>${count} imported lines still need a home</strong><span>Review category and owner before trusting the dashboard totals.</span></div><button type="button" class="secondary" data-jump="transactions">Go to Review</button></div>` : ""}
+        `;
 
-        // Draw owner donut
-        destroyChart("ownerChart");
-        const ownerColors = ["#2a78d6","#1baf7a","#eda100"];
-        const ownerEntries = Object.entries(byOwner);
-        chartInstances["ownerChart"] = new Chart(document.getElementById("ownerChart"), {
-          type: "doughnut",
-          data: { labels: ownerEntries.map(([k]) => k), datasets: [{ data: ownerEntries.map(([,v]) => v), backgroundColor: ownerColors, borderWidth: 2 }] },
-          options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => " " + money.format(ctx.raw) } } } }
-        });
-        document.getElementById("ownerLegend").innerHTML = ownerEntries.map(([k, v], i) =>
-          `<span><span class="legend-dot" style="background:${ownerColors[i % ownerColors.length]}"></span>${escapeHtml(k)} ${money.format(v)}</span>`
-        ).join("");
-
-        // Draw income vs planned bar
-        destroyChart("incVsPlanChart");
-        chartInstances["incVsPlanChart"] = new Chart(document.getElementById("incVsPlanChart"), {
-          type: "bar",
-          data: { labels: ["Income","Planned","% ratio"], datasets: [{ data: [incomeForView, totalPlanned, incomeForView > 0 ? Math.round(totalPlanned / incomeForView * 100) : 0], backgroundColor: ["#1baf7a", "#2a78d6", incomeForView > 0 && totalPlanned > incomeForView ? "#e34948" : "#eda100"], borderRadius: 4 }] },
-          options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => ctx.dataIndex === 2 ? " " + ctx.raw + "%" : " " + money.format(ctx.raw) } } }, scales: { x: { ticks: { color: "#888", font: { size: 10 } }, grid: { display: false } }, y: { ticks: { color: "#888", font: { size: 10 }, callback: (v, i, vals) => i === vals.length - 1 ? "" : "$" + Math.round(v / 1000) + "k" }, grid: { color: "rgba(128,128,128,0.12)" } } } }
-        });
-
-        document.querySelectorAll("[data-jump]").forEach(btn => btn.addEventListener("click", () => { state.activeView = btn.dataset.jump; render(); }));
-        document.querySelectorAll("[data-dashboard-owner]").forEach(btn => btn.addEventListener("click", () => { state.dashboardOwnerFilter = btn.dataset.dashboardOwner; render(); saveState(); }));
+        ["catChart", "ownerChart", "incVsPlanChart"].forEach(destroyChart);
+        document.querySelectorAll("[data-jump]").forEach(btn => btn.addEventListener("click", () => {
+          state.activeView = btn.dataset.jump;
+          render();
+          saveState();
+        }));
       }
 
-      function renderKeepInAccountCard(info) {
+            function renderKeepInAccountCard(info) {
         const selectedAssumed = new Set(normalizeFilterValues(state.safetyAssumePaidBillIds));
         const billCandidateRows = (info.billCandidates || []).map(line => ({...line, keepType: "Bill", keepAmount: Number(line.remainingAmount || line.amount || 0), canAssumePaid: true, assumedPaid: selectedAssumed.has(line.id)}));
         const flexRows = (info.flexItems || []).map(line => ({...line, canAssumePaid: false, assumedPaid: false}));

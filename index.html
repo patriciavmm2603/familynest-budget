@@ -1271,7 +1271,7 @@
       }
 
 
-      /* v56 income type dashboard personal */
+      /* v58 other income wording */
       .split-badge {
         display: inline-flex;
         gap: .25rem;
@@ -1717,6 +1717,12 @@
       @media (max-width: 760px) {
         #allowance .form-grid .metric { grid-column: 1 / -1; }
       }
+
+
+      /* v57: Dashboard detail tables removed; Quick actions kept with Compare Months */
+
+
+      /* v58: Other Income wording clarified as vault/non-job/non-side-hustle money */
 
 </style>
   
@@ -2693,7 +2699,6 @@
 
         const familySpendRows = (month.transactions || []).filter(txn => Boolean(txn.reconciled) && Number(txn.amount || 0) < 0 && !isPersonalTransaction(txn));
         const familySpent = Math.abs(sum(familySpendRows, txn => Number(txn.amount || 0)));
-        const personalRows = (month.transactions || []).filter(isPersonalTransaction);
         const personalSpent = actualPersonalSpending(month);
         const personalBudget = dashboardPersonalBudget(month, "Everyone");
         const personalRemaining = Math.max(0, personalBudget - personalSpent);
@@ -2707,16 +2712,9 @@
         const breathingRoom = plannedAvailable - plannedTotal;
         const actualNet = actualJobTotal + actualOtherTotal + actualSideTotal - familySpent - personalSpent;
 
-        const topFamilyCategories = Object.entries(familySpendRows.reduce((acc, txn) => {
-          const category = txn.category || "Uncategorized";
-          acc[category] = (acc[category] || 0) + Math.abs(Number(txn.amount || 0));
-          return acc;
-        }, {})).sort((a, b) => b[1] - a[1]).slice(0, 6);
-        const recentFamilyRows = familySpendRows.slice().sort((a, b) => String(b.date || "").localeCompare(String(a.date || ""))).slice(0, 8);
-        const recentPersonalRows = personalRows.slice().sort((a, b) => String(b.date || "").localeCompare(String(a.date || ""))).slice(0, 8);
-
-        const simpleRowsTable = (rows, emptyText) => rows.length ? `<div class="table-wrap"><table><thead><tr><th>Date</th><th>Description</th><th>Category</th><th>Income Type</th><th class="money">Amount</th></tr></thead><tbody>${rows.map(txn => `<tr><td>${escapeHtml(txn.date || "")}</td><td><strong>${escapeHtml(txn.description || txn.name || "Transaction")}</strong><div class="muted">${escapeHtml(txn.account || "")}</div></td><td>${escapeHtml(txn.category || "")}</td><td>${escapeHtml(transactionIncomeType(txn) || "")}</td><td class="money">${money.format(Math.abs(Number(txn.amount || 0)))}</td></tr>`).join("")}</tbody></table></div>` : `<div class="empty">${escapeHtml(emptyText)}</div>`;
-        const plannedJobText = plannedJobRows.length ? plannedJobRows.map(row => `${escapeHtml(row.source || row.name || row.owner || row.type || "Income")} ${money.format(Number(row.monthly || 0))}`).join(" · ") : "Add salary rows in Income.";
+        const plannedJobText = plannedJobRows.length
+          ? plannedJobRows.map(row => `${escapeHtml(row.source || row.name || row.owner || row.type || "Income")} ${money.format(Number(row.monthly || 0))}`).join(" · ")
+          : "Add salary rows in Income.";
         const sideHint = `Set aside this month: ${money.format(sideHustleSetAside)} · Set aside overall: ${money.format(sideHustleYtd.setAside || 0)} · Net: ${money.format(sideHustleNet)}`;
 
         document.querySelector("#dashboard").innerHTML = `
@@ -2727,7 +2725,7 @@
           <div class="cards kb-simple-dashboard-cards">
             ${metric("Reliable job income", plannedJobIncome, plannedJobText)}
             ${metric("Actual job income", actualJobTotal, `${actualJobRows.length} statement deposit${actualJobRows.length === 1 ? "" : "s"} classified as Job Income.`)}
-            ${metric("Actual other income", actualOtherTotal, `${actualOtherRows.length} statement deposit${actualOtherRows.length === 1 ? "" : "s"} classified as Other Income.`)}
+            ${metric("Actual other income", actualOtherTotal, `${actualOtherRows.length} deposit${actualOtherRows.length === 1 ? "" : "s"} from vaults or other non-job / non-side-hustle money.`)}
             ${metric("Side hustle gross", sideHustleGross, `${actualSideRows.length || paypalSideGigRows(month).length} side hustle deposit${(actualSideRows.length || paypalSideGigRows(month).length) === 1 ? "" : "s"}. ${sideHint}`)}
           </div>
 
@@ -2746,31 +2744,16 @@
             ${metric("Needs review", count, "Imported transactions that still need category/owner/income type review.", count > 0 ? "red" : "")}
           </div>
 
-          <div class="split kb-dashboard-split">
-            <div class="card">
-              <div class="section-title"><h3>Family spending by category</h3><span>No graph, just the truth</span></div>
-              ${topFamilyCategories.length ? `<div class="kb-simple-list">${topFamilyCategories.map(([category, amount]) => `<div class="kb-simple-row"><span>${escapeHtml(category)}</span><strong>${money.format(amount)}</strong></div>`).join("")}</div>` : `<div class="empty">No reconciled family spending yet.</div>`}
-              <div class="toolbar" style="justify-content:flex-start;margin-top:1rem"><button type="button" class="secondary" data-jump="transactions">Open CSV Review</button></div>
+          <div class="card">
+            <div class="section-title"><h3>Quick actions</h3><span>Open the detailed pages only when needed</span></div>
+            <div class="kb-action-grid">
+              <button type="button" data-jump="income">Income</button>
+              <button type="button" data-jump="allowance">Personal Money</button>
+              <button type="button" data-jump="budget">Monthly Plan</button>
+              <button type="button" data-jump="transactions">CSV Review</button>
+              <button type="button" data-jump="compare">Compare Months</button>
+              <button type="button" data-jump="debt">Debt Tracker</button>
             </div>
-            <div class="card">
-              <div class="section-title"><h3>Quick actions</h3><span>Open the detailed pages only when needed</span></div>
-              <div class="kb-action-grid">
-                <button type="button" data-jump="income">Income</button>
-                <button type="button" data-jump="allowance">Personal Money</button>
-                <button type="button" data-jump="budget">Monthly Plan</button>
-                <button type="button" data-jump="transactions">CSV Review</button>
-              </div>
-            </div>
-          </div>
-
-          <div class="split kb-dashboard-split">
-            <div class="card"><div class="section-title"><h3>Recent job income</h3><span>From statements</span></div>${simpleRowsTable(actualJobRows.slice().sort((a,b)=>String(b.date||"").localeCompare(String(a.date||""))).slice(0,8), "No Job Income statement deposits yet.")}</div>
-            <div class="card"><div class="section-title"><h3>Recent other income</h3><span>Vault, savings, quarterly, reimbursements</span></div>${simpleRowsTable(actualOtherRows.slice().sort((a,b)=>String(b.date||"").localeCompare(String(a.date||""))).slice(0,8), "No Other Income statement deposits yet.")}</div>
-          </div>
-
-          <div class="split kb-dashboard-split">
-            <div class="card"><div class="section-title"><h3>Recent family spending</h3><span>Not personal</span></div>${simpleRowsTable(recentFamilyRows, "No reconciled non-personal spending yet.")}</div>
-            <div class="card"><div class="section-title"><h3>Recent personal spending</h3><span>Only category = Personal</span></div>${simpleRowsTable(recentPersonalRows, "No reconciled Personal Money spending yet.")}</div>
           </div>
 
           ${count ? `<div class="banner"><div><strong>${count} imported lines still need a home</strong><span>Review category, owner, and income type before trusting the dashboard totals.</span></div><button type="button" class="secondary" data-jump="transactions">Go to Review</button></div>` : ""}
@@ -4271,7 +4254,7 @@
             ${metric("Planned job income", plannedJob, "Reliable salary/paycheck money.")}
             ${metric("Planned other income", plannedOther, "Vault, savings, quarterly, reimbursements, or one-time planned money.")}
             ${metric("Actual job income", actualJobTotal, actualJobRows.length + " statement deposit" + (actualJobRows.length === 1 ? "" : "s") + " classified as Job Income.", "green")}
-            ${metric("Actual other income", actualOtherTotal, actualOtherRows.length + " statement deposit" + (actualOtherRows.length === 1 ? "" : "s") + " classified as Other Income.", "green")}
+            ${metric("Actual other income", actualOtherTotal, actualOtherRows.length + " deposit" + (actualOtherRows.length === 1 ? "" : "s") + " from vaults or other non-job / non-side-hustle money.", "green")}
             ${metric("Side hustle gross", paypalGross, "PayPal is always side hustle. Set aside this month: " + money.format(paypalSetAside) + " · Set aside overall: " + money.format(paypalYtd.setAside || 0) + " · Net: " + money.format(paypalNet))}
           </div>`,
 

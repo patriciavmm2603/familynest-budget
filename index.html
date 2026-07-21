@@ -1271,7 +1271,7 @@
       }
 
 
-      /* v70 fix personal money count */
+      /* v71 reserve wording dashboard check */
       .split-badge {
         display: inline-flex;
         gap: .25rem;
@@ -1760,6 +1760,9 @@
 
       /* v70: Fix Personal Money counting after vault rule; category Personal counts again */
 
+
+      /* v71: Dashboard distinguishes next-month mortgage reserves from current-month uncovered bills */
+
 </style>
   
   <link rel="manifest" href="/manifest.webmanifest">
@@ -1944,7 +1947,7 @@
       const PAYPAL_SIDE_HUSTLE_TAX_RATE = 30;
       const owners = ["Patricia", "Alec", "Shared"];
       const assets = ["House 1", "House 2", "Car 1", "Car 2", "Family", "Debt", "Giving", "Kids", "Personal"];
-      const categories = ["Personal", "Credit Cards", "Medical", "Entertainment", "Fuel", "Groceries", "Insurance", "HOA", "Mortgage", "Patinada", "Utilities", "Income", "Side Hustles", "Side Gig", "Contribution", "Debt", "Savings", "This Month Bill Reserve / Vault", "Transfer / Vault Movement", "Quarterly Reserve / Vault Set-Aside", "Paid from Vault / Already Reserved", "Uncategorized"];
+      const categories = ["Personal", "Credit Cards", "Medical", "Entertainment", "Fuel", "Groceries", "Insurance", "HOA", "Mortgage", "Patinada", "Utilities", "Income", "Side Hustles", "Side Gig", "Contribution", "Debt", "Savings", "Next Month Mortgage Reserve / Vault", "This Month Bill Reserve / Vault", "Transfer / Vault Movement", "Quarterly Reserve / Vault Set-Aside", "Paid from Vault / Already Reserved", "Uncategorized"];
       const incomeTypes = ["", "Job Income", "Side Hustle Income", "Other Income"];
       const statuses = ["Not Paid", "Scheduled", "Committed", "Funded", "Paid", "Partial", "Auto-pay", "Review", "Skipped"];
       const navItems = [
@@ -2674,6 +2677,7 @@
       function isVaultMovementCategory(value) {
         const category = String(value || "").trim().toLowerCase();
         return [
+          "next month mortgage reserve / vault",
           "this month bill reserve / vault",
           "transfer / vault movement",
           "quarterly reserve / vault set-aside",
@@ -2706,6 +2710,8 @@
           txn.merchant
         ].join(" ").toLowerCase();
 
+        if (category === "next month mortgage reserve / vault") return false;
+        if (/(next month|next-month).*mortgage/.test(text)) return false;
         if (category === "this month bill reserve / vault") return true;
         if (category === "transfer / vault movement" && /(mortgage|pennymac|this month|current month|current bill)/.test(text)) return true;
         return false;
@@ -2722,7 +2728,7 @@
           txn.name,
           txn.merchant
         ].join(" ").toLowerCase();
-        return category === "quarterly reserve / vault set-aside" || /quarterly|future reserve|future bill/.test(text);
+        return category === "quarterly reserve / vault set-aside" || category === "next month mortgage reserve / vault" || /quarterly|future reserve|future bill/.test(text);
       }
 
       function currentMonthBillReserveRows(month = currentMonth()) {
@@ -2731,6 +2737,27 @@
 
       function currentMonthBillReserveTotal(month = currentMonth()) {
         return Math.abs(sum(currentMonthBillReserveRows(month), txn => Number(txn.amount || 0)));
+      }
+
+      function nextMonthMortgageReserveRows(month = currentMonth()) {
+        return (month.transactions || []).filter(txn => {
+          if (!txn || !txn.reconciled || Number(txn.amount || 0) >= 0) return false;
+          const category = String(txn.category || "").trim().toLowerCase();
+          const text = [
+            txn.category,
+            txn.subcategory,
+            txn.description,
+            txn.notes,
+            txn.name,
+            txn.merchant
+          ].join(" ").toLowerCase();
+          return category === "next month mortgage reserve / vault"
+            || /(next month|next-month|august|september|october|november|december|january|february|march|april|may|june|july).*mortgage/.test(text);
+        });
+      }
+
+      function nextMonthMortgageReserveTotal(month = currentMonth()) {
+        return Math.abs(sum(nextMonthMortgageReserveRows(month), txn => Number(txn.amount || 0)));
       }
 
       function futureReserveRows(month = currentMonth()) {
@@ -2937,7 +2964,8 @@
         const personalDeficit = Math.max(0, personalSpent - personalBudget);
         const personalSurplus = Math.max(0, personalBudget - personalSpent);
         const currentReservedForBills = Math.min(stillReserved, currentMonthBillReserveTotal(month));
-        const futureReservedForLater = futureReserveTotal(month);
+        const nextMonthMortgageReserve = nextMonthMortgageReserveTotal(month);
+        const futureReservedForLater = Math.max(0, futureReserveTotal(month) - nextMonthMortgageReserve);
         const uncoveredBills = Math.max(0, stillReserved - currentReservedForBills);
         const monthCushionAfterExpected = expectedIncomeLeft - uncoveredBills;
         const actualNet = actualJobTotal + actualOtherTotal + actualSideTotal - familySpent - personalSpent;
@@ -2962,19 +2990,21 @@
           <div class="cards kb-simple-dashboard-cards">
             ${metric("Planned bills", plannedBills, "Total bills planned for this month, not including Personal Money.")}
             ${metric("Already paid", matchedBills, "Bills already matched or marked paid from the monthly plan.", "green")}
-            ${metric("Reserved for this month", currentReservedForBills, "Current-month bill money already protected in vault.", currentReservedForBills > 0 ? "green" : "yellow")}
-            ${metric("Uncovered bills", uncoveredBills, "Bills left to pay minus current-month vault reserves.", uncoveredBills > 0 ? "yellow" : "green")}
+            ${metric("Current-month bill reserve", currentReservedForBills, "Only money reserved for bills still due this month.", currentReservedForBills > 0 ? "green" : "yellow")}
+            ${metric("Next month mortgage reserve", nextMonthMortgageReserve, "Already set aside for next month’s mortgage payments. Not used for this month’s uncovered bills.", nextMonthMortgageReserve > 0 ? "green" : "yellow")}
+            ${metric("Uncovered bills", uncoveredBills, "This month’s bills left to pay minus current-month reserves only.", uncoveredBills > 0 ? "yellow" : "green")}
             ${metric("Personal Money total", personalSpent, personalSpent > personalBudget ? `Budgeted ${money.format(personalBudget)} · Spent ${money.format(personalSpent)} · Deficit ${money.format(personalSpent - personalBudget)}` : `Budgeted ${money.format(personalBudget)} · Spent ${money.format(personalSpent)} · Surplus ${money.format(personalBudget - personalSpent)}`, personalSpent > personalBudget ? "red" : "green")}
           </div>
 
           <div class="section-title" style="margin:.25rem 0 .15rem"><h3>Month Outlook</h3><span>What is still coming, what is still unpaid, and whether we are okay</span></div>
-          <p class="muted small"><strong>Vault rule:</strong> current-month vault reserves reduce uncovered bills; quarterly/future reserves do not. Vault transfers are not new income or duplicate spending.</p>
+          <p class="muted small"><strong>Vault rule:</strong> current-month reserves reduce uncovered bills. Next-month mortgage reserves and future/quarterly reserves are shown separately and are not new income.</p>
           <div class="cards kb-simple-dashboard-cards">
             ${metric("Expected income left", expectedIncomeLeft, expectedIncomeLeftText)}
-            ${metric("Bills left to pay", stillReserved, "Planned bills still unpaid/reserved.")}
-            ${metric("Reserved for this month’s bills", currentReservedForBills, futureReservedForLater > 0 ? `${money.format(futureReservedForLater)} is saved for future/quarterly bills and is not counted here.` : "Current-month bill money already protected in vault.", currentReservedForBills > 0 ? "green" : "yellow")}
-            ${metric("Uncovered bills", uncoveredBills, "Bills left to pay minus current-month vault reserves.", uncoveredBills > 0 ? "yellow" : "green")}
-            ${metric(monthCushionAfterExpected >= 0 ? "Cushion after expected income" : "Short after expected income", monthCushionAfterExpected, "Expected income left − uncovered bills. Personal Money status is tracked separately.", monthCushionAfterExpected < 0 ? "red" : "green")}
+            ${metric("Bills left to pay", stillReserved, "Bills still unpaid for this budget month.")}
+            ${metric("Next month mortgage reserve", nextMonthMortgageReserve, "Already set aside for next month’s mortgage payments. Not used to calculate this month’s uncovered bills.", nextMonthMortgageReserve > 0 ? "green" : "yellow")}
+            ${metric("Future / quarterly reserve", futureReservedForLater, "Money saved for future or quarterly bills. Not used for this month’s uncovered bills.", futureReservedForLater > 0 ? "green" : "yellow")}
+            ${metric("Uncovered this month", uncoveredBills, "This month’s bills left to pay minus current-month reserves only.", uncoveredBills > 0 ? "yellow" : "green")}
+            ${metric(monthCushionAfterExpected >= 0 ? "Cushion after expected income" : "Short after expected income", monthCushionAfterExpected, "Expected income left − uncovered this month. Personal Money status is tracked separately.", monthCushionAfterExpected < 0 ? "red" : "green")}
             ${metric("Personal Money status", personalDeficit > 0 ? -personalDeficit : personalSurplus, personalDeficit > 0 ? `Over personal budget by ${money.format(personalDeficit)}.` : `Still under personal budget by ${money.format(personalSurplus)}.`, personalDeficit > 0 ? "red" : "green")}
           </div>
 

@@ -1271,7 +1271,7 @@
       }
 
 
-      /* v53 job vault income */
+      /* v54 smarter reliable income */
       .split-badge {
         display: inline-flex;
         gap: .25rem;
@@ -1704,6 +1704,9 @@
       .kb-dashboard-intro {
         border-left: 4px solid var(--green);
       }
+
+
+      /* v54 reliable income: normal recurring income defaults to job income unless clearly marked extra/vault */
 
 </style>
   
@@ -2589,26 +2592,33 @@
       }
 
       // ── DASHBOARD ────────────────────────────────────────────────────────────
+      function incomeRowText(row) {
+        return [row.source, row.name, row.owner, row.notes, row.type, row.category, row.label].join(" ").toLowerCase();
+      }
+
+      function isKnownJobIncomeRow(row) {
+        const text = incomeRowText(row);
+        return /campus\s*crusade|cru|city\s*(of\s*)?new\s*port\s*richey|new\s*port\s*richey|janis/.test(text);
+      }
+
+      function isExtraVaultIncomeRow(row) {
+        const text = incomeRowText(row);
+        return /vault|saving|savings|quarter|quarterly|bonus|reimburse|reimbursement|refund|transfer|one[-\s]?time|extra|side\s*hustle|paypal|pay\s*pal|prolific|gift|tax\s*refund|irs|escrow/.test(text);
+      }
+
       function reliableJobIncomeRows() {
-        const jobMatchers = [
-          /campus\s*crusade/i,
-          /\bcru\b/i,
-          /city\s*(of\s*)?new\s*port\s*richey/i,
-          /new\s*port\s*richey/i,
-          /\bjanis\b/i
-        ];
         return regularIncomeRows().filter(row => {
-          const text = [row.source, row.name, row.owner, row.notes, row.type].join(" ");
-          return jobMatchers.some(rx => rx.test(text));
+          if (isExtraVaultIncomeRow(row)) return false;
+          if (isKnownJobIncomeRow(row)) return true;
+          // Default normal recurring income rows to reliable job income.
+          // Anything that should not count as job income should be named/marked as Vault, Savings,
+          // Quarterly, Bonus, Reimbursement, Transfer, Side Hustle, PayPal, Prolific, etc.
+          return Number(row.monthly || 0) > 0;
         });
       }
 
       function extraVaultIncomeRows() {
-        const jobIds = new Set(reliableJobIncomeRows().map(row => row.id || [row.owner, row.source, row.name, row.monthly].join("|")));
-        return regularIncomeRows().filter(row => {
-          const key = row.id || [row.owner, row.source, row.name, row.monthly].join("|");
-          return !jobIds.has(key);
-        });
+        return regularIncomeRows().filter(row => isExtraVaultIncomeRow(row));
       }
 
       function reliableJobIncomeTotal() {
@@ -2685,7 +2695,7 @@
               <h3>Month at a glance</h3>
               <span>${escapeHtml(month.label || state.activeMonth)} · income separated by type</span>
             </div>
-            <p class="muted" style="margin:0">Reliable job income is only normal job/paycheck money: Campus Crusade, City of New Port Richey, and Janis. Extra / Vault money is everything else we are choosing to use, like savings, quarterly money, reimbursements, or one-time money.</p>
+            <p class="muted" style="margin:0">Reliable job income is normal recurring paycheck money. Extra / Vault money is anything named or marked as savings, vault, quarterly, bonus, reimbursement, transfer, one-time money, or side hustle.</p>
           </div>
 
           ${renderQuarterlyIncomeNotice(activeQuarterTotal, activeQuarterRows.length, isQuarterlyIncomeMonth(state.activeMonth))}
@@ -2695,7 +2705,7 @@
             <span>Jobs, vault/extra, and side hustle are separate</span>
           </div>
           <div class="cards kb-simple-dashboard-cards">
-            ${metric("Reliable job income", reliableJobs, `${jobRows.length} job income source${jobRows.length === 1 ? "" : "s"}: Campus Crusade, City of New Port Richey, Janis.`)}
+            ${metric("Reliable job income", reliableJobs, `${jobRows.length} reliable job income source${jobRows.length === 1 ? "" : "s"}. Rows named as vault/savings/quarterly/bonus/reimbursement/transfer/side hustle are excluded.`)}
             ${metric("Extra / Vault money", extraVault, `${money.format(sum(vaultRows, row => row.monthly))} other income + ${money.format(activeQuarterTotal)} quarterly money.`)}
             ${metric("Actual income from statements", actualIncomeTotal, `${actualIncomeRows.length} reconciled income deposit${actualIncomeRows.length === 1 ? "" : "s"} categorized as Income, excluding PayPal side hustles.`)}
             ${metric("Side hustle gross", sideHustleGross, `${sideHustleRows.length} PayPal side hustle item${sideHustleRows.length === 1 ? "" : "s"}. Tracked separately from job/vault money.`)}
@@ -2705,7 +2715,7 @@
           <div class="split kb-dashboard-split">
             <div class="card">
               <div class="section-title"><h3>Reliable job income sources</h3><span>Normal paycheck money only</span></div>
-              ${incomeSourceList(jobRows, row => row.monthly, "No job income sources matched yet. Add/rename them in Income as Campus Crusade, City of New Port Richey, or Janis.")}
+              ${incomeSourceList(jobRows, row => row.monthly, "No reliable job income sources found yet. Regular income rows count here unless they are named/marked as vault, savings, quarterly, bonus, reimbursement, transfer, or side hustle.")}
             </div>
             <div class="card">
               <div class="section-title"><h3>Extra / Vault money sources</h3><span>Savings, quarterly, one-time, other</span></div>

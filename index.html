@@ -1271,7 +1271,7 @@
       }
 
 
-      /* v77 vaults reserves clean */
+      /* v78 month outlook clear money */
       .split-badge {
         display: inline-flex;
         gap: .25rem;
@@ -1780,6 +1780,9 @@
 
 
       /* v77: Vaults section only shows reserve buckets; uncovered stays in Month Outlook */
+
+
+      /* v78: Month Outlook uses clearer money language: left after bills, not free extra money */
 
 </style>
   
@@ -3056,7 +3059,8 @@
         const nextMonthMortgageReserve = smartNextMonthMortgageReserveTotal(month);
         const futureReservedForLater = Math.max(0, futureReserveTotal(month));
         const uncoveredBills = Math.max(0, stillReserved - currentReservedForBills);
-        const monthCushionAfterExpected = expectedIncomeLeft - uncoveredBills;
+        const moneyLeftAfterBills = expectedIncomeLeft - uncoveredBills;
+        const monthCushionAfterExpected = moneyLeftAfterBills;
         const actualNet = actualJobTotal + actualOtherTotal + actualSideTotal - familySpent - personalSpent;
 
         const plannedJobText = plannedJobRows.length
@@ -3091,13 +3095,14 @@
             ${metric("Future / quarterly reserve", futureReservedForLater, "Money saved for future or quarterly bills.", futureReservedForLater > 0 ? "green" : "yellow")}
           </div>
 
-          <div class="section-title" style="margin:.25rem 0 .15rem"><h3>Month Outlook</h3><span>What is still coming, what is still unpaid, and whether we are okay</span></div>
+          <div class="section-title" style="margin:.25rem 0 .15rem"><h3>Month Outlook</h3><span>What is coming, what still needs income, and what remains after bills</span></div>
           <div class="cards kb-simple-dashboard-cards">
             ${metric("Expected income left", expectedIncomeLeft, expectedIncomeLeftText)}
-            ${metric("Bills left to pay", stillReserved, "Bills still unpaid for this budget month.")}
-            ${metric("Uncovered this month", uncoveredBills, "This month’s unpaid bills after applying reserves available for this month.", uncoveredBills > 0 ? "yellow" : "green")}
-            ${metric(monthCushionAfterExpected >= 0 ? "Cushion after expected income" : "Short after expected income", monthCushionAfterExpected, "Expected income left − uncovered this month. Personal Money status is tracked separately.", monthCushionAfterExpected < 0 ? "red" : "green")}
-            ${metric("Personal Money status", personalDeficit > 0 ? -personalDeficit : personalSurplus, personalDeficit > 0 ? `Over personal budget by ${money.format(personalDeficit)}.` : `Still under personal budget by ${money.format(personalSurplus)}.`, personalDeficit > 0 ? "red" : "green")}
+            ${metric("Bills still to pay", stillReserved, "Bills still unpaid for this budget month.")}
+            ${metric("Reserve applied this month", currentReservedForBills, "Reserve money available to cover bills still due this month.", currentReservedForBills > 0 ? "green" : "yellow")}
+            ${metric("Still needs income", uncoveredBills, "Bills still to pay after applying this month’s available reserves.", uncoveredBills > 0 ? "yellow" : "green")}
+            ${metric(moneyLeftAfterBills >= 0 ? "Left after bills" : "Short after bills", moneyLeftAfterBills, "Expected income left − still needs income. Not extra spending money; use it for Personal Money deficit, savings, vaults, or next month.", moneyLeftAfterBills < 0 ? "red" : "green")}
+            ${metric("Personal Money status", personalDeficit > 0 ? -personalDeficit : personalSurplus, personalDeficit > 0 ? `Over personal budget by ${money.format(personalDeficit)}. This is already spent, so review it separately from bill coverage.` : `Still under personal budget by ${money.format(personalSurplus)}.`, personalDeficit > 0 ? "red" : "green")}
           </div>
 
           <div class="card">

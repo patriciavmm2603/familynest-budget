@@ -1271,7 +1271,7 @@
       }
 
 
-      /* v54 smarter reliable income */
+      /* v56 income type dashboard personal */
       .split-badge {
         display: inline-flex;
         gap: .25rem;
@@ -1563,7 +1563,7 @@
         /* Bottom quick nav like Held, without removing the full top tabs */
         .kb-bottom-nav {
           display: grid !important;
-          grid-template-columns: repeat(6, 1fr) !important;
+          grid-template-columns: repeat(5, 1fr) !important;
           position: fixed !important;
           left: 10px !important;
           right: 10px !important;
@@ -1707,6 +1707,16 @@
 
 
       /* v54 reliable income: normal recurring income defaults to job income unless clearly marked extra/vault */
+
+
+      /* v55: Keep in Account removed from navigation tabs */
+
+
+      /* v56: income type classification, clean dashboard, no Income chart, Personal search total */
+      .kb-dashboard-intro { display:none !important; }
+      @media (max-width: 760px) {
+        #allowance .form-grid .metric { grid-column: 1 / -1; }
+      }
 
 </style>
   
@@ -1893,10 +1903,10 @@
       const owners = ["Patricia", "Alec", "Shared"];
       const assets = ["House 1", "House 2", "Car 1", "Car 2", "Family", "Debt", "Giving", "Kids", "Personal"];
       const categories = ["Personal", "Credit Cards", "Medical", "Entertainment", "Fuel", "Groceries", "Insurance", "HOA", "Mortgage", "Patinada", "Utilities", "Income", "Side Hustles", "Side Gig", "Contribution", "Debt", "Savings", "Uncategorized"];
+      const incomeTypes = ["", "Job Income", "Side Hustle Income", "Other Income"];
       const statuses = ["Not Paid", "Scheduled", "Committed", "Funded", "Paid", "Partial", "Auto-pay", "Review", "Skipped"];
       const navItems = [
         ["dashboard", "Dashboard"],
-        ["cashguard", "Keep in Account"],
         ["template", "Base Template"],
         ["budget", "Monthly Plan"],
         ["transactions", "CSV Review"],
@@ -2424,7 +2434,7 @@
         return Boolean(txn && txn.reconciled)
           && Number(txn.amount || 0) > 0
           && String(txn.category || "").trim() === "Income"
-          && !isPaypalSideGig(txn);
+          && transactionIncomeType(txn) !== "Side Hustle Income";
       }
       function actualStatementIncomeRows(month = currentMonth()) {
         return (month.transactions || []).filter(isActualStatementIncome);
@@ -2458,8 +2468,8 @@
       }
       function actualIncomeRowsTable(rows) {
         if (!rows.length) return `<div class="empty">No reconciled statement income yet. In CSV Review, categorize bank deposits as Income to show them here.</div>`;
-        return `<div class="table-wrap"><table><thead><tr><th>Date</th><th>Description</th><th>Owner</th><th>Account</th><th class="money">Amount</th></tr></thead><tbody>
-          ${rows.map(txn => `<tr><td>${escapeHtml(txn.date)}</td><td><strong>${escapeHtml(txn.description || "")}</strong></td><td>${ownerPill(txn.owner || "Unassigned")}</td><td>${escapeHtml(txn.account || "")}</td><td class="money" style="color:var(--green)">${money.format(txn.amount || 0)}</td></tr>`).join("")}
+        return `<div class="table-wrap"><table><thead><tr><th>Date</th><th>Description</th><th>Income Type</th><th>Owner</th><th>Account</th><th class="money">Amount</th></tr></thead><tbody>
+          ${rows.map(txn => `<tr><td>${escapeHtml(txn.date)}</td><td><strong>${escapeHtml(txn.description || "")}</strong></td><td>${escapeHtml(transactionIncomeType(txn) || "")}</td><td>${ownerPill(txn.owner || "Unassigned")}</td><td>${escapeHtml(txn.account || "")}</td><td class="money" style="color:var(--green)">${money.format(txn.amount || 0)}</td></tr>`).join("")}
         </tbody></table></div>`;
       }
       function contributionReceived(month = currentMonth()) { return sum(month.contributions || [], row => row.received); }
@@ -2513,7 +2523,7 @@
       function renderMobileBottomNav() {
         const node = document.querySelector("#mobileBottomNav");
         if (!node) return;
-        const quick = ["dashboard", "budget", "transactions", "allowance", "income", "cashguard"];
+        const quick = ["dashboard", "budget", "transactions", "allowance", "income"];
         node.innerHTML = quick.map(id => {
           const found = navItems.find(([view]) => view === id);
           if (!found) return "";
@@ -2592,158 +2602,148 @@
       }
 
       // ── DASHBOARD ────────────────────────────────────────────────────────────
-      function incomeRowText(row) {
-        return [row.source, row.name, row.owner, row.notes, row.type, row.category, row.label].join(" ").toLowerCase();
+      function normalizeIncomeType(value) {
+        const raw = String(value || "").trim().toLowerCase();
+        if (!raw) return "";
+        if (["job", "jobs", "salary", "paycheck", "reliable", "reliable job income", "job income"].includes(raw)) return "Job Income";
+        if (["side hustle", "side hustles", "side gig", "side gigs", "sidehustle", "paypal", "prolific", "side hustle income"].includes(raw)) return "Side Hustle Income";
+        if (["other", "other income", "vault", "vault income", "extra", "extra income", "savings", "saving", "quarterly", "quarterly money"].includes(raw)) return "Other Income";
+        return value;
       }
 
+      function incomeDetectionText(item) {
+        return [item?.description, item?.account, item?.category, item?.owner, item?.source, item?.name, item?.notes, item?.type, item?.incomeType].join(" ").toLowerCase();
+      }
+
+      function guessIncomeType(item) {
+        const current = normalizeIncomeType(item?.incomeType);
+        const text = incomeDetectionText(item);
+        if (/paypal|pay\s*pal|pp\*|prolific/.test(text)) return "Side Hustle Income";
+        if (/campus\s*crusade|\bcru\b|city\s*(of\s*)?new\s*port\s*richey|new\s*port\s*richey|\bjanis\b/.test(text)) return "Job Income";
+        if (/vault|saving|savings|quarter|quarterly|bonus|reimburse|reimbursement|refund|transfer|one[-\s]?time|extra|gift|tax\s*refund|irs|escrow/.test(text)) return "Other Income";
+        return current || "Job Income";
+      }
+
+      function transactionIncomeType(txn) {
+        if (!txn || Number(txn.amount || 0) <= 0) return "";
+        return normalizeIncomeType(txn.incomeType) || guessIncomeType(txn);
+      }
+
+      function isIncomeTxn(txn) {
+        return Boolean(txn && txn.reconciled) && Number(txn.amount || 0) > 0;
+      }
+
+      function actualJobIncomeRows(month = currentMonth()) {
+        return (month.transactions || []).filter(txn => isIncomeTxn(txn) && transactionIncomeType(txn) === "Job Income");
+      }
+      function actualSideHustleIncomeRows(month = currentMonth()) {
+        return (month.transactions || []).filter(txn => isIncomeTxn(txn) && transactionIncomeType(txn) === "Side Hustle Income");
+      }
+      function actualOtherIncomeRows(month = currentMonth()) {
+        return (month.transactions || []).filter(txn => isIncomeTxn(txn) && transactionIncomeType(txn) === "Other Income");
+      }
+      function actualJobIncomeTotal(month = currentMonth()) { return sum(actualJobIncomeRows(month), txn => Number(txn.amount || 0)); }
+      function actualSideHustleIncomeTotal(month = currentMonth()) { return sum(actualSideHustleIncomeRows(month), txn => Number(txn.amount || 0)); }
+      function actualOtherIncomeTotal(month = currentMonth()) { return sum(actualOtherIncomeRows(month), txn => Number(txn.amount || 0)); }
+
+      function incomeRowText(row) {
+        return [row.source, row.name, row.owner, row.notes, row.type, row.category, row.label, row.incomeType].join(" ").toLowerCase();
+      }
       function isKnownJobIncomeRow(row) {
         const text = incomeRowText(row);
-        return /campus\s*crusade|cru|city\s*(of\s*)?new\s*port\s*richey|new\s*port\s*richey|janis/.test(text);
+        const type = normalizeIncomeType(row.incomeType || row.type);
+        return type === "Job Income" || /campus\s*crusade|cru|city\s*(of\s*)?new\s*port\s*richey|new\s*port\s*richey|janis/.test(text);
       }
-
-      function isExtraVaultIncomeRow(row) {
+      function isOtherPlannedIncomeRow(row) {
         const text = incomeRowText(row);
-        return /vault|saving|savings|quarter|quarterly|bonus|reimburse|reimbursement|refund|transfer|one[-\s]?time|extra|side\s*hustle|paypal|pay\s*pal|prolific|gift|tax\s*refund|irs|escrow/.test(text);
+        const type = normalizeIncomeType(row.incomeType || row.type);
+        return type === "Other Income" || /vault|saving|savings|quarter|quarterly|bonus|reimburse|reimbursement|refund|transfer|one[-\s]?time|extra|gift|tax\s*refund|irs|escrow/.test(text);
       }
-
       function reliableJobIncomeRows() {
         return regularIncomeRows().filter(row => {
-          if (isExtraVaultIncomeRow(row)) return false;
+          if (isOtherPlannedIncomeRow(row)) return false;
           if (isKnownJobIncomeRow(row)) return true;
-          // Default normal recurring income rows to reliable job income.
-          // Anything that should not count as job income should be named/marked as Vault, Savings,
-          // Quarterly, Bonus, Reimbursement, Transfer, Side Hustle, PayPal, Prolific, etc.
           return Number(row.monthly || 0) > 0;
         });
       }
+      function otherPlannedIncomeRows() { return regularIncomeRows().filter(row => isOtherPlannedIncomeRow(row)); }
+      function reliableJobIncomeTotal() { return sum(reliableJobIncomeRows(), row => row.monthly); }
+      function otherPlannedIncomeTotal(monthKey = state.activeMonth) { return sum(otherPlannedIncomeRows(), row => row.monthly) + quarterlyIncomeTotal(monthKey); }
 
-      function extraVaultIncomeRows() {
-        return regularIncomeRows().filter(row => isExtraVaultIncomeRow(row));
-      }
-
-      function reliableJobIncomeTotal() {
-        return sum(reliableJobIncomeRows(), row => row.monthly);
-      }
-
-      function extraVaultIncomeTotal(monthKey = state.activeMonth) {
-        return sum(extraVaultIncomeRows(), row => row.monthly) + quarterlyIncomeTotal(monthKey);
-      }
-
-      function renderDashboard() {
+            function renderDashboard() {
         const month = currentMonth();
         applyBillPaymentStatuses(month);
 
         const familyBudgetLines = dashboardBudgetLines(month, "Everyone");
+        const plannedJobRows = reliableJobIncomeRows();
+        const plannedJobIncome = reliableJobIncomeTotal();
+        const plannedOtherIncome = otherPlannedIncomeTotal(state.activeMonth);
 
-        const jobRows = reliableJobIncomeRows();
-        const reliableJobs = reliableJobIncomeTotal();
+        const actualJobRows = actualJobIncomeRows(month);
+        const actualOtherRows = actualOtherIncomeRows(month);
+        const actualSideRows = actualSideHustleIncomeRows(month);
+        const actualJobTotal = actualJobIncomeTotal(month);
+        const actualOtherTotal = actualOtherIncomeTotal(month);
+        const actualSideTotal = actualSideHustleIncomeTotal(month);
 
-        const vaultRows = extraVaultIncomeRows();
-        const activeQuarterRows = activeQuarterlyIncomeRows();
-        const activeQuarterTotal = sum(activeQuarterRows, row => row.amount);
-        const extraVault = extraVaultIncomeTotal(state.activeMonth);
-
-        const sideHustleGross = paypalSideGigGross(month);
+        const sideHustleGross = paypalSideGigGross(month) || actualSideTotal;
         const sideHustleSetAside = paypalSideGigSetAside(month);
         const sideHustleNet = paypalSideGigNet(month);
-        const sideHustleRows = paypalSideGigRows(month);
+        const sideHustleYtd = paypalSideHustleYtdTotals();
 
-        const actualIncomeRows = actualStatementIncomeRows(month);
-        const actualIncomeTotal = actualStatementIncomeTotal(month);
-
-        const familySpendRows = (month.transactions || []).filter(txn =>
-          Boolean(txn.reconciled) &&
-          Number(txn.amount || 0) < 0 &&
-          !isPersonalTransaction(txn)
-        );
+        const familySpendRows = (month.transactions || []).filter(txn => Boolean(txn.reconciled) && Number(txn.amount || 0) < 0 && !isPersonalTransaction(txn));
         const familySpent = Math.abs(sum(familySpendRows, txn => Number(txn.amount || 0)));
-
         const personalRows = (month.transactions || []).filter(isPersonalTransaction);
         const personalSpent = actualPersonalSpending(month);
         const personalBudget = dashboardPersonalBudget(month, "Everyone");
         const personalRemaining = Math.max(0, personalBudget - personalSpent);
-
         const plannedBills = sum(familyBudgetLines, row => Number(row.amount || 0));
         const matchedBills = sum(familyBudgetLines, row => Number(row.paidAmount || 0));
         const stillReserved = Math.max(0, plannedBills - matchedBills);
-        const keepInfo = keepInAccountInfo(month, "Everyone");
         const count = unreconciledCount(month);
-
-        const incomeAvailableForPlan = reliableJobs + extraVault;
-        const plannedTotalWithoutSideHustle = plannedBills + personalBudget;
-        const jobOnlyBreathingRoom = reliableJobs - plannedTotalWithoutSideHustle;
-        const breathingRoom = incomeAvailableForPlan - plannedTotalWithoutSideHustle;
-        const actualOutflow = familySpent + personalSpent;
-        const actualNetFromStatements = actualIncomeTotal - actualOutflow;
+        const plannedAvailable = plannedJobIncome + plannedOtherIncome;
+        const plannedTotal = plannedBills + personalBudget;
+        const jobsOnlyGap = plannedJobIncome - plannedTotal;
+        const breathingRoom = plannedAvailable - plannedTotal;
+        const actualNet = actualJobTotal + actualOtherTotal + actualSideTotal - familySpent - personalSpent;
 
         const topFamilyCategories = Object.entries(familySpendRows.reduce((acc, txn) => {
           const category = txn.category || "Uncategorized";
           acc[category] = (acc[category] || 0) + Math.abs(Number(txn.amount || 0));
           return acc;
         }, {})).sort((a, b) => b[1] - a[1]).slice(0, 6);
-
         const recentFamilyRows = familySpendRows.slice().sort((a, b) => String(b.date || "").localeCompare(String(a.date || ""))).slice(0, 8);
         const recentPersonalRows = personalRows.slice().sort((a, b) => String(b.date || "").localeCompare(String(a.date || ""))).slice(0, 8);
 
-        const simpleRowsTable = (rows, emptyText) => rows.length ? `<div class="table-wrap"><table><thead><tr><th>Date</th><th>Description</th><th>Category</th><th>Owner</th><th class="money">Amount</th></tr></thead><tbody>${rows.map(txn => `<tr><td>${escapeHtml(txn.date || "")}</td><td><strong>${escapeHtml(txn.description || txn.name || "Transaction")}</strong></td><td>${escapeHtml(txn.category || "")}</td><td>${escapeHtml(txn.owner || "Shared")}</td><td class="money">${money.format(Math.abs(Number(txn.amount || 0)))}</td></tr>`).join("")}</tbody></table></div>` : `<div class="empty">${escapeHtml(emptyText)}</div>`;
-
-        const incomeSourceList = (rows, amountGetter, emptyText) => rows.length ? `<div class="kb-simple-list">${rows.map(row => `<div class="kb-simple-row"><span>${escapeHtml(row.source || row.name || row.owner || "Income")}</span><strong>${money.format(amountGetter(row))}</strong></div>`).join("")}</div>` : `<div class="empty">${escapeHtml(emptyText)}</div>`;
+        const simpleRowsTable = (rows, emptyText) => rows.length ? `<div class="table-wrap"><table><thead><tr><th>Date</th><th>Description</th><th>Category</th><th>Income Type</th><th class="money">Amount</th></tr></thead><tbody>${rows.map(txn => `<tr><td>${escapeHtml(txn.date || "")}</td><td><strong>${escapeHtml(txn.description || txn.name || "Transaction")}</strong><div class="muted">${escapeHtml(txn.account || "")}</div></td><td>${escapeHtml(txn.category || "")}</td><td>${escapeHtml(transactionIncomeType(txn) || "")}</td><td class="money">${money.format(Math.abs(Number(txn.amount || 0)))}</td></tr>`).join("")}</tbody></table></div>` : `<div class="empty">${escapeHtml(emptyText)}</div>`;
+        const plannedJobText = plannedJobRows.length ? plannedJobRows.map(row => `${escapeHtml(row.source || row.name || row.owner || row.type || "Income")} ${money.format(Number(row.monthly || 0))}`).join(" · ") : "Add salary rows in Income.";
+        const sideHint = `Set aside this month: ${money.format(sideHustleSetAside)} · Set aside overall: ${money.format(sideHustleYtd.setAside || 0)} · Net: ${money.format(sideHustleNet)}`;
 
         document.querySelector("#dashboard").innerHTML = `
-          <div class="card kb-dashboard-intro">
-            <div class="section-title">
-              <h3>Month at a glance</h3>
-              <span>${escapeHtml(month.label || state.activeMonth)} · income separated by type</span>
-            </div>
-            <p class="muted" style="margin:0">Reliable job income is normal recurring paycheck money. Extra / Vault money is anything named or marked as savings, vault, quarterly, bonus, reimbursement, transfer, one-time money, or side hustle.</p>
-          </div>
-
-          ${renderQuarterlyIncomeNotice(activeQuarterTotal, activeQuarterRows.length, isQuarterlyIncomeMonth(state.activeMonth))}
-
           <div class="section-title" style="margin:.25rem 0 .15rem">
             <h3>Income</h3>
-            <span>Jobs, vault/extra, and side hustle are separate</span>
+            <span>Job, side hustle, and other income are separated by transaction Income Type</span>
           </div>
           <div class="cards kb-simple-dashboard-cards">
-            ${metric("Reliable job income", reliableJobs, `${jobRows.length} reliable job income source${jobRows.length === 1 ? "" : "s"}. Rows named as vault/savings/quarterly/bonus/reimbursement/transfer/side hustle are excluded.`)}
-            ${metric("Extra / Vault money", extraVault, `${money.format(sum(vaultRows, row => row.monthly))} other income + ${money.format(activeQuarterTotal)} quarterly money.`)}
-            ${metric("Actual income from statements", actualIncomeTotal, `${actualIncomeRows.length} reconciled income deposit${actualIncomeRows.length === 1 ? "" : "s"} categorized as Income, excluding PayPal side hustles.`)}
-            ${metric("Side hustle gross", sideHustleGross, `${sideHustleRows.length} PayPal side hustle item${sideHustleRows.length === 1 ? "" : "s"}. Tracked separately from job/vault money.`)}
-            ${metric("Side hustle set aside", sideHustleSetAside, `Estimated tax/savings set-aside. Net side hustle: ${money.format(sideHustleNet)}.`)}
+            ${metric("Reliable job income", plannedJobIncome, plannedJobText)}
+            ${metric("Actual job income", actualJobTotal, `${actualJobRows.length} statement deposit${actualJobRows.length === 1 ? "" : "s"} classified as Job Income.`)}
+            ${metric("Actual other income", actualOtherTotal, `${actualOtherRows.length} statement deposit${actualOtherRows.length === 1 ? "" : "s"} classified as Other Income.`)}
+            ${metric("Side hustle gross", sideHustleGross, `${actualSideRows.length || paypalSideGigRows(month).length} side hustle deposit${(actualSideRows.length || paypalSideGigRows(month).length) === 1 ? "" : "s"}. ${sideHint}`)}
           </div>
 
-          <div class="split kb-dashboard-split">
-            <div class="card">
-              <div class="section-title"><h3>Reliable job income sources</h3><span>Normal paycheck money only</span></div>
-              ${incomeSourceList(jobRows, row => row.monthly, "No reliable job income sources found yet. Regular income rows count here unless they are named/marked as vault, savings, quarterly, bonus, reimbursement, transfer, or side hustle.")}
-            </div>
-            <div class="card">
-              <div class="section-title"><h3>Extra / Vault money sources</h3><span>Savings, quarterly, one-time, other</span></div>
-              ${incomeSourceList(vaultRows, row => row.monthly, "No regular extra/vault income rows yet.")}
-              ${activeQuarterRows.length ? `<div style="margin-top:.75rem">${incomeSourceList(activeQuarterRows, row => row.amount, "No quarterly money this month.")}</div>` : ""}
-            </div>
-          </div>
-
-          <div class="section-title" style="margin:.25rem 0 .15rem">
-            <h3>Spending</h3>
-            <span>Family spending is separated from Personal Money</span>
-          </div>
+          <div class="section-title" style="margin:.25rem 0 .15rem"><h3>Spending</h3><span>Family spending is separated from Personal Money</span></div>
           <div class="cards kb-simple-dashboard-cards">
             ${metric("Family spending", familySpent, "Reconciled spending that is not Personal Money.")}
             ${metric("Personal spending", personalSpent, `${money.format(personalRemaining)} personal money remaining from ${money.format(personalBudget)} budgeted.`)}
             ${metric("Planned bills", plannedBills, `${money.format(matchedBills)} matched/paid · ${money.format(stillReserved)} still reserved.`)}
-            ${metric("Keep in account", keepInfo.keepInAccount, "Amount that should stay in the joint account before the next paycheck.")}
           </div>
 
-          <div class="section-title" style="margin:.25rem 0 .15rem">
-            <h3>What is left</h3>
-            <span>Shows whether jobs alone cover it, then jobs + vault</span>
-          </div>
+          <div class="section-title" style="margin:.25rem 0 .15rem"><h3>What is left</h3><span>Shows jobs-only cushion and total planned cushion</span></div>
           <div class="cards kb-simple-dashboard-cards">
-            ${metric("Jobs-only gap / cushion", jobOnlyBreathingRoom, "Reliable job income − planned bills − personal money.", jobOnlyBreathingRoom < 0 ? "red" : "green")}
-            ${metric("Breathing room with vault", breathingRoom, "Reliable job income + Extra/Vault money − planned bills − personal money.", breathingRoom < 0 ? "red" : "green")}
-            ${metric("Actual net from statements", actualNetFromStatements, "Actual statement income − family spending − personal spending.", actualNetFromStatements < 0 ? "red" : "green")}
-            ${metric("Needs review", count, "Imported transactions that still need category/owner review.", count > 0 ? "red" : "")}
+            ${metric("Jobs-only gap / cushion", jobsOnlyGap, "Reliable job income − planned bills − personal money.", jobsOnlyGap < 0 ? "red" : "green")}
+            ${metric("Breathing room with other income", breathingRoom, "Reliable job income + planned other income − planned bills − personal money.", breathingRoom < 0 ? "red" : "green")}
+            ${metric("Actual net from statements", actualNet, "Actual job + other + side hustle income − family spending − personal spending.", actualNet < 0 ? "red" : "green")}
+            ${metric("Needs review", count, "Imported transactions that still need category/owner/income type review.", count > 0 ? "red" : "")}
           </div>
 
           <div class="split kb-dashboard-split">
@@ -2758,31 +2758,26 @@
                 <button type="button" data-jump="income">Income</button>
                 <button type="button" data-jump="allowance">Personal Money</button>
                 <button type="button" data-jump="budget">Monthly Plan</button>
-                <button type="button" data-jump="cashguard">Keep in Account</button>
+                <button type="button" data-jump="transactions">CSV Review</button>
               </div>
             </div>
           </div>
 
           <div class="split kb-dashboard-split">
-            <div class="card">
-              <div class="section-title"><h3>Recent family spending</h3><span>Not personal</span></div>
-              ${simpleRowsTable(recentFamilyRows, "No reconciled non-personal spending yet.")}
-            </div>
-            <div class="card">
-              <div class="section-title"><h3>Recent personal spending</h3><span>Only category = Personal</span></div>
-              ${simpleRowsTable(recentPersonalRows, "No reconciled Personal Money spending yet.")}
-            </div>
+            <div class="card"><div class="section-title"><h3>Recent job income</h3><span>From statements</span></div>${simpleRowsTable(actualJobRows.slice().sort((a,b)=>String(b.date||"").localeCompare(String(a.date||""))).slice(0,8), "No Job Income statement deposits yet.")}</div>
+            <div class="card"><div class="section-title"><h3>Recent other income</h3><span>Vault, savings, quarterly, reimbursements</span></div>${simpleRowsTable(actualOtherRows.slice().sort((a,b)=>String(b.date||"").localeCompare(String(a.date||""))).slice(0,8), "No Other Income statement deposits yet.")}</div>
           </div>
 
-          ${count ? `<div class="banner"><div><strong>${count} imported lines still need a home</strong><span>Review category and owner before trusting the dashboard totals.</span></div><button type="button" class="secondary" data-jump="transactions">Go to Review</button></div>` : ""}
+          <div class="split kb-dashboard-split">
+            <div class="card"><div class="section-title"><h3>Recent family spending</h3><span>Not personal</span></div>${simpleRowsTable(recentFamilyRows, "No reconciled non-personal spending yet.")}</div>
+            <div class="card"><div class="section-title"><h3>Recent personal spending</h3><span>Only category = Personal</span></div>${simpleRowsTable(recentPersonalRows, "No reconciled Personal Money spending yet.")}</div>
+          </div>
+
+          ${count ? `<div class="banner"><div><strong>${count} imported lines still need a home</strong><span>Review category, owner, and income type before trusting the dashboard totals.</span></div><button type="button" class="secondary" data-jump="transactions">Go to Review</button></div>` : ""}
         `;
 
-        ["catChart", "ownerChart", "incVsPlanChart"].forEach(destroyChart);
-        document.querySelectorAll("[data-jump]").forEach(btn => btn.addEventListener("click", () => {
-          state.activeView = btn.dataset.jump;
-          render();
-          saveState();
-        }));
+        ["catChart", "ownerChart", "incVsPlanChart", "incomeBarChart"].forEach(destroyChart);
+        document.querySelectorAll("[data-jump]").forEach(btn => btn.addEventListener("click", () => { state.activeView = btn.dataset.jump; render(); saveState(); }));
       }
 
             function renderKeepInAccountCard(info) {
@@ -2811,7 +2806,7 @@
         const helper = info.manualNextDay ? `Using next paycheck day ${info.nextDepositDay}.` : `Auto-picked next paycheck day ${info.nextDepositDay} from paycheck buckets. You can override it.`;
         return `<div class="card">
           <div class="section-title"><h3>Keep in account</h3><span>${escapeHtml(info.filterLabel)}</span></div>
-          <div class="income-math"><strong>Formula:</strong> unpaid bills due before the next paycheck + prorated gas, groceries, and personal money + buffer. This is the amount that should stay in the joint account so nothing gets squeezed before more income hits.</div><div class="toolbar" style="justify-content:flex-start;margin-bottom:.8rem"><button type="button" data-jump="cashguard">Open full Keep in Account page</button></div>
+          <div class="income-math"><strong>Formula:</strong> unpaid bills due before the next paycheck + prorated gas, groceries, and personal money + buffer. This is the amount that should stay in the joint account so nothing gets squeezed before more income hits.</div>
           <div class="form-grid" style="margin-bottom:.8rem">
             ${field("Joint account balance", input("jointAccountBalance", state.jointAccountBalance, "number", "0.01"))}
             ${field("Next paycheck day", input("jointNextDepositDay", state.jointNextDepositDay, "number", "1"))}
@@ -3470,6 +3465,7 @@
           <div class="form-grid" style="margin-bottom:.8rem">
             ${field("Bulk bill", select("bulkBillId", billOptions(), ""), "wide")}
             ${field("Bulk category", select("bulkCategory", ["",...categories], ""))}
+            ${field("Bulk income type", select("bulkIncomeType", incomeTypes, ""))}
             ${field("Bulk owner", select("bulkOwner", ["",...owners], ""))}
             <button id="applyBulkSelectedTxn" type="button">Apply To Selected</button>
             <button id="applyBulkTxn" type="button">Apply To Visible</button>
@@ -3477,7 +3473,7 @@
             <button id="selectVisibleTxn" class="secondary" type="button">Select Visible</button>
             <button id="clearSelectedTxn" class="secondary" type="button">Clear Selection</button>
           </div>`,
-          rows.length ? `<div class="table-wrap"><table><thead><tr><th><input type="checkbox" id="toggleVisibleTxn" aria-label="Select all visible"></th><th>Date</th><th>Description</th><th>Bill</th><th>Category</th><th>Owner</th><th class="money">Amount</th><th>Status</th><th></th></tr></thead><tbody>${rows.map(txn => transactionRow(txn)).join("")}</tbody></table></div>` : `<div class="empty">No transactions match your filters.</div>`,
+          rows.length ? `<div class="table-wrap"><table><thead><tr><th><input type="checkbox" id="toggleVisibleTxn" aria-label="Select all visible"></th><th>Date</th><th>Description</th><th>Bill</th><th>Category</th><th>Income Type</th><th>Owner</th><th class="money">Amount</th><th>Status</th><th></th></tr></thead><tbody>${rows.map(txn => transactionRow(txn)).join("")}</tbody></table></div>` : `<div class="empty">No transactions match your filters.</div>`,
           `</div>`
         ].join("");
 
@@ -3520,10 +3516,13 @@
         const billId = document.querySelector("[name='bulkBillId']").value;
         const bill = billId ? month.budgetLines.find(line => line.id === billId) : null;
         const category = document.querySelector("[name='bulkCategory']").value;
+        const incomeType = document.querySelector("[name='bulkIncomeType']")?.value || "";
         const owner = document.querySelector("[name='bulkOwner']").value;
         transactions.forEach(txn => {
           if (bill) { txn.billId = bill.id; txn.category = bill.category || txn.category; txn.owner = bill.owner || txn.owner; txn.asset = bill.asset || txn.asset; }
           if (category) txn.category = category;
+          if (incomeType && Number(txn.amount || 0) > 0) { txn.incomeType = normalizeIncomeType(incomeType); txn.category = "Income"; }
+          if (!txn.incomeType && Number(txn.amount || 0) > 0) txn.incomeType = guessIncomeType(txn);
           if (owner) txn.owner = owner;
           txn.reconciled = Boolean(txn.billId || (txn.category && txn.owner && txn.category !== "Uncategorized"));
         });
@@ -3589,6 +3588,7 @@
           <td><strong>${escapeHtml(txn.description)}</strong><div class="muted">${escapeHtml(txn.account || "")}</div>${personalSplitText}</td>
           <td>${bill ? escapeHtml(bill.payee) : `<span class="muted">Unmatched</span>`}</td>
           <td>${escapeHtml(txn.category || "Uncategorized")}</td>
+          <td>${Number(txn.amount || 0) > 0 ? `<span class="pill ${transactionIncomeType(txn) === "Side Hustle Income" ? "yellow" : transactionIncomeType(txn) === "Other Income" ? "blue" : "green"}">${escapeHtml(transactionIncomeType(txn) || "Job Income")}</span>` : `<span class="muted">—</span>`}</td>
           <td>${hasPersonalSplit(txn) ? `<span class="pill green">Split</span>` : escapeHtml(txn.owner || "-")}</td>
           <td class="money" style="color:${Number(txn.amount)>=0?"var(--green)":"var(--red)"}">${money.format(txn.amount)}</td>
           <td>${needs ? `<span class="pill red">Needs review</span>` : `<span class="pill green">Reconciled</span>`}</td>
@@ -3618,7 +3618,9 @@
             const amount = parseAmount(row[amountKey], row[debitKey], row[creditKey]);
             const guessed = guessTransaction(row[descKey] || "", amount);
             const importNotes = [row[typeKey] ? "Type: "+row[typeKey] : "", row[statusKey] ? "Status: "+row[statusKey] : "", row[balanceKey] ? "Balance after: "+row[balanceKey] : ""].filter(Boolean).join(" · ");
-            return { id: uid("txn"), date: toDateInputValue(row[dateKey]) || row[dateKey] || "", description: row[descKey] || "Imported transaction", amount, category: guessed.category, owner: guessed.owner, asset: guessed.asset, account: row[accountKey] || accountNameFromCsvFile(file.name), notes: importNotes, reconciled: guessed.confident };
+            const txn = { id: uid("txn"), date: toDateInputValue(row[dateKey]) || row[dateKey] || "", description: row[descKey] || "Imported transaction", amount, category: guessed.category, owner: guessed.owner, asset: guessed.asset, account: row[accountKey] || accountNameFromCsvFile(file.name), notes: importNotes, reconciled: guessed.confident };
+            if (amount > 0) { txn.category = txn.category === "Uncategorized" ? "Income" : txn.category; txn.incomeType = guessIncomeType(txn); }
+            return txn;
           });
           const month = currentMonth();
           const existingExact = new Set(month.transactions.map(transactionKey));
@@ -3667,6 +3669,7 @@
           if (existing.has(key)) return;
           existing.add(key);
           txn.category = "Side Hustles";
+          txn.incomeType = "Side Hustle Income";
           txn.owner ||= "Patricia";
           txn.asset ||= "Family";
           txn.reconciled = true;
@@ -3801,6 +3804,7 @@
           field("Description", input("description", value.description), "wide"),
           field("Payee / Bill match", select("billId", billOptions(), value.billId || ""), "wide"),
           field("Category", select("category", categories, value.category)),
+          Number(value.amount || 0) > 0 ? field("Income Type", select("incomeType", incomeTypes, normalizeIncomeType(value.incomeType) || guessIncomeType(value))) : "",
           field("Owner", select("owner", ["",...owners], value.owner)),
           field("Account", input("account", value.account)),
           `<div class="full toolbar" style="justify-content:flex-start"><button type="button" class="secondary" id="autoTxnCategory">Auto-categorize</button><button type="button" class="secondary" id="createBillFromTxn">Create bill from this</button></div>`,
@@ -3815,6 +3819,8 @@
           data.date = toDateInputValue(data.date);
           if (data.billId) { const bill = currentMonth().budgetLines.find(line => line.id === data.billId); if (bill) { data.category = bill.category || data.category; data.owner = bill.owner || data.owner; data.asset = bill.asset || data.asset; } }
           const next = { ...value, ...data, amount: Number(data.amount || 0), id: editing ? value.id : uid("txn") };
+          if (next.amount > 0) { next.category = next.category === "Uncategorized" ? "Income" : next.category; next.incomeType = normalizeIncomeType(next.incomeType) || guessIncomeType(next); }
+          else { delete next.incomeType; }
           next.reconciled = Boolean(next.billId || (next.category && next.owner && next.category !== "Uncategorized"));
           if (next.category !== "Personal" || next.billId || Number(next.amount || 0) >= 0) delete next.personalSplit;
           if (editing) Object.assign(value, next); else currentMonth().transactions.push(next);
@@ -3897,11 +3903,15 @@
       // ── ALLOWANCE ────────────────────────────────────────────────────────────
       function renderAllowance() {
         const month = currentMonth();
-        const personalRows = month.transactions.filter(isPersonalTransaction).filter(txn => !state.personalOwnerFilter || personalAmountForOwner(txn, state.personalOwnerFilter) > 0 || txn.owner === state.personalOwnerFilter).sort((a, b) => String(b.date).localeCompare(String(a.date)));
+        const search = String(state.personalSearch || "").trim().toLowerCase();
+        const allPersonalRows = month.transactions.filter(isPersonalTransaction).filter(txn => !state.personalOwnerFilter || personalAmountForOwner(txn, state.personalOwnerFilter) > 0 || txn.owner === state.personalOwnerFilter);
+        const personalRows = allPersonalRows.filter(txn => {
+          if (!search) return true;
+          const haystack = [txn.description, txn.category, txn.notes, txn.account, txn.owner, personalSplitLabel(txn)].join(" ").toLowerCase();
+          return haystack.includes(search);
+        }).sort((a, b) => String(b.date).localeCompare(String(a.date)));
         const personalFilterLabel = state.personalOwnerFilter ? state.personalOwnerFilter : "Everyone";
-
-        // Build chart data
-        const allowanceData = month.allowances.map(row => ({ owner: row.owner, limit: row.monthlyLimit, used: personalUsedByOwner(month, row.owner) }));
+        const filteredPersonalTotal = sum(personalRows, txn => state.personalOwnerFilter ? personalAmountForOwner(txn, state.personalOwnerFilter) : personalAmountTotal(txn));
 
         document.querySelector("#allowance").innerHTML = [
           `<div class="card"><div class="section-title"><h3>Personal spending guardrails</h3><span>Guilt-free, but fenced in</span></div>
@@ -3916,37 +3926,36 @@
           }).join("")}
           </tbody></table></div></div>`,
 
-          `<div class="chart-card">
-            <h3>Personal spending progress</h3>
-            <div style="position:relative;width:100%;height:${Math.max(140, allowanceData.length*60+60)}px"><canvas id="allowChart" role="img" aria-label="Horizontal bar chart of personal money usage">Personal money usage by person.</canvas></div>
-          </div>`,
-
-          `<div class="card"><div class="section-title"><h3>Personal transactions</h3><span>${escapeHtml(personalFilterLabel)} · ${personalRows.length} lines</span></div>
-          <div class="toolbar" style="justify-content:flex-start;margin-bottom:.8rem"><button id="showAllPersonal" class="secondary" type="button">Show Everyone</button></div>
+          `<div class="card"><div class="section-title"><h3>Personal transactions</h3><span>${escapeHtml(personalFilterLabel)} · ${personalRows.length} matching line${personalRows.length === 1 ? "" : "s"}</span></div>
+          <div class="form-grid" style="margin-bottom:.8rem">
+            ${field("Search personal transactions", input("personalSearch", state.personalSearch || ""), "wide")}
+            ${metric("Filtered total", filteredPersonalTotal, search ? `Matches "${escapeHtml(search)}"` : "All visible personal transactions.")}
+            ${metric("Transactions found", personalRows.length, "Matching Personal Money rows.")}
+          </div>
+          <div class="toolbar" style="justify-content:flex-start;margin-bottom:.8rem"><button id="showAllPersonal" class="secondary" type="button">Show Everyone</button><button id="clearPersonalSearch" class="secondary" type="button">Clear Search</button></div>
           ${personalRows.length ? `<div class="table-wrap"><table><thead><tr><th>Date</th><th>Description</th><th>Owner / Split</th><th>Category</th><th>Note</th><th class="money">Personal amount</th></tr></thead><tbody>${personalRows.map(t => {
             const amountShown = state.personalOwnerFilter ? personalAmountForOwner(t, state.personalOwnerFilter) : personalAmountTotal(t);
             return `<tr><td>${escapeHtml(t.date)}</td><td><strong>${escapeHtml(t.description)}</strong>${hasPersonalSplit(t) ? `<div class="split-badge">${personalSplitLabel(t)}</div>` : ""}</td><td>${hasPersonalSplit(t) ? `<span class="pill green">Split</span>` : escapeHtml(t.owner||"-")}</td><td>${escapeHtml(t.category||"-")}</td><td style="min-width:14rem"><input type="text" data-personal-note="${t.id}" value="${escapeHtml(t.notes||"")}" placeholder="Add a note..." aria-label="Note for ${escapeHtml(t.description)}"></td><td class="money">${money.format(amountShown)}</td></tr>`;
-          }).join("")}</tbody></table></div>` : `<div class="empty">No personal spending marked yet. In CSV Review, set Category to Personal.</div>`}
+          }).join("")}</tbody></table></div>` : `<div class="empty">${search ? "No personal transactions match this search." : "No personal spending marked yet. In CSV Review, set Category to Personal."}</div>`}
           </div>`
         ].join("");
 
         destroyChart("allowChart");
-        chartInstances["allowChart"] = new Chart(document.getElementById("allowChart"), {
-          type: "bar",
-          data: {
-            labels: allowanceData.map(a => a.owner),
-            datasets: [
-              { label: "Used", data: allowanceData.map(a => a.used), backgroundColor: "#2a78d6", borderRadius: 4, stack: "s" },
-              { label: "Remaining", data: allowanceData.map(a => Math.max(0, a.limit - a.used)), backgroundColor: "#e4dfd6", borderRadius: 4, stack: "s" }
-            ]
-          },
-          options: { indexAxis: "y", responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => " " + money.format(ctx.raw) } } }, scales: { x: { ticks: { color: "#888", font: { size: 10 }, callback: v => "$" + v }, grid: { color: "rgba(128,128,128,0.12)" } }, y: { ticks: { color: "#888", font: { size: 11 } }, grid: { display: false } } } }
-        });
-
         document.querySelector("#addAllowance").addEventListener("click", () => openAllowanceModal());
         document.querySelectorAll("[data-edit-allow]").forEach(btn => btn.addEventListener("click", () => openAllowanceModal(month.allowances.find(row => row.id === btn.dataset.editAllow))));
         document.querySelectorAll("[data-filter-personal-owner]").forEach(btn => btn.addEventListener("click", () => { state.personalOwnerFilter = btn.dataset.filterPersonalOwner; renderAllowance(); saveState(); }));
         document.querySelector("#showAllPersonal").addEventListener("click", () => { state.personalOwnerFilter = ""; renderAllowance(); saveState(); });
+        const personalSearchInput = document.querySelector("[name='personalSearch']");
+        if (personalSearchInput) {
+          personalSearchInput.addEventListener("input", event => {
+            state.personalSearch = event.target.value;
+            renderAllowance();
+            saveState();
+          });
+          personalSearchInput.focus();
+          personalSearchInput.setSelectionRange(personalSearchInput.value.length, personalSearchInput.value.length);
+        }
+        document.querySelector("#clearPersonalSearch")?.addEventListener("click", () => { state.personalSearch = ""; renderAllowance(); saveState(); });
         document.querySelectorAll("[data-personal-note]").forEach(input => input.addEventListener("change", () => {
           const txn = month.transactions.find(t => t.id === input.dataset.personalNote);
           if (!txn) return;
@@ -3955,7 +3964,7 @@
         }));
       }
 
-      function isPersonalTransaction(txn) {
+            function isPersonalTransaction(txn) {
         const category = String(txn.category || "").trim();
         const asset = String(txn.asset || "").trim();
         const hasAssignedBill = Boolean(txn.billId);
@@ -4243,55 +4252,49 @@
       function renderIncome() {
         const month = currentMonth();
         const quarterRows = activeQuarterlyIncomeRows();
-        const regularTotal = regularIncomeTotal();
         const quarterTotal = quarterlyIncomeTotal();
-        const total = incomeTotal();
-        const patriciaRows = regularIncomeRows().filter(row => row.owner === "Patricia");
-        const patriciaMonthly = sum(patriciaRows, row => row.monthly) + sum(quarterRows.filter(row => row.owner === "Patricia"), row => row.amount);
-        const patriciaPaychecks = patriciaRows.find(row => String(row.type||"").toLowerCase().includes("regular"))?.monthly || 0;
-        const extra = patriciaMonthly - patriciaPaychecks;
-        const planned = plannedTotal(month);
-        const paypalGross = paypalSideGigGross(month);
+        const plannedJob = reliableJobIncomeTotal();
+        const plannedOther = otherPlannedIncomeTotal(state.activeMonth);
+        const actualJobRows = actualJobIncomeRows(month);
+        const actualOtherRows = actualOtherIncomeRows(month);
+        const actualSideRows = actualSideHustleIncomeRows(month);
+        const actualJobTotal = actualJobIncomeTotal(month);
+        const actualOtherTotal = actualOtherIncomeTotal(month);
+        const actualSideTotal = actualSideHustleIncomeTotal(month);
+        const paypalGross = paypalSideGigGross(month) || actualSideTotal;
         const paypalSetAside = paypalSideGigSetAside(month);
         const paypalNet = paypalSideGigNet(month);
         const paypalYtd = paypalSideHustleYtdTotals();
-        const actualIncomeRows = actualStatementIncomeRows(month);
-        const actualIncomeTotal = actualStatementIncomeTotal(month);
 
         document.querySelector("#income").innerHTML = [
           `<div class="cards">
-            ${metric("Total reliable income", total, "Planned regular + quarter money for this month")}
-            ${metric("Actual income from statements", actualIncomeTotal, actualIncomeRows.length + " reconciled Income line" + (actualIncomeRows.length === 1 ? "" : "s") + ". Excludes PayPal side hustles.", "green")}
-            ${metric("Quarterly money", quarterTotal, isQuarterlyIncomeMonth() ? "Active for this month." : "Only active in Jan, Apr, Jul, Oct.")}
-            ${metric("Patricia", patriciaMonthly, "Patricia total")}
-            ${metric("Alec", sum(regularIncomeRows().filter(r => r.owner === "Alec"), r => r.monthly) + sum(quarterRows.filter(r => r.owner === "Alec"), r => r.amount), "Alec total")}
-            ${percentMetric("Expense ratio", total > 0 ? planned / total * 100 : 0, total > 0 ? "Bills as % of income" : "Add reliable income to calculate this", total > 0 && planned > total ? "red" : "")}
-            ${metric("PayPal gross", paypalGross, "This month only. Resets each month.")}
-            ${metric("Recommended set aside", paypalSetAside, `${PAYPAL_SIDE_HUSTLE_TAX_RATE}% of this month's PayPal side-hustle deposits.`, "yellow")}
-            ${metric("PayPal after set aside", paypalNet, "This is tracked separately, not available money.", "green")}
-            ${metric("YTD set aside", paypalYtd.setAside, `${paypalYtd.year} through ${currentMonth().label}.`)}
-          </div>`,
-
-          patriciaMonthly ? `<div class="income-math">Patricia income math: ${money.format(patriciaPaychecks/2)} + ${money.format(patriciaPaychecks/2)}${extra ? " + " + money.format(extra) + " extra" : ""} = ${money.format(patriciaMonthly)}/month.</div>` : "",
-
-          // Income vs bills chart
-          `<div class="chart-card">
-            <h3>Income vs planned bills</h3>
-            <div class="legend" id="incLegend"></div>
-            <div style="position:relative;width:100%;height:200px"><canvas id="incomeBarChart" role="img" aria-label="Bar chart comparing income to planned bills">Income versus planned spending comparison.</canvas></div>
+            ${metric("Planned job income", plannedJob, "Reliable salary/paycheck money.")}
+            ${metric("Planned other income", plannedOther, "Vault, savings, quarterly, reimbursements, or one-time planned money.")}
+            ${metric("Actual job income", actualJobTotal, actualJobRows.length + " statement deposit" + (actualJobRows.length === 1 ? "" : "s") + " classified as Job Income.", "green")}
+            ${metric("Actual other income", actualOtherTotal, actualOtherRows.length + " statement deposit" + (actualOtherRows.length === 1 ? "" : "s") + " classified as Other Income.", "green")}
+            ${metric("Side hustle gross", paypalGross, "PayPal is always side hustle. Set aside this month: " + money.format(paypalSetAside) + " · Set aside overall: " + money.format(paypalYtd.setAside || 0) + " · Net: " + money.format(paypalNet))}
           </div>`,
 
           `<div class="card">
-            <div class="section-title"><h3>Actual income from statements</h3><span>Reconciled CSV deposits categorized as Income, excluding PayPal side hustles</span></div>
-            ${actualIncomeRowsTable(actualIncomeRows)}
+            <div class="section-title"><h3>Actual income from statements</h3><span>Classified in CSV Review by Income Type</span></div>
+            ${actualIncomeRowsTable([...actualJobRows, ...actualOtherRows].sort((a,b)=>String(b.date||"").localeCompare(String(a.date||""))))}
           </div>`,
 
           `<div class="split">
-            <div class="card"><div class="section-title"><h3>Reliable income</h3><span>Safe to plan from</span></div>
+            <div class="card"><div class="section-title"><h3>Reliable job income</h3><span>Salary / normal paycheck money</span></div>
             <div class="toolbar" style="justify-content:flex-start;margin-bottom:.8rem"><button id="addIncome" type="button">Add Income</button></div>
             <div class="table-wrap"><table><thead><tr><th>Owner</th><th>Type</th><th class="money">Monthly</th><th>Notes</th><th></th></tr></thead><tbody>
-            ${state.incomes.map(row => `<tr><td>${escapeHtml(row.owner)}</td><td>${escapeHtml(row.type)}</td><td class="money" style="color:var(--green)">${money.format(row.monthly)}</td><td style="color:var(--muted);font-size:.82rem">${escapeHtml(row.notes)}</td><td class="right"><button class="ghost" data-edit-income="${row.id}" type="button">Edit</button> <button class="danger" data-delete-income="${row.id}" type="button">Delete</button></td></tr>`).join("")}
+            ${reliableJobIncomeRows().map(row => `<tr><td>${escapeHtml(row.owner)}</td><td>${escapeHtml(row.type)}</td><td class="money" style="color:var(--green)">${money.format(row.monthly)}</td><td style="color:var(--muted);font-size:.82rem">${escapeHtml(row.notes)}</td><td class="right"><button class="ghost" data-edit-income="${row.id}" type="button">Edit</button> <button class="danger" data-delete-income="${row.id}" type="button">Delete</button></td></tr>`).join("")}
             </tbody></table></div></div>
+            <div class="card"><div class="section-title"><h3>Other planned income</h3><span>Vault, savings, quarterly, one-time</span></div>
+            <div class="table-wrap"><table><thead><tr><th>Owner</th><th>Type</th><th class="money">Monthly</th><th>Notes</th><th></th></tr></thead><tbody>
+            ${otherPlannedIncomeRows().map(row => `<tr><td>${escapeHtml(row.owner)}</td><td>${escapeHtml(row.type)}</td><td class="money" style="color:var(--green)">${money.format(row.monthly)}</td><td style="color:var(--muted);font-size:.82rem">${escapeHtml(row.notes)}</td><td class="right"><button class="ghost" data-edit-income="${row.id}" type="button">Edit</button> <button class="danger" data-delete-income="${row.id}" type="button">Delete</button></td></tr>`).join("") || `<tr><td colspan="5"><div class="empty">No other planned income rows yet.</div></td></tr>`}
+            </tbody></table></div></div>
+          </div>`,
+
+          renderQuarterlyIncomeSection(quarterRows, quarterTotal),
+
+          `<div class="split">
             <div class="card"><div class="section-title"><h3>Daughters' contributions</h3><span>Expected, not guaranteed</span></div>
             <div class="toolbar" style="justify-content:flex-start;margin-bottom:.8rem"><button id="addContribution" type="button">Add Contribution</button></div>
             <div class="mini-list">${month.contributions.map(row => {
@@ -4300,44 +4303,33 @@
             }).join("")}</div>
             <div style="margin-top:.75rem;padding:.6rem;background:var(--yellow-soft);border-radius:6px;font-size:.8rem;color:var(--yellow)">Do not count daughters' contributions as safe-to-spend until received.</div>
             </div>
-          </div>`,
-
-          renderQuarterlyIncomeSection(quarterRows, quarterTotal),
-
-          `<div class="split">
             <div class="card"><div class="section-title"><h3>Paycheck schedule</h3><span>Editable buckets</span></div>
             <div class="toolbar" style="justify-content:flex-start;margin-bottom:.8rem"><button id="addPaycheck" type="button">Add Paycheck Bucket</button></div>
             <div class="table-wrap"><table><thead><tr><th>Owner</th><th>Label</th><th>Expected</th><th>Frequency</th><th class="money">Amount</th><th></th></tr></thead><tbody>
             ${(month.paychecks||[]).map(row => `<tr><td>${ownerPill(row.owner)}</td><td><strong>${escapeHtml(row.label)}</strong></td><td>${escapeHtml(row.expectedDay)}</td><td>${escapeHtml(row.frequency)}</td><td class="money">${money.format(row.amount)}</td><td class="right"><button class="ghost" data-edit-paycheck="${row.id}" type="button">Edit</button></td></tr>`).join("")}
             </tbody></table></div></div>
-            <div class="card"><div class="section-title"><h3>Side gig income</h3><span>Tracked separately, not available money</span></div>
+          </div>`,
+
+          `<div class="card"><div class="section-title"><h3>Side gig income</h3><span>PayPal is always side hustle</span></div>
+            <div class="cards" style="margin-bottom:.8rem">
+              ${metric("Gross this month", paypalGross, "Side hustle deposits this month.")}
+              ${metric("Set aside this month", paypalSetAside, `${PAYPAL_SIDE_HUSTLE_TAX_RATE}% recommended set aside.`, "yellow")}
+              ${metric("Set aside overall", paypalYtd.setAside || 0, `${paypalYtd.year} through ${currentMonth().label}.`, "yellow")}
+              ${metric("Net after set aside", paypalNet, "Gross minus monthly set aside.", "green")}
+            </div>
             <div class="toolbar" style="justify-content:flex-start;margin-bottom:.8rem"><button id="addGig" type="button">Add Side Gig</button></div>
-            <div class="table-wrap"><table><thead><tr><th>Date</th><th>Source</th><th class="money">Gross</th><th class="money">Recommended set aside</th><th class="money">After set aside</th><th></th></tr></thead><tbody>
+            <div class="table-wrap"><table><thead><tr><th>Date</th><th>Source</th><th class="money">Gross</th><th class="money">Set aside</th><th class="money">After set aside</th><th></th></tr></thead><tbody>
             ${month.sideGigs.map(row => {
               const tax = isPaypalSideGig(row) ? Number(row.gross||0) * PAYPAL_SIDE_HUSTLE_TAX_RATE / 100 : 0;
               const net = Number(row.gross||0) - tax;
               return `<tr><td>${escapeHtml(row.date)}</td><td><strong>${escapeHtml(row.source)}</strong></td><td class="money">${money.format(row.gross)}</td><td class="money">${money.format(tax)}</td><td class="money" style="color:var(--green)">${money.format(net)}</td><td class="right"><button class="ghost" data-edit-gig="${row.id}" type="button">Edit</button></td></tr>`;
             }).join("")}
-            </tbody></table></div></div>
-          </div>`,
+            </tbody></table></div></div>`,
 
           renderPayPalSideHustleYearSection(paypalYtd)
         ].join("");
 
-        destroyChart("incomeBarChart");
-        const incomeByOwner = {};
-        regularIncomeRows().forEach(r => { incomeByOwner[r.owner + " income"] = (incomeByOwner[r.owner + " income"] || 0) + r.monthly; });
-        quarterRows.forEach(r => { incomeByOwner[(r.owner || "Shared") + " quarterly"] = (incomeByOwner[(r.owner || "Shared") + " quarterly"] || 0) + Number(r.amount || 0); });
-        const incLabels = [...Object.keys(incomeByOwner), "Total income", "Total planned"];
-        const incData = [...Object.values(incomeByOwner), total, planned];
-        const incColors = [...Object.keys(incomeByOwner).map((_, i) => CHART_COLORS[i]), "#2a78d6", planned > total ? "#e34948" : "#eda100"];
-        chartInstances["incomeBarChart"] = new Chart(document.getElementById("incomeBarChart"), {
-          type: "bar",
-          data: { labels: incLabels, datasets: [{ data: incData, backgroundColor: incColors, borderRadius: 4 }] },
-          options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => " " + money.format(ctx.raw) } } }, scales: { x: { ticks: { color: "#888", font: { size: 10 } }, grid: { display: false } }, y: { ticks: { color: "#888", font: { size: 10 }, callback: v => "$" + Math.round(v/1000) + "k" }, grid: { color: "rgba(128,128,128,0.12)" } } } }
-        });
-        document.getElementById("incLegend").innerHTML = incLabels.map((l, i) => `<span><span class="legend-dot" style="background:${incColors[i]}"></span>${l} ${money.format(incData[i])}</span>`).join("");
-
+        ["incomeBarChart"].forEach(destroyChart);
         document.querySelector("#addIncome").addEventListener("click", () => openIncomeModal());
         document.querySelectorAll("[data-edit-income]").forEach(btn => btn.addEventListener("click", () => openIncomeModal(state.incomes.find(row => row.id === btn.dataset.editIncome))));
         document.querySelectorAll("[data-delete-income]").forEach(btn => btn.addEventListener("click", () => deleteIncomeLine(btn.dataset.deleteIncome)));
@@ -4355,7 +4347,7 @@
         document.querySelectorAll("[data-edit-gig]").forEach(btn => btn.addEventListener("click", () => openGigModal(month.sideGigs.find(row => row.id === btn.dataset.editGig))));
       }
 
-      function renderPayPalSideHustleYearSection(ytd) {
+            function renderPayPalSideHustleYearSection(ytd) {
         const rows = sideHustleMonthlyRollup(ytd?.year || activeYear());
         const activeKey = state.activeMonth;
         return `<div class="card"><div class="section-title"><h3>PayPal side hustle tracker</h3><span>${money.format(ytd?.setAside || 0)} recommended set aside YTD</span></div>
@@ -4406,19 +4398,22 @@
 
       function openIncomeModal(row) {
         const editing = Boolean(row);
-        const value = row || { owner: "Patricia", type: "Reliable income", monthly: 0, notes: "" };
-        openModal(editing ? "Edit income" : "Add income", `<form id="incomeForm" class="form-grid">${field("Owner", select("owner", owners, value.owner))}${field("Type", input("type", value.type))}${field("Monthly", input("monthly", value.monthly, "number", "0.01"))}${field("Notes", input("notes", value.notes), "wide")}<div class="full toolbar" style="justify-content:space-between">${editing ? `<button type="button" class="danger" id="deleteIncomeFromModal">Delete</button>` : `<span></span>`}<button type="submit">Save</button></div></form>`);
+        const value = row || { owner: "Patricia", type: "Job Income", incomeType: "Job Income", monthly: 0, notes: "" };
+        const currentIncomeType = normalizeIncomeType(value.incomeType || value.type) || "Job Income";
+        openModal(editing ? "Edit income" : "Add income", `<form id="incomeForm" class="form-grid">${field("Owner", select("owner", owners, value.owner))}${field("Income Type", select("incomeType", ["Job Income","Other Income"], currentIncomeType === "Side Hustle Income" ? "Job Income" : currentIncomeType))}${field("Label / Type", input("type", value.type || currentIncomeType))}${field("Monthly", input("monthly", value.monthly, "number", "0.01"))}${field("Notes", input("notes", value.notes), "wide")}<div class="full muted">Use Job Income for salary/paycheck money. Use Other Income for vault, savings, bonus, reimbursement, or one-time planned money. Side Hustle is tracked in the Side Gig section.</div><div class="full toolbar" style="justify-content:space-between">${editing ? `<button type="button" class="danger" id="deleteIncomeFromModal">Delete</button>` : `<span></span>`}<button type="submit">Save</button></div></form>`);
         document.querySelector("#incomeForm").addEventListener("submit", event => {
           event.preventDefault();
           const data = formData(event.currentTarget);
+          data.incomeType = normalizeIncomeType(data.incomeType) || "Job Income";
+          if (!data.type) data.type = data.incomeType;
           const next = { ...value, ...data, monthly: Number(data.monthly||0), id: editing ? value.id : uid("income") };
           if (editing) Object.assign(value, next); else state.incomes.push(next);
-          closeModal(); render();
+          closeModal(); render(); saveState();
         });
         document.querySelector("#deleteIncomeFromModal")?.addEventListener("click", () => deleteIncomeLine(value.id));
       }
 
-      function deleteIncomeLine(id) {
+            function deleteIncomeLine(id) {
         const row = state.incomes.find(item => item.id === id);
         if (!row) return;
         if (!confirm("Delete this reliable income line?")) return;

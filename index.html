@@ -1271,7 +1271,7 @@
       }
 
 
-      /* v52 simple dashboard */
+      /* v53 job vault income */
       .split-badge {
         display: inline-flex;
         gap: .25rem;
@@ -1697,6 +1697,12 @@
         .kb-action-grid {
           grid-template-columns: 1fr !important;
         }
+      }
+
+
+      /* v53 Dashboard income split: reliable jobs vs Extra/Vault */
+      .kb-dashboard-intro {
+        border-left: 4px solid var(--green);
       }
 
 </style>
@@ -2583,15 +2589,49 @@
       }
 
       // ── DASHBOARD ────────────────────────────────────────────────────────────
+      function reliableJobIncomeRows() {
+        const jobMatchers = [
+          /campus\s*crusade/i,
+          /\bcru\b/i,
+          /city\s*(of\s*)?new\s*port\s*richey/i,
+          /new\s*port\s*richey/i,
+          /\bjanis\b/i
+        ];
+        return regularIncomeRows().filter(row => {
+          const text = [row.source, row.name, row.owner, row.notes, row.type].join(" ");
+          return jobMatchers.some(rx => rx.test(text));
+        });
+      }
+
+      function extraVaultIncomeRows() {
+        const jobIds = new Set(reliableJobIncomeRows().map(row => row.id || [row.owner, row.source, row.name, row.monthly].join("|")));
+        return regularIncomeRows().filter(row => {
+          const key = row.id || [row.owner, row.source, row.name, row.monthly].join("|");
+          return !jobIds.has(key);
+        });
+      }
+
+      function reliableJobIncomeTotal() {
+        return sum(reliableJobIncomeRows(), row => row.monthly);
+      }
+
+      function extraVaultIncomeTotal(monthKey = state.activeMonth) {
+        return sum(extraVaultIncomeRows(), row => row.monthly) + quarterlyIncomeTotal(monthKey);
+      }
+
       function renderDashboard() {
         const month = currentMonth();
         applyBillPaymentStatuses(month);
 
         const familyBudgetLines = dashboardBudgetLines(month, "Everyone");
-        const regularReliable = regularIncomeTotal();
+
+        const jobRows = reliableJobIncomeRows();
+        const reliableJobs = reliableJobIncomeTotal();
+
+        const vaultRows = extraVaultIncomeRows();
         const activeQuarterRows = activeQuarterlyIncomeRows();
         const activeQuarterTotal = sum(activeQuarterRows, row => row.amount);
-        const reliable = regularReliable + activeQuarterTotal;
+        const extraVault = extraVaultIncomeTotal(state.activeMonth);
 
         const sideHustleGross = paypalSideGigGross(month);
         const sideHustleSetAside = paypalSideGigSetAside(month);
@@ -2619,8 +2659,9 @@
         const keepInfo = keepInAccountInfo(month, "Everyone");
         const count = unreconciledCount(month);
 
-        const incomeAvailableForPlan = reliable;
+        const incomeAvailableForPlan = reliableJobs + extraVault;
         const plannedTotalWithoutSideHustle = plannedBills + personalBudget;
+        const jobOnlyBreathingRoom = reliableJobs - plannedTotalWithoutSideHustle;
         const breathingRoom = incomeAvailableForPlan - plannedTotalWithoutSideHustle;
         const actualOutflow = familySpent + personalSpent;
         const actualNetFromStatements = actualIncomeTotal - actualOutflow;
@@ -2636,26 +2677,41 @@
 
         const simpleRowsTable = (rows, emptyText) => rows.length ? `<div class="table-wrap"><table><thead><tr><th>Date</th><th>Description</th><th>Category</th><th>Owner</th><th class="money">Amount</th></tr></thead><tbody>${rows.map(txn => `<tr><td>${escapeHtml(txn.date || "")}</td><td><strong>${escapeHtml(txn.description || txn.name || "Transaction")}</strong></td><td>${escapeHtml(txn.category || "")}</td><td>${escapeHtml(txn.owner || "Shared")}</td><td class="money">${money.format(Math.abs(Number(txn.amount || 0)))}</td></tr>`).join("")}</tbody></table></div>` : `<div class="empty">${escapeHtml(emptyText)}</div>`;
 
+        const incomeSourceList = (rows, amountGetter, emptyText) => rows.length ? `<div class="kb-simple-list">${rows.map(row => `<div class="kb-simple-row"><span>${escapeHtml(row.source || row.name || row.owner || "Income")}</span><strong>${money.format(amountGetter(row))}</strong></div>`).join("")}</div>` : `<div class="empty">${escapeHtml(emptyText)}</div>`;
+
         document.querySelector("#dashboard").innerHTML = `
           <div class="card kb-dashboard-intro">
             <div class="section-title">
               <h3>Month at a glance</h3>
-              <span>${escapeHtml(month.label || state.activeMonth)} · no Patricia/Alec filter here</span>
+              <span>${escapeHtml(month.label || state.activeMonth)} · income separated by type</span>
             </div>
-            <p class="muted" style="margin:0">Dashboard is now grouped by money type: income, family spending, and personal spending. Patricia/Alec details still live in Income, Personal Money, and Monthly Plan.</p>
+            <p class="muted" style="margin:0">Reliable job income is only normal job/paycheck money: Campus Crusade, City of New Port Richey, and Janis. Extra / Vault money is everything else we are choosing to use, like savings, quarterly money, reimbursements, or one-time money.</p>
           </div>
 
           ${renderQuarterlyIncomeNotice(activeQuarterTotal, activeQuarterRows.length, isQuarterlyIncomeMonth(state.activeMonth))}
 
           <div class="section-title" style="margin:.25rem 0 .15rem">
             <h3>Income</h3>
-            <span>Side hustle stays separate from reliable income</span>
+            <span>Jobs, vault/extra, and side hustle are separate</span>
           </div>
           <div class="cards kb-simple-dashboard-cards">
-            ${metric("Reliable income", reliable, "Regular reliable income + active quarterly income for this month.")}
+            ${metric("Reliable job income", reliableJobs, `${jobRows.length} job income source${jobRows.length === 1 ? "" : "s"}: Campus Crusade, City of New Port Richey, Janis.`)}
+            ${metric("Extra / Vault money", extraVault, `${money.format(sum(vaultRows, row => row.monthly))} other income + ${money.format(activeQuarterTotal)} quarterly money.`)}
             ${metric("Actual income from statements", actualIncomeTotal, `${actualIncomeRows.length} reconciled income deposit${actualIncomeRows.length === 1 ? "" : "s"} categorized as Income, excluding PayPal side hustles.`)}
-            ${metric("Side hustle gross", sideHustleGross, `${sideHustleRows.length} PayPal side hustle item${sideHustleRows.length === 1 ? "" : "s"}. Tracked separately from reliable income.`)}
+            ${metric("Side hustle gross", sideHustleGross, `${sideHustleRows.length} PayPal side hustle item${sideHustleRows.length === 1 ? "" : "s"}. Tracked separately from job/vault money.`)}
             ${metric("Side hustle set aside", sideHustleSetAside, `Estimated tax/savings set-aside. Net side hustle: ${money.format(sideHustleNet)}.`)}
+          </div>
+
+          <div class="split kb-dashboard-split">
+            <div class="card">
+              <div class="section-title"><h3>Reliable job income sources</h3><span>Normal paycheck money only</span></div>
+              ${incomeSourceList(jobRows, row => row.monthly, "No job income sources matched yet. Add/rename them in Income as Campus Crusade, City of New Port Richey, or Janis.")}
+            </div>
+            <div class="card">
+              <div class="section-title"><h3>Extra / Vault money sources</h3><span>Savings, quarterly, one-time, other</span></div>
+              ${incomeSourceList(vaultRows, row => row.monthly, "No regular extra/vault income rows yet.")}
+              ${activeQuarterRows.length ? `<div style="margin-top:.75rem">${incomeSourceList(activeQuarterRows, row => row.amount, "No quarterly money this month.")}</div>` : ""}
+            </div>
           </div>
 
           <div class="section-title" style="margin:.25rem 0 .15rem">
@@ -2671,10 +2727,11 @@
 
           <div class="section-title" style="margin:.25rem 0 .15rem">
             <h3>What is left</h3>
-            <span>Reliable income is the planning base; side hustle is extra and separate</span>
+            <span>Shows whether jobs alone cover it, then jobs + vault</span>
           </div>
           <div class="cards kb-simple-dashboard-cards">
-            ${metric("Breathing room", breathingRoom, "Reliable income − planned bills − personal money.", breathingRoom < 0 ? "red" : "green")}
+            ${metric("Jobs-only gap / cushion", jobOnlyBreathingRoom, "Reliable job income − planned bills − personal money.", jobOnlyBreathingRoom < 0 ? "red" : "green")}
+            ${metric("Breathing room with vault", breathingRoom, "Reliable job income + Extra/Vault money − planned bills − personal money.", breathingRoom < 0 ? "red" : "green")}
             ${metric("Actual net from statements", actualNetFromStatements, "Actual statement income − family spending − personal spending.", actualNetFromStatements < 0 ? "red" : "green")}
             ${metric("Needs review", count, "Imported transactions that still need category/owner review.", count > 0 ? "red" : "")}
           </div>

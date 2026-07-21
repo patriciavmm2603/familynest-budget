@@ -1271,7 +1271,7 @@
       }
 
 
-      /* v63 personal search clean */
+      /* v64 dedupe paychecks */
       .split-badge {
         display: inline-flex;
         gap: .25rem;
@@ -1738,6 +1738,9 @@
 
 
       /* v63: Personal search only shows filtered total; transactions-found card removed */
+
+
+      /* v64: Expected income left de-duplicates same owner/date/amount paychecks */
 
 </style>
   
@@ -2783,10 +2786,21 @@
         const status = activeMonthStatus();
         if (status === "past") return [];
         const today = new Date().getDate();
+        const seen = new Set();
         return (month.paychecks || [])
           .flatMap(paycheckOccurrencesForRow)
           .filter(item => status === "future" || item.date.getDate() >= today)
-          .sort((a, b) => a.date - b.date);
+          .sort((a, b) => a.date - b.date)
+          .filter(item => {
+            const key = [
+              String(item.owner || "").trim().toLowerCase(),
+              item.date.toISOString().slice(0, 10),
+              Number(item.amount || 0).toFixed(2)
+            ].join("|");
+            if (seen.has(key)) return false;
+            seen.add(key);
+            return true;
+          });
       }
 
       function expectedPaychecksLeftTotal(month = currentMonth()) {

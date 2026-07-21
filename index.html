@@ -1271,7 +1271,7 @@
       }
 
 
-      /* v64 dedupe paychecks */
+      /* v65 cushion no personal deficit */
       .split-badge {
         display: inline-flex;
         gap: .25rem;
@@ -1741,6 +1741,9 @@
 
 
       /* v64: Expected income left de-duplicates same owner/date/amount paychecks */
+
+
+      /* v65: Cushion after expected income excludes Personal Money deficit */
 
 </style>
   
@@ -2848,7 +2851,7 @@
         const expectedIncomeLeftText = expectedPaychecksLeftLabel(month);
         const personalDeficit = Math.max(0, personalSpent - personalBudget);
         const personalSurplus = Math.max(0, personalBudget - personalSpent);
-        const monthCushionAfterExpected = expectedIncomeLeft - stillReserved - personalDeficit;
+        const monthCushionAfterExpected = expectedIncomeLeft - stillReserved;
         const actualNet = actualJobTotal + actualOtherTotal + actualSideTotal - familySpent - personalSpent;
 
         const plannedJobText = plannedJobRows.length
@@ -2880,7 +2883,7 @@
           <div class="cards kb-simple-dashboard-cards">
             ${metric("Expected income left", expectedIncomeLeft, expectedIncomeLeftText)}
             ${metric("Bills left to pay", stillReserved, "Planned bills still unpaid/reserved.")}
-            ${metric("Cushion after expected income", monthCushionAfterExpected, "Expected income left − bills left to pay − personal deficit.", monthCushionAfterExpected < 0 ? "red" : "green")}
+            ${metric("Cushion after expected income", monthCushionAfterExpected, "Expected income left − bills left to pay. Personal Money status is tracked separately.", monthCushionAfterExpected < 0 ? "red" : "green")}
             ${metric("Personal Money status", personalDeficit > 0 ? -personalDeficit : personalSurplus, personalDeficit > 0 ? `Over personal budget by ${money.format(personalDeficit)}.` : `Still under personal budget by ${money.format(personalSurplus)}.`, personalDeficit > 0 ? "red" : "green")}
           </div>
 

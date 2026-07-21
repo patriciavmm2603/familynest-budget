@@ -1271,7 +1271,7 @@
       }
 
 
-      /* v68 hide other income dashboard */
+      /* v69 spending uncovered bills */
       .split-badge {
         display: inline-flex;
         gap: .25rem;
@@ -1753,6 +1753,9 @@
 
 
       /* v68: Dashboard hides Actual other income because vault money is handled in reserves */
+
+
+      /* v69: Spending section shows reserved + uncovered instead of raw left-to-pay panic number */
 
 </style>
   
@@ -2952,11 +2955,12 @@
             ${metric("Side hustle gross", sideHustleGross, `${actualSideRows.length || paypalSideGigRows(month).length} side hustle deposit${(actualSideRows.length || paypalSideGigRows(month).length) === 1 ? "" : "s"}. ${sideHint}`)}
           </div>
 
-          <div class="section-title" style="margin:.25rem 0 .15rem"><h3>Spending</h3><span>Planned, paid, left to pay, and Personal Money status</span></div>
+          <div class="section-title" style="margin:.25rem 0 .15rem"><h3>Spending</h3><span>Planned, paid, reserved, uncovered, and Personal Money status</span></div>
           <div class="cards kb-simple-dashboard-cards">
             ${metric("Planned bills", plannedBills, "Total bills planned for this month, not including Personal Money.")}
             ${metric("Already paid", matchedBills, "Bills already matched or marked paid from the monthly plan.", "green")}
-            ${metric("Left to pay", stillReserved, "Planned bills still unpaid/reserved.", stillReserved > 0 ? "yellow" : "green")}
+            ${metric("Reserved for this month", currentReservedForBills, "Current-month bill money already protected in vault.", currentReservedForBills > 0 ? "green" : "yellow")}
+            ${metric("Uncovered bills", uncoveredBills, "Bills left to pay minus current-month vault reserves.", uncoveredBills > 0 ? "yellow" : "green")}
             ${metric("Personal Money total", personalSpent, personalSpent > personalBudget ? `Budgeted ${money.format(personalBudget)} · Spent ${money.format(personalSpent)} · Deficit ${money.format(personalSpent - personalBudget)}` : `Budgeted ${money.format(personalBudget)} · Spent ${money.format(personalSpent)} · Surplus ${money.format(personalBudget - personalSpent)}`, personalSpent > personalBudget ? "red" : "green")}
           </div>
 

@@ -1271,7 +1271,7 @@
       }
 
 
-      /* v76 separate vaults section */
+      /* v77 vaults reserves clean */
       .split-badge {
         display: inline-flex;
         gap: .25rem;
@@ -1777,6 +1777,9 @@
 
 
       /* v76: Spending is simple; vault/reserve logic moved into its own section */
+
+
+      /* v77: Vaults section only shows reserve buckets; uncovered stays in Month Outlook */
 
 </style>
   
@@ -3080,20 +3083,19 @@
             ${metric("Personal Money total", personalSpent, personalSpent > personalBudget ? `Budgeted ${money.format(personalBudget)} · Spent ${money.format(personalSpent)} · Deficit ${money.format(personalSpent - personalBudget)}` : `Budgeted ${money.format(personalBudget)} · Spent ${money.format(personalSpent)} · Surplus ${money.format(personalBudget - personalSpent)}`, personalSpent > personalBudget ? "red" : "green")}
           </div>
 
-          <div class="section-title" style="margin:.25rem 0 .15rem"><h3>Vaults / Reserves</h3><span>Money protected in vaults, separated from regular spending</span></div>
-          <p class="muted small"><strong>Vault rule:</strong> mortgage reserve saved this month is for next month. Mortgage reserve saved last month can cover this month if a mortgage is still unpaid.</p>
+          <div class="section-title" style="margin:.25rem 0 .15rem"><h3>Vaults / Reserves</h3><span>Money protected for future or reserved bills</span></div>
+          <p class="muted small"><strong>Vault rule:</strong> this section only shows money set aside. It does not decide whether we are short; that stays in Month Outlook.</p>
           <div class="cards kb-simple-dashboard-cards">
             ${metric("Reserve available for this month", currentReservedForBills, "Current-month bill reserve plus prior-month mortgage reserve if a mortgage is still unpaid.", currentReservedForBills > 0 ? "green" : "yellow")}
             ${metric("Next month mortgage reserve", nextMonthMortgageReserve, "Mortgage money saved in this budget month for next month’s mortgage payments.", nextMonthMortgageReserve > 0 ? "green" : "yellow")}
             ${metric("Future / quarterly reserve", futureReservedForLater, "Money saved for future or quarterly bills.", futureReservedForLater > 0 ? "green" : "yellow")}
-            ${metric("Uncovered this month", uncoveredBills, "This month’s bills left to pay minus reserves available for this month.", uncoveredBills > 0 ? "yellow" : "green")}
           </div>
 
           <div class="section-title" style="margin:.25rem 0 .15rem"><h3>Month Outlook</h3><span>What is still coming, what is still unpaid, and whether we are okay</span></div>
           <div class="cards kb-simple-dashboard-cards">
             ${metric("Expected income left", expectedIncomeLeft, expectedIncomeLeftText)}
             ${metric("Bills left to pay", stillReserved, "Bills still unpaid for this budget month.")}
-            ${metric("Uncovered this month", uncoveredBills, "Bills left to pay minus reserves available for this month.", uncoveredBills > 0 ? "yellow" : "green")}
+            ${metric("Uncovered this month", uncoveredBills, "This month’s unpaid bills after applying reserves available for this month.", uncoveredBills > 0 ? "yellow" : "green")}
             ${metric(monthCushionAfterExpected >= 0 ? "Cushion after expected income" : "Short after expected income", monthCushionAfterExpected, "Expected income left − uncovered this month. Personal Money status is tracked separately.", monthCushionAfterExpected < 0 ? "red" : "green")}
             ${metric("Personal Money status", personalDeficit > 0 ? -personalDeficit : personalSurplus, personalDeficit > 0 ? `Over personal budget by ${money.format(personalDeficit)}.` : `Still under personal budget by ${money.format(personalSurplus)}.`, personalDeficit > 0 ? "red" : "green")}
           </div>

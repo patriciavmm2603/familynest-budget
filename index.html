@@ -1271,7 +1271,7 @@
       }
 
 
-      /* v61 clean month outlook */
+      /* v63 personal search clean */
       .split-badge {
         display: inline-flex;
         gap: .25rem;
@@ -1732,6 +1732,12 @@
 
 
       /* v61: Month Outlook only shows expected income, bills left, personal status, and cushion */
+
+
+      /* v62: Month Outlook uses real active-month paycheck dates; cushion appears before Personal Money status */
+
+
+      /* v63: Personal search only shows filtered total; transactions-found card removed */
 
 </style>
   
@@ -2685,8 +2691,9 @@
       function reliableJobIncomeTotal() { return sum(reliableJobIncomeRows(), row => row.monthly); }
       function otherPlannedIncomeTotal(monthKey = state.activeMonth) { return sum(otherPlannedIncomeRows(), row => row.monthly) + quarterlyIncomeTotal(monthKey); }
 
-            function monthKeyCompare(a, b) {
-        return String(a || "").localeCompare(String(b || ""));
+            function activeMonthDateParts() {
+        const [year, month] = String(state.activeMonth || "").split("-").map(Number);
+        return { year, month };
       }
 
       function activeMonthStatus() {
@@ -2697,22 +2704,89 @@
         return "current";
       }
 
+      function monthDate(year, month, day) {
+        return new Date(year, month - 1, day);
+      }
+
+      function daysInActiveMonth() {
+        const { year, month } = activeMonthDateParts();
+        return new Date(year, month, 0).getDate();
+      }
+
+      function shortMonthDay(date) {
+        return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+      }
+
       function firstDayNumber(value) {
         const text = String(value || "");
         const match = text.match(/\b([1-9]|[12][0-9]|3[01])\b/);
         return match ? Number(match[1]) : null;
       }
 
+      function biweeklyThursdayPaydaysForActiveMonth() {
+        const { year, month } = activeMonthDateParts();
+        if (!year || !month) return [];
+        // Anchor: Alec had a payday on Thu Jul 2, 2026. Biweekly Thursdays repeat every 14 days.
+        const anchor = new Date(2026, 6, 2);
+        const daysInMonth = daysInActiveMonth();
+        const out = [];
+        for (let day = 1; day <= daysInMonth; day++) {
+          const d = monthDate(year, month, day);
+          const diffDays = Math.round((d - anchor) / 86400000);
+          if (diffDays % 14 === 0) out.push(d);
+        }
+        return out;
+      }
+
+      function paycheckOccurrencesForRow(row) {
+        const { year, month } = activeMonthDateParts();
+        if (!year || !month || Number(row.amount || 0) <= 0) return [];
+        const text = [row.owner, row.label, row.expectedDay, row.frequency, row.notes].join(" ").toLowerCase();
+        const amount = Number(row.amount || 0);
+        const owner = row.owner || "";
+        const label = row.label || "paycheck";
+        const occurrences = [];
+
+        const add = day => {
+          const max = daysInActiveMonth();
+          if (!day || day < 1 || day > max) return;
+          occurrences.push({ date: monthDate(year, month, day), amount, owner, label });
+        };
+
+        // Patricia usually has semi-monthly pay on the 10th and 24th.
+        // If a row explicitly says 24 or 10, use that. If it says twice-monthly/semi-monthly, use both.
+        if (/patricia/.test(text) && (/twice|semi|10.*24|24.*10/.test(text))) {
+          add(10); add(24);
+          return occurrences;
+        }
+
+        const explicitDay = firstDayNumber(row.expectedDay || row.label || row.notes);
+        if (explicitDay && !/every other thursday|biweekly/.test(text)) {
+          add(explicitDay);
+          return occurrences;
+        }
+
+        // Alec is paid every other Thursday.
+        if (/alec/.test(text) && (/every other thursday|biweekly|every other|thursday/.test(text))) {
+          return biweeklyThursdayPaydaysForActiveMonth().map(date => ({ date, amount, owner, label }));
+        }
+
+        if (/every other thursday|biweekly/.test(text)) {
+          return biweeklyThursdayPaydaysForActiveMonth().map(date => ({ date, amount, owner, label }));
+        }
+
+        if (explicitDay) add(explicitDay);
+        return occurrences;
+      }
+
       function expectedPaychecksLeft(month = currentMonth()) {
         const status = activeMonthStatus();
         if (status === "past") return [];
         const today = new Date().getDate();
-        return (month.paychecks || []).filter(row => {
-          const day = firstDayNumber(row.expectedDay || row.label || row.notes);
-          if (status === "future") return Number(row.amount || 0) > 0;
-          if (!day) return Number(row.amount || 0) > 0;
-          return day >= today && Number(row.amount || 0) > 0;
-        });
+        return (month.paychecks || [])
+          .flatMap(paycheckOccurrencesForRow)
+          .filter(item => status === "future" || item.date.getDate() >= today)
+          .sort((a, b) => a.date - b.date);
       }
 
       function expectedPaychecksLeftTotal(month = currentMonth()) {
@@ -2722,14 +2796,10 @@
       function expectedPaychecksLeftLabel(month = currentMonth()) {
         const rows = expectedPaychecksLeft(month);
         if (!rows.length) return "No future paycheck buckets found for this month.";
-        return rows.map(row => {
-          const day = firstDayNumber(row.expectedDay || row.label || row.notes);
-          const when = day ? "around the " + day : (row.expectedDay || row.frequency || "expected");
-          return `${escapeHtml(row.owner || "Income")} ${escapeHtml(row.label || "paycheck")} ${money.format(Number(row.amount || 0))} ${escapeHtml(when)}`;
-        }).join(" · ");
+        return rows.map(row => `${escapeHtml(row.owner || "Income")} — ${escapeHtml(shortMonthDay(row.date))} — ${money.format(Number(row.amount || 0))}`).join(" · ");
       }
 
-      function renderDashboard() {
+            function renderDashboard() {
         const month = currentMonth();
         applyBillPaymentStatuses(month);
 
@@ -2796,8 +2866,8 @@
           <div class="cards kb-simple-dashboard-cards">
             ${metric("Expected income left", expectedIncomeLeft, expectedIncomeLeftText)}
             ${metric("Bills left to pay", stillReserved, "Planned bills still unpaid/reserved.")}
-            ${metric("Personal Money status", personalDeficit > 0 ? -personalDeficit : personalSurplus, personalDeficit > 0 ? `Over personal budget by ${money.format(personalDeficit)}.` : `Still under personal budget by ${money.format(personalSurplus)}.`, personalDeficit > 0 ? "red" : "green")}
             ${metric("Cushion after expected income", monthCushionAfterExpected, "Expected income left − bills left to pay − personal deficit.", monthCushionAfterExpected < 0 ? "red" : "green")}
+            ${metric("Personal Money status", personalDeficit > 0 ? -personalDeficit : personalSurplus, personalDeficit > 0 ? `Over personal budget by ${money.format(personalDeficit)}.` : `Still under personal budget by ${money.format(personalSurplus)}.`, personalDeficit > 0 ? "red" : "green")}
           </div>
 
           <div class="card">
@@ -3969,7 +4039,6 @@
           <div class="form-grid" style="margin-bottom:.8rem">
             ${field("Search personal transactions", input("personalSearch", state.personalSearch || ""), "wide")}
             ${metric("Filtered total", filteredPersonalTotal, search ? `Matches "${escapeHtml(search)}"` : "All visible personal transactions.")}
-            ${metric("Transactions found", personalRows.length, "Matching Personal Money rows.")}
           </div>
           <div class="toolbar" style="justify-content:flex-start;margin-bottom:.8rem"><button id="showAllPersonal" class="secondary" type="button">Show Everyone</button><button id="clearPersonalSearch" class="secondary" type="button">Clear Search</button></div>
           ${personalRows.length ? `<div class="table-wrap"><table><thead><tr><th>Date</th><th>Description</th><th>Owner / Split</th><th>Category</th><th>Note</th><th class="money">Personal amount</th></tr></thead><tbody>${personalRows.map(t => {

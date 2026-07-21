@@ -1271,7 +1271,7 @@
       }
 
 
-      /* v74 smart mortgage reserve */
+      /* v75 mortgage reserve carryover */
       .split-badge {
         display: inline-flex;
         gap: .25rem;
@@ -1772,6 +1772,9 @@
 
       /* v74: Mortgage reserve automatically moves to next month when current-month mortgage is already paid */
 
+
+      /* v75: Mortgage reserve carries from previous month into active month; current month savings show as next month reserve */
+
 </style>
   
   <link rel="manifest" href="/manifest.webmanifest">
@@ -1956,7 +1959,7 @@
       const PAYPAL_SIDE_HUSTLE_TAX_RATE = 30;
       const owners = ["Patricia", "Alec", "Shared"];
       const assets = ["House 1", "House 2", "Car 1", "Car 2", "Family", "Debt", "Giving", "Kids", "Personal"];
-      const categories = ["Personal", "Credit Cards", "Medical", "Entertainment", "Fuel", "Groceries", "Insurance", "HOA", "Mortgage", "Patinada", "Utilities", "Income", "Side Hustles", "Side Gig", "Contribution", "Debt", "Savings", "Next Month Mortgage Reserve / Vault", "This Month Bill Reserve / Vault", "Transfer / Vault Movement", "Quarterly Reserve / Vault Set-Aside", "Paid from Vault / Already Reserved", "Uncategorized"];
+      const categories = ["Personal", "Credit Cards", "Medical", "Entertainment", "Fuel", "Groceries", "Insurance", "HOA", "Mortgage", "Patinada", "Utilities", "Income", "Side Hustles", "Side Gig", "Contribution", "Debt", "Savings", "Next Month Mortgage Reserve / Vault", "Bill Still Due This Month Reserve / Vault", "This Month Bill Reserve / Vault", "Transfer / Vault Movement", "Quarterly Reserve / Vault Set-Aside", "Paid from Vault / Already Reserved", "Uncategorized"];
       const incomeTypes = ["", "Job Income", "Side Hustle Income", "Other Income"];
       const statuses = ["Not Paid", "Scheduled", "Committed", "Funded", "Paid", "Partial", "Auto-pay", "Review", "Skipped"];
       const navItems = [
@@ -2686,6 +2689,7 @@
       function isVaultMovementCategory(value) {
         const category = String(value || "").trim().toLowerCase();
         return [
+          "bill still due this month reserve / vault",
           "next month mortgage reserve / vault",
           "this month bill reserve / vault",
           "transfer / vault movement",
@@ -2710,34 +2714,10 @@
       function isCurrentMonthBillReserveTxn(txn) {
         if (!txn || !txn.reconciled || Number(txn.amount || 0) >= 0) return false;
         const category = String(txn.category || "").trim().toLowerCase();
-        const text = [
-          txn.category,
-          txn.subcategory,
-          txn.description,
-          txn.notes,
-          txn.name,
-          txn.merchant
-        ].join(" ").toLowerCase();
 
-        // In this budget flow, mortgage/PennyMac reserve is for next month, not this month.
-        if (/(mortgage|pennymac)/.test(text)) return false;
-
-        // This only counts when the user intentionally marks it for bills still due this month.
-        return category === "this month bill reserve / vault";
-      }
-
-      function isFutureReserveTxn(txn) {
-        if (!txn || !txn.reconciled || Number(txn.amount || 0) >= 0) return false;
-        const category = String(txn.category || "").trim().toLowerCase();
-        const text = [
-          txn.category,
-          txn.subcategory,
-          txn.description,
-          txn.notes,
-          txn.name,
-          txn.merchant
-        ].join(" ").toLowerCase();
-        return category === "quarterly reserve / vault set-aside" || category === "next month mortgage reserve / vault" || /quarterly|future reserve|future bill/.test(text);
+        // New explicit category only. The old "This Month Bill Reserve" label is treated as legacy
+        // mortgage reserve for next month, because that is how this budget flow is being used.
+        return category === "bill still due this month reserve / vault";
       }
 
       function currentMonthBillReserveRows(month = currentMonth()) {
@@ -2748,101 +2728,120 @@
         return Math.abs(sum(currentMonthBillReserveRows(month), txn => Number(txn.amount || 0)));
       }
 
-      function isMortgageBillLine(row) {
-        const text = [
-          row.category,
-          row.paymentType,
-          row.name,
-          row.description,
-          row.notes,
-          row.vendor,
-          row.merchant
-        ].join(" ").toLowerCase();
-        return /mortgage|pennymac/.test(text);
+      function previousMonthKey(monthKey = state.activeMonth) {
+        const [year, month] = String(monthKey || "").split("-").map(Number);
+        if (!year || !month) return "";
+        const d = new Date(year, month - 2, 1);
+        return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0");
       }
 
-      function unpaidMortgageBillsTotal(month = currentMonth()) {
-        return sum(familyBudgetRows(month).filter(row => isMortgageBillLine(row)), row => {
-          const amount = Number(row.amount || 0);
-          const paid = Number(row.paidAmount || 0);
-          const remaining = Number.isFinite(Number(row.remainingAmount)) ? Number(row.remainingAmount || 0) : Math.max(0, amount - paid);
-          const status = String(row.status || "").toLowerCase();
-          if (/paid|complete/.test(status)) return 0;
-          return Math.max(0, remaining);
-        });
+      function monthByKey(monthKey) {
+        if (!monthKey) return null;
+        if (state.months && state.months[monthKey]) return state.months[monthKey];
+        if (Array.isArray(state.months)) return state.months.find(m => m.key === monthKey || m.month === monthKey || m.id === monthKey) || null;
+        return null;
+      }
+
+      function reserveText(txn) {
+        return [
+          txn && txn.category,
+          txn && txn.subcategory,
+          txn && txn.description,
+          txn && txn.notes,
+          txn && txn.name,
+          txn && txn.merchant
+        ].join(" ").toLowerCase();
       }
 
       function isMortgageReserveTxn(txn) {
-        const text = [
-          txn.category,
-          txn.subcategory,
-          txn.description,
-          txn.notes,
-          txn.name,
-          txn.merchant
-        ].join(" ").toLowerCase();
-        return /(mortgage|pennymac)/.test(text);
+        if (!txn || !txn.reconciled || Number(txn.amount || 0) >= 0) return false;
+        const category = String(txn.category || "").trim().toLowerCase();
+        const text = reserveText(txn);
+
+        // Old/current reserve category is treated as legacy next-month mortgage reserve.
+        return category === "next month mortgage reserve / vault"
+          || category === "this month bill reserve / vault"
+          || ((category === "transfer / vault movement" || category === "bill still due this month reserve / vault") && /(mortgage|pennymac|next month)/.test(text));
       }
 
       function mortgageReserveRows(month = currentMonth()) {
-        return (month.transactions || []).filter(txn => {
-          if (!txn || !txn.reconciled || Number(txn.amount || 0) >= 0) return false;
-          const category = String(txn.category || "").trim().toLowerCase();
-          return isMortgageReserveTxn(txn)
-            && [
-              "next month mortgage reserve / vault",
-              "this month bill reserve / vault",
-              "transfer / vault movement"
-            ].includes(category);
-        });
+        return (month.transactions || []).filter(isMortgageReserveTxn);
       }
 
       function mortgageReserveTotal(month = currentMonth()) {
         return Math.abs(sum(mortgageReserveRows(month), txn => Number(txn.amount || 0)));
       }
 
-      function smartCurrentMonthReserveTotal(month = currentMonth()) {
-        const nonMortgageCurrent = Math.abs(sum(currentMonthBillReserveRows(month).filter(txn => !isMortgageReserveTxn(txn)), txn => Number(txn.amount || 0)));
-        const mortgageStillUnpaid = unpaidMortgageBillsTotal(month);
-        const mortgageReserveForThisMonth = Math.min(mortgageStillUnpaid, mortgageReserveTotal(month));
-        return nonMortgageCurrent + mortgageReserveForThisMonth;
-      }
-
-      function smartNextMonthMortgageReserveTotal(month = currentMonth()) {
-        const reserve = mortgageReserveTotal(month);
-        const mortgageStillUnpaid = unpaidMortgageBillsTotal(month);
-        return Math.max(0, reserve - Math.min(reserve, mortgageStillUnpaid));
-      }
-
       function nextMonthMortgageReserveRows(month = currentMonth()) {
-        return (month.transactions || []).filter(txn => {
-          if (!txn || !txn.reconciled || Number(txn.amount || 0) >= 0) return false;
-          const category = String(txn.category || "").trim().toLowerCase();
-          const text = [
-            txn.category,
-            txn.subcategory,
-            txn.description,
-            txn.notes,
-            txn.name,
-            txn.merchant
-          ].join(" ").toLowerCase();
-
-          // Exact category is preferred.
-          if (category === "next month mortgage reserve / vault") return true;
-
-          // Backward-compatible safety:
-          // If an older reserve category was used for mortgage/PennyMac,
-          // treat it as next-month mortgage reserve because Patricia's mortgage reserve flow is for next month.
-          if ((category === "this month bill reserve / vault" || category === "transfer / vault movement")
-              && /(mortgage|pennymac)/.test(text)) return true;
-
-          return /(next month|next-month).*mortgage/.test(text)
-            || /mortgage.*(next month|next-month)/.test(text);
-        });
+        return mortgageReserveRows(month);
       }
 
       function nextMonthMortgageReserveTotal(month = currentMonth()) {
-        return Math.abs(sum(nextMonthMortgageReserveRows(month), txn => Number(txn.amount || 0)));
+        return mortgageReserveTotal(month);
+      }
+
+      function previousMonthMortgageReserveTotal() {
+        const prev = monthByKey(previousMonthKey());
+        return prev ? mortgageReserveTotal(prev) : 0;
+      }
+
+      function isMortgageBillLine(row) {
+        const text = [
+          row && row.category,
+          row && row.paymentType,
+          row && row.name,
+          row && row.payee,
+          row && row.description,
+          row && row.notes,
+          row && row.vendor,
+          row && row.merchant
+        ].join(" ").toLowerCase();
+        return /mortgage|pennymac/.test(text);
+      }
+
+      function activeBillRows(month = currentMonth()) {
+        return activeBudgetLines(allBudgetLines(month));
+      }
+
+      function unpaidMortgageBillsTotal(month = currentMonth()) {
+        return sum(activeBillRows(month).filter(row => isMortgageBillLine(row)), row => {
+          const amount = Math.abs(Number(row.amount || 0));
+          const paid = Math.abs(Number(row.paidAmount || 0));
+          const remaining = Number.isFinite(Number(row.remainingAmount)) ? Math.abs(Number(row.remainingAmount || 0)) : Math.max(0, amount - paid);
+          const status = String(row.status || "").toLowerCase();
+          if (/paid|complete/.test(status)) return 0;
+          return Math.max(0, remaining);
+        });
+      }
+
+      function mortgageReserveAvailableForActiveMonth(month = currentMonth()) {
+        // Money saved in the previous budget month for "next month mortgage"
+        // becomes available in the active month.
+        return previousMonthMortgageReserveTotal();
+      }
+
+      function smartCurrentMonthReserveTotal(month = currentMonth()) {
+        const explicitCurrent = currentMonthBillReserveTotal(month);
+        const mortgageStillUnpaid = unpaidMortgageBillsTotal(month);
+        const priorMortgageReserveAvailable = mortgageReserveAvailableForActiveMonth(month);
+        return Math.min(stillNumber(explicitCurrent + Math.min(mortgageStillUnpaid, priorMortgageReserveAvailable)), Number.MAX_SAFE_INTEGER);
+      }
+
+      function stillNumber(value) {
+        const n = Number(value || 0);
+        return Number.isFinite(n) ? n : 0;
+      }
+
+      function smartNextMonthMortgageReserveTotal(month = currentMonth()) {
+        // Money saved this month is for next month's mortgage dashboard.
+        return nextMonthMortgageReserveTotal(month);
+      }
+
+      function isFutureReserveTxn(txn) {
+        if (!txn || !txn.reconciled || Number(txn.amount || 0) >= 0) return false;
+        const category = String(txn.category || "").trim().toLowerCase();
+        const text = reserveText(txn);
+        return category === "quarterly reserve / vault set-aside" || /quarterly|future reserve|future bill/.test(text);
       }
 
       function futureReserveRows(month = currentMonth()) {
@@ -2852,7 +2851,6 @@
       function futureReserveTotal(month = currentMonth()) {
         return Math.abs(sum(futureReserveRows(month), txn => Number(txn.amount || 0)));
       }
-
       function isIncomeTxn(txn) {
         return Boolean(txn && txn.reconciled) && Number(txn.amount || 0) > 0 && !isVaultMovementTxn(txn);
       }
@@ -3050,7 +3048,7 @@
         const personalSurplus = Math.max(0, personalBudget - personalSpent);
         const currentReservedForBills = Math.min(stillReserved, smartCurrentMonthReserveTotal(month));
         const nextMonthMortgageReserve = smartNextMonthMortgageReserveTotal(month);
-        const futureReservedForLater = Math.max(0, futureReserveTotal(month) - nextMonthMortgageReserve);
+        const futureReservedForLater = Math.max(0, futureReserveTotal(month));
         const uncoveredBills = Math.max(0, stillReserved - currentReservedForBills);
         const monthCushionAfterExpected = expectedIncomeLeft - uncoveredBills;
         const actualNet = actualJobTotal + actualOtherTotal + actualSideTotal - familySpent - personalSpent;
@@ -3075,20 +3073,20 @@
           <div class="cards kb-simple-dashboard-cards">
             ${metric("Planned bills", plannedBills, "Total bills planned for this month, not including Personal Money.")}
             ${metric("Already paid", matchedBills, "Bills already matched or marked paid from the monthly plan.", "green")}
-            ${metric("Reserved for bills still due this month", currentReservedForBills, "Reserve money that applies to bills still unpaid this month.", currentReservedForBills > 0 ? "green" : "yellow")}
-            ${metric("Next month mortgage reserve", nextMonthMortgageReserve, "Mortgage reserve not needed for this month because this month’s mortgage is already paid.", nextMonthMortgageReserve > 0 ? "green" : "yellow")}
-            ${metric("Uncovered bills", uncoveredBills, "This month’s bills left to pay minus only explicit current-month reserves.", uncoveredBills > 0 ? "yellow" : "green")}
+            ${metric("Reserve available for this month", currentReservedForBills, "Current-month bill reserve plus prior-month mortgage reserve if a mortgage is still unpaid.", currentReservedForBills > 0 ? "green" : "yellow")}
+            ${metric("Next month mortgage reserve", nextMonthMortgageReserve, "Mortgage money saved in this budget month for next month’s mortgage payments.", nextMonthMortgageReserve > 0 ? "green" : "yellow")}
+            ${metric("Uncovered bills", uncoveredBills, "This month’s bills left to pay minus reserves available for this month.", uncoveredBills > 0 ? "yellow" : "green")}
             ${metric("Personal Money total", personalSpent, personalSpent > personalBudget ? `Budgeted ${money.format(personalBudget)} · Spent ${money.format(personalSpent)} · Deficit ${money.format(personalSpent - personalBudget)}` : `Budgeted ${money.format(personalBudget)} · Spent ${money.format(personalSpent)} · Surplus ${money.format(personalBudget - personalSpent)}`, personalSpent > personalBudget ? "red" : "green")}
           </div>
 
           <div class="section-title" style="margin:.25rem 0 .15rem"><h3>Month Outlook</h3><span>What is still coming, what is still unpaid, and whether we are okay</span></div>
-          <p class="muted small"><strong>Vault rule:</strong> mortgage reserve only counts for this month if a current-month mortgage is still unpaid. Otherwise it shows as next month mortgage reserve.</p>
+          <p class="muted small"><strong>Vault rule:</strong> mortgage reserve saved this month is for next month. Mortgage reserve saved last month can cover this month if a mortgage is still unpaid.</p>
           <div class="cards kb-simple-dashboard-cards">
             ${metric("Expected income left", expectedIncomeLeft, expectedIncomeLeftText)}
             ${metric("Bills left to pay", stillReserved, "Bills still unpaid for this budget month.")}
             ${metric("Next month mortgage reserve", nextMonthMortgageReserve, "Already set aside for next month’s mortgage payments. Not used to calculate this month’s uncovered bills.", nextMonthMortgageReserve > 0 ? "green" : "yellow")}
             ${metric("Future / quarterly reserve", futureReservedForLater, "Money saved for future or quarterly bills. Not used for this month’s uncovered bills.", futureReservedForLater > 0 ? "green" : "yellow")}
-            ${metric("Uncovered this month", uncoveredBills, "This month’s bills left to pay minus only explicit current-month reserves.", uncoveredBills > 0 ? "yellow" : "green")}
+            ${metric("Uncovered this month", uncoveredBills, "This month’s bills left to pay minus reserves available for this month.", uncoveredBills > 0 ? "yellow" : "green")}
             ${metric(monthCushionAfterExpected >= 0 ? "Cushion after expected income" : "Short after expected income", monthCushionAfterExpected, "Expected income left − uncovered this month. Personal Money status is tracked separately.", monthCushionAfterExpected < 0 ? "red" : "green")}
             ${metric("Personal Money status", personalDeficit > 0 ? -personalDeficit : personalSurplus, personalDeficit > 0 ? `Over personal budget by ${money.format(personalDeficit)}.` : `Still under personal budget by ${money.format(personalSurplus)}.`, personalDeficit > 0 ? "red" : "green")}
           </div>

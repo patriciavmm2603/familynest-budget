@@ -4,6 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Kingdom Builder</title>
+  <!-- v79 safety hardening -->
   <!-- v44 actual income rollup -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
     <style>
@@ -1784,6 +1785,9 @@
 
       /* v78: Month Outlook uses clearer money language: left after bills, not free extra money */
 
+
+      /* v79: Safety hardening - no September delete, no PennyMac clobber, no cloud seed overwrite, mutually exclusive reserves */
+
 </style>
   
   <link rel="manifest" href="/manifest.webmanifest">
@@ -2252,15 +2256,30 @@
         }
       }
 
+      function loadLocalState() {
+        try {
+          const raw = localStorage.getItem(STORAGE_KEY);
+          return raw ? JSON.parse(raw) : null;
+        } catch (err) {
+          console.warn("Could not load local Kingdom Builder state", err);
+          return null;
+        }
+      }
+
       async function loadCloudState() {
-        if (!cloudAvailable()) { setStorageStatus("Browser only", "Log in to save to the shared database."); return; }
+        if (!cloudAvailable()) {
+          setStorageStatus("Browser only", "Log in to save to the shared database.");
+          return;
+        }
         try {
           const { data, error } = await supabaseClient
             .from("app_state")
             .select("state, updated_at")
             .eq("household_id", HOUSEHOLD_ID)
             .maybeSingle();
+
           if (error) throw error;
+
           if (data && data.state && data.state.months) {
             state = normalizeState(data.state);
             localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
@@ -2268,15 +2287,38 @@
             setStorageStatus("Shared storage", "Loaded from Supabase. Changes auto-save for both of you.");
             return;
           }
-          state = cloneSeedState();
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-          cloudReady = true;
-          setStorageStatus("Shared storage", "First shared save created from your Kingdom Builder backup.");
-          await saveCloudState();
+
+          if (!data) {
+            // First-time setup only: no row exists at all. Safe to create initial shared row.
+            state = normalizeState(loadLocalState() || cloneSeedState());
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+            cloudReady = true;
+            setStorageStatus("Shared storage", "First shared save created from local app state.");
+            await saveCloudState();
+            return;
+          }
+
+          // Safety: a row exists, but it is malformed or missing state.months.
+          // Never overwrite the cloud row with seed/demo data in this situation.
+          cloudReady = false;
+          const local = loadLocalState();
+          if (local && local.months) {
+            state = normalizeState(local);
+            setStorageStatus("Cloud paused", "Supabase returned malformed data. Using local copy only; cloud save is paused to protect shared data.");
+          } else {
+            setStorageStatus("Cloud paused", "Supabase returned malformed data. Cloud save is paused to protect shared data.");
+          }
+          alert("Kingdom Builder stopped cloud saving to protect your data. Supabase returned a shared row, but it did not contain a valid state.months object. I did NOT overwrite it with seed/demo data.");
         } catch (err) {
           cloudReady = false;
-          setStorageStatus("Setup needed", "Run the app_state SQL in Supabase, then refresh. " + (err.message || err));
-          alert("Kingdom Builder shared storage could not load. Most likely the app_state table is missing. Run the SQL setup file in Supabase, then refresh.\n\n" + (err.message || err));
+          const local = loadLocalState();
+          if (local && local.months) {
+            state = normalizeState(local);
+            setStorageStatus("Cloud paused", "Could not load Supabase. Using local copy only; cloud save is paused. " + (err.message || err));
+          } else {
+            setStorageStatus("Setup needed", "Could not load Supabase and no local backup was found. " + (err.message || err));
+          }
+          alert("Kingdom Builder shared storage could not load. I did NOT overwrite Supabase. Cloud saving is paused until this is fixed.\n\n" + (err.message || err));
         }
       }
 
@@ -2336,9 +2378,6 @@
         if (parsed.months) {
           Object.keys(parsed.months).forEach(monthKey => {
             const monthLabel = String(parsed.months[monthKey]?.label || "").toLowerCase();
-            if (monthKey === "2026-09" || monthLabel.includes("september 2026")) {
-              delete parsed.months[monthKey];
-            }
           });
           if (!parsed.months[parsed.activeMonth]) {
             parsed.activeMonth = parsed.months["2026-07"] ? "2026-07" : (parsed.months["2026-06"] ? "2026-06" : Object.keys(parsed.months).sort()[0]);
@@ -2379,10 +2418,7 @@
           month.transactions ||= []; month.budgetLines ||= [];
           month.budgetLines.forEach(line => {
             line.paycheckId ||= defaultPaycheckId(line);
-            if (String(line.payee || "").toLowerCase().includes("pennymac") && Number(line.paidAmount || 0) <= 0) {
-              line.paycheckId = "pc-patricia-24"; line.dueDay = "30"; line.status = "Committed";
-              line.notes = "Treat as end-of-month mortgage money from Patricia's 24th paycheck.";
-            }
+        // v79: Removed hardcoded PennyMac normalization overwrite.
           });
           month.closeout ||= { billsChecked: false, transactionsChecked: false, allowanceChecked: false, incomeChecked: false, notes: "" };
         });
@@ -2723,12 +2759,17 @@
       function isCurrentMonthBillReserveTxn(txn) {
         if (!txn || !txn.reconciled || Number(txn.amount || 0) >= 0) return false;
         const category = String(txn.category || "").trim().toLowerCase();
+        const text = reserveText(txn);
 
-        // New explicit category only. The old "This Month Bill Reserve" label is treated as legacy
-        // mortgage reserve for next month, because that is how this budget flow is being used.
-        return category === "bill still due this month reserve / vault";
+        // Mutually exclusive reserve buckets:
+        // next-month mortgage reserve never counts as current-month reserve.
+        if (category === "next month mortgage reserve / vault") return false;
+        if (category === "quarterly reserve / vault set-aside") return false;
+        if (/(next month|next-month).*mortgage/.test(text) || /mortgage.*(next month|next-month)/.test(text)) return false;
+
+        return category === "bill still due this month reserve / vault"
+          || (category === "this month bill reserve / vault" && !/(mortgage|pennymac)/.test(text));
       }
-
       function currentMonthBillReserveRows(month = currentMonth()) {
         return (month.transactions || []).filter(isCurrentMonthBillReserveTxn);
       }
@@ -2770,7 +2811,8 @@
         // Old/current reserve category is treated as legacy next-month mortgage reserve.
         return category === "next month mortgage reserve / vault"
           || category === "this month bill reserve / vault"
-          || ((category === "transfer / vault movement" || category === "bill still due this month reserve / vault") && /(mortgage|pennymac|next month)/.test(text));
+          || (category === "transfer / vault movement" && /(next month|next-month).*mortgage/.test(text))
+          || (category === "transfer / vault movement" && /mortgage.*(next month|next-month)/.test(text));
       }
 
       function mortgageReserveRows(month = currentMonth()) {

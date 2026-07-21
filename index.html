@@ -1271,7 +1271,7 @@
       }
 
 
-      /* v50 held-style tabs */
+      /* v51 personal mobile nav */
       .split-badge {
         display: inline-flex;
         gap: .25rem;
@@ -1563,7 +1563,7 @@
         /* Bottom quick nav like Held, without removing the full top tabs */
         .kb-bottom-nav {
           display: grid !important;
-          grid-template-columns: repeat(5, 1fr) !important;
+          grid-template-columns: repeat(6, 1fr) !important;
           position: fixed !important;
           left: 10px !important;
           right: 10px !important;
@@ -1602,6 +1602,33 @@
           font-size: 1.15rem;
           line-height: 1;
           margin-bottom: .15rem;
+        }
+      }
+
+
+      /* v51: keep Personal Money visible in the mobile bottom nav */
+      @media (max-width: 760px) {
+        .kb-bottom-nav button {
+          font-size: .66rem !important;
+          padding: 8px 2px !important;
+        }
+
+        .kb-bottom-nav button .kb-nav-icon {
+          font-size: 1.05rem !important;
+        }
+      }
+
+      @media (max-width: 380px) {
+        .kb-bottom-nav {
+          left: 6px !important;
+          right: 6px !important;
+          padding: 6px 4px !important;
+          gap: 2px !important;
+        }
+
+        .kb-bottom-nav button {
+          font-size: .61rem !important;
+          min-height: 44px !important;
         }
       }
 
@@ -2401,7 +2428,8 @@
           budget: ["▰", "Budget"],
           transactions: ["$", "Txns"],
           income: ["↗", "Income"],
-          cashguard: ["☂", "Guard"]
+          cashguard: ["☂", "Guard"],
+          allowance: ["◉", "Personal"]
         };
         return map[id] || ["•", label];
       }
@@ -2409,7 +2437,7 @@
       function renderMobileBottomNav() {
         const node = document.querySelector("#mobileBottomNav");
         if (!node) return;
-        const quick = ["dashboard", "budget", "transactions", "income", "cashguard"];
+        const quick = ["dashboard", "budget", "transactions", "allowance", "income", "cashguard"];
         node.innerHTML = quick.map(id => {
           const found = navItems.find(([view]) => view === id);
           if (!found) return "";

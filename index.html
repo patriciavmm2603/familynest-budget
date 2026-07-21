@@ -1271,7 +1271,7 @@
       }
 
 
-      /* v65 cushion no personal deficit */
+      /* v68 hide other income dashboard */
       .split-badge {
         display: inline-flex;
         gap: .25rem;
@@ -1745,6 +1745,15 @@
 
       /* v65: Cushion after expected income excludes Personal Money deficit */
 
+
+      /* v66: Vault reserve categories added; vault movement is not income or Personal Money spending */
+
+
+      /* v67: Current-month vault reserves reduce uncovered bills; future/quarterly reserves stay separate */
+
+
+      /* v68: Dashboard hides Actual other income because vault money is handled in reserves */
+
 </style>
   
   <link rel="manifest" href="/manifest.webmanifest">
@@ -1929,7 +1938,7 @@
       const PAYPAL_SIDE_HUSTLE_TAX_RATE = 30;
       const owners = ["Patricia", "Alec", "Shared"];
       const assets = ["House 1", "House 2", "Car 1", "Car 2", "Family", "Debt", "Giving", "Kids", "Personal"];
-      const categories = ["Personal", "Credit Cards", "Medical", "Entertainment", "Fuel", "Groceries", "Insurance", "HOA", "Mortgage", "Patinada", "Utilities", "Income", "Side Hustles", "Side Gig", "Contribution", "Debt", "Savings", "Uncategorized"];
+      const categories = ["Personal", "Credit Cards", "Medical", "Entertainment", "Fuel", "Groceries", "Insurance", "HOA", "Mortgage", "Patinada", "Utilities", "Income", "Side Hustles", "Side Gig", "Contribution", "Debt", "Savings", "This Month Bill Reserve / Vault", "Transfer / Vault Movement", "Quarterly Reserve / Vault Set-Aside", "Paid from Vault / Already Reserved", "Uncategorized"];
       const incomeTypes = ["", "Job Income", "Side Hustle Income", "Other Income"];
       const statuses = ["Not Paid", "Scheduled", "Committed", "Funded", "Paid", "Partial", "Auto-pay", "Review", "Skipped"];
       const navItems = [
@@ -2656,8 +2665,78 @@
         return normalizeIncomeType(txn.incomeType) || guessIncomeType(txn);
       }
 
+      function isVaultMovementCategory(value) {
+        const category = String(value || "").trim().toLowerCase();
+        return [
+          "this month bill reserve / vault",
+          "transfer / vault movement",
+          "quarterly reserve / vault set-aside",
+          "paid from vault / already reserved"
+        ].includes(category);
+      }
+
+      function isVaultMovementTxn(txn) {
+        if (!txn) return false;
+        const text = [
+          txn.category,
+          txn.subcategory,
+          txn.description,
+          txn.notes,
+          txn.name,
+          txn.merchant
+        ].join(" ").toLowerCase();
+        return isVaultMovementCategory(txn.category) || /vault|reserve|set-aside|set aside|already reserved|paid from vault/.test(text);
+      }
+
+      function isCurrentMonthBillReserveTxn(txn) {
+        if (!txn || !txn.reconciled || Number(txn.amount || 0) >= 0) return false;
+        const category = String(txn.category || "").trim().toLowerCase();
+        const text = [
+          txn.category,
+          txn.subcategory,
+          txn.description,
+          txn.notes,
+          txn.name,
+          txn.merchant
+        ].join(" ").toLowerCase();
+
+        if (category === "this month bill reserve / vault") return true;
+        if (category === "transfer / vault movement" && /(mortgage|pennymac|this month|current month|current bill)/.test(text)) return true;
+        return false;
+      }
+
+      function isFutureReserveTxn(txn) {
+        if (!txn || !txn.reconciled || Number(txn.amount || 0) >= 0) return false;
+        const category = String(txn.category || "").trim().toLowerCase();
+        const text = [
+          txn.category,
+          txn.subcategory,
+          txn.description,
+          txn.notes,
+          txn.name,
+          txn.merchant
+        ].join(" ").toLowerCase();
+        return category === "quarterly reserve / vault set-aside" || /quarterly|future reserve|future bill/.test(text);
+      }
+
+      function currentMonthBillReserveRows(month = currentMonth()) {
+        return (month.transactions || []).filter(isCurrentMonthBillReserveTxn);
+      }
+
+      function currentMonthBillReserveTotal(month = currentMonth()) {
+        return Math.abs(sum(currentMonthBillReserveRows(month), txn => Number(txn.amount || 0)));
+      }
+
+      function futureReserveRows(month = currentMonth()) {
+        return (month.transactions || []).filter(isFutureReserveTxn);
+      }
+
+      function futureReserveTotal(month = currentMonth()) {
+        return Math.abs(sum(futureReserveRows(month), txn => Number(txn.amount || 0)));
+      }
+
       function isIncomeTxn(txn) {
-        return Boolean(txn && txn.reconciled) && Number(txn.amount || 0) > 0;
+        return Boolean(txn && txn.reconciled) && Number(txn.amount || 0) > 0 && !isVaultMovementTxn(txn);
       }
 
       function actualJobIncomeRows(month = currentMonth()) {
@@ -2851,7 +2930,10 @@
         const expectedIncomeLeftText = expectedPaychecksLeftLabel(month);
         const personalDeficit = Math.max(0, personalSpent - personalBudget);
         const personalSurplus = Math.max(0, personalBudget - personalSpent);
-        const monthCushionAfterExpected = expectedIncomeLeft - stillReserved;
+        const currentReservedForBills = Math.min(stillReserved, currentMonthBillReserveTotal(month));
+        const futureReservedForLater = futureReserveTotal(month);
+        const uncoveredBills = Math.max(0, stillReserved - currentReservedForBills);
+        const monthCushionAfterExpected = expectedIncomeLeft - uncoveredBills;
         const actualNet = actualJobTotal + actualOtherTotal + actualSideTotal - familySpent - personalSpent;
 
         const plannedJobText = plannedJobRows.length
@@ -2862,12 +2944,11 @@
         document.querySelector("#dashboard").innerHTML = `
           <div class="section-title" style="margin:.25rem 0 .15rem">
             <h3>Income</h3>
-            <span>Job, side hustle, and other income are separated by transaction Income Type</span>
+            <span>Job income and side hustle only; vault money is handled in reserves</span>
           </div>
           <div class="cards kb-simple-dashboard-cards">
             ${metric("Reliable job income", plannedJobIncome, plannedJobText)}
             ${metric("Actual job income", actualJobTotal, `${actualJobRows.length} statement deposit${actualJobRows.length === 1 ? "" : "s"} classified as Job Income.`)}
-            ${metric("Actual other income", actualOtherTotal, `${actualOtherRows.length} deposit${actualOtherRows.length === 1 ? "" : "s"} from vaults or other non-job / non-side-hustle money.`)}
             ${metric("Side hustle gross", sideHustleGross, `${actualSideRows.length || paypalSideGigRows(month).length} side hustle deposit${(actualSideRows.length || paypalSideGigRows(month).length) === 1 ? "" : "s"}. ${sideHint}`)}
           </div>
 
@@ -2880,10 +2961,13 @@
           </div>
 
           <div class="section-title" style="margin:.25rem 0 .15rem"><h3>Month Outlook</h3><span>What is still coming, what is still unpaid, and whether we are okay</span></div>
+          <p class="muted small"><strong>Vault rule:</strong> current-month vault reserves reduce uncovered bills; quarterly/future reserves do not. Vault transfers are not new income or duplicate spending.</p>
           <div class="cards kb-simple-dashboard-cards">
             ${metric("Expected income left", expectedIncomeLeft, expectedIncomeLeftText)}
             ${metric("Bills left to pay", stillReserved, "Planned bills still unpaid/reserved.")}
-            ${metric("Cushion after expected income", monthCushionAfterExpected, "Expected income left − bills left to pay. Personal Money status is tracked separately.", monthCushionAfterExpected < 0 ? "red" : "green")}
+            ${metric("Reserved for this month’s bills", currentReservedForBills, futureReservedForLater > 0 ? `${money.format(futureReservedForLater)} is saved for future/quarterly bills and is not counted here.` : "Current-month bill money already protected in vault.", currentReservedForBills > 0 ? "green" : "yellow")}
+            ${metric("Uncovered bills", uncoveredBills, "Bills left to pay minus current-month vault reserves.", uncoveredBills > 0 ? "yellow" : "green")}
+            ${metric(monthCushionAfterExpected >= 0 ? "Cushion after expected income" : "Short after expected income", monthCushionAfterExpected, "Expected income left − uncovered bills. Personal Money status is tracked separately.", monthCushionAfterExpected < 0 ? "red" : "green")}
             ${metric("Personal Money status", personalDeficit > 0 ? -personalDeficit : personalSurplus, personalDeficit > 0 ? `Over personal budget by ${money.format(personalDeficit)}.` : `Still under personal budget by ${money.format(personalSurplus)}.`, personalDeficit > 0 ? "red" : "green")}
           </div>
 
@@ -4090,7 +4174,7 @@
       }
 
             function isPersonalTransaction(txn) {
-        const category = String(txn.category || "").trim();
+        const category = String(txn.category || "").trim() && !isVaultMovementTxn(txn);
         const asset = String(txn.asset || "").trim();
         const hasAssignedBill = Boolean(txn.billId);
 

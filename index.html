@@ -1271,7 +1271,7 @@
       }
 
 
-      /* v60 month outlook */
+      /* v61 clean month outlook */
       .split-badge {
         display: inline-flex;
         gap: .25rem;
@@ -1729,6 +1729,9 @@
 
 
       /* v60: Month Outlook replaces confusing jobs-only gap/breathing room cards */
+
+
+      /* v61: Month Outlook only shows expected income, bills left, personal status, and cushion */
 
 </style>
   
@@ -2789,14 +2792,12 @@
             ${metric("Personal Money total", personalSpent, personalSpent > personalBudget ? `Budgeted ${money.format(personalBudget)} · Spent ${money.format(personalSpent)} · Deficit ${money.format(personalSpent - personalBudget)}` : `Budgeted ${money.format(personalBudget)} · Spent ${money.format(personalSpent)} · Surplus ${money.format(personalBudget - personalSpent)}`, personalSpent > personalBudget ? "red" : "green")}
           </div>
 
-          <div class="section-title" style="margin:.25rem 0 .15rem"><h3>Month Outlook</h3><span>Looks at what is still expected, not like the month is already over</span></div>
+          <div class="section-title" style="margin:.25rem 0 .15rem"><h3>Month Outlook</h3><span>What is still coming, what is still unpaid, and whether we are okay</span></div>
           <div class="cards kb-simple-dashboard-cards">
             ${metric("Expected income left", expectedIncomeLeft, expectedIncomeLeftText)}
             ${metric("Bills left to pay", stillReserved, "Planned bills still unpaid/reserved.")}
             ${metric("Personal Money status", personalDeficit > 0 ? -personalDeficit : personalSurplus, personalDeficit > 0 ? `Over personal budget by ${money.format(personalDeficit)}.` : `Still under personal budget by ${money.format(personalSurplus)}.`, personalDeficit > 0 ? "red" : "green")}
             ${metric("Cushion after expected income", monthCushionAfterExpected, "Expected income left − bills left to pay − personal deficit.", monthCushionAfterExpected < 0 ? "red" : "green")}
-            ${metric("Actual statement result", actualNet, "Actual reviewed deposits minus actual reviewed spending so far.", actualNet < 0 ? "red" : "green")}
-            ${metric("Needs review", count, "Imported transactions that still need category/owner/income type review.", count > 0 ? "red" : "")}
           </div>
 
           <div class="card">

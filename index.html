@@ -4,6 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Kingdom Builder</title>
+  <!-- v82 expected income actuals -->
   <!-- v81 fix csv amount sort -->
   <!-- v44 actual income rollup -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
@@ -1794,6 +1795,9 @@
 
       /* v81: CSV Review sort now finds columns by header text; Amount sorts numerically after Income Type column */
 
+
+      /* v82: Expected income left subtracts matching actual job deposits already received early */
+
 </style>
   
   <link rel="manifest" href="/manifest.webmanifest">
@@ -3074,11 +3078,69 @@
         return occurrences;
       }
 
+      function dateOnlyKey(date) {
+        if (!(date instanceof Date) || Number.isNaN(date.getTime())) return "";
+        return date.toISOString().slice(0, 10);
+      }
+
+      function transactionDateObject(txn) {
+        const d = new Date(String(txn && txn.date || "").trim());
+        return Number.isNaN(d.getTime()) ? null : d;
+      }
+
+      function sameOwnerForPaycheck(a, b) {
+        const left = String(a || "").trim().toLowerCase();
+        const right = String(b || "").trim().toLowerCase();
+        if (!left || !right || left === "shared" || right === "shared" || left === "unassigned" || right === "unassigned") return true;
+        return left === right;
+      }
+
+      function closePaycheckAmount(a, b) {
+        const left = Math.abs(Number(a || 0));
+        const right = Math.abs(Number(b || 0));
+        if (!left || !right) return false;
+        const diff = Math.abs(left - right);
+        return diff <= 2 || diff <= Math.max(5, left * 0.03);
+      }
+
+      function actualJobDepositsForExpectedIncome(month = currentMonth()) {
+        return actualJobIncomeRows(month)
+          .map(txn => ({ txn, date: transactionDateObject(txn), amount: Number(txn.amount || 0), owner: txn.owner || "" }))
+          .filter(row => row.date && Number(row.amount || 0) > 0)
+          .sort((a, b) => a.date - b.date);
+      }
+
+      function paycheckOccurrenceWasAlreadyReceived(occurrence, actualRows, usedActualIndexes) {
+        const scheduled = occurrence.date;
+        const scheduledTime = scheduled.getTime();
+        const oneDay = 24 * 60 * 60 * 1000;
+
+        const matchIndex = actualRows.findIndex((row, index) => {
+          if (usedActualIndexes.has(index)) return false;
+          if (!sameOwnerForPaycheck(row.owner, occurrence.owner)) return false;
+          if (!closePaycheckAmount(row.amount, occurrence.amount)) return false;
+
+          // Covers early deposits without hardcoding a date:
+          // if the paycheck posted up to 7 days before the scheduled bucket date,
+          // don't keep showing that scheduled bucket as expected income.
+          const daysBeforeOrOnSchedule = (scheduledTime - row.date.getTime()) / oneDay;
+          return daysBeforeOrOnSchedule >= 0 && daysBeforeOrOnSchedule <= 7;
+        });
+
+        if (matchIndex === -1) return false;
+        usedActualIndexes.add(matchIndex);
+        return true;
+      }
+
       function expectedPaychecksLeft(month = currentMonth()) {
         const status = activeMonthStatus();
         if (status === "past") return [];
+
         const today = new Date().getDate();
+        const actualRows = status === "current" ? actualJobDepositsForExpectedIncome(month) : [];
+        const usedActualIndexes = new Set();
         const seen = new Set();
+
         return (month.paychecks || [])
           .flatMap(paycheckOccurrencesForRow)
           .filter(item => status === "future" || item.date.getDate() >= today)
@@ -3086,13 +3148,14 @@
           .filter(item => {
             const key = [
               String(item.owner || "").trim().toLowerCase(),
-              item.date.toISOString().slice(0, 10),
+              dateOnlyKey(item.date),
               Number(item.amount || 0).toFixed(2)
             ].join("|");
             if (seen.has(key)) return false;
             seen.add(key);
             return true;
-          });
+          })
+          .filter(item => !paycheckOccurrenceWasAlreadyReceived(item, actualRows, usedActualIndexes));
       }
 
       function expectedPaychecksLeftTotal(month = currentMonth()) {

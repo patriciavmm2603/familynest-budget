@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Kingdom Builder</title>
-  <!-- v90 fix blank dashboard -->
+  <!-- v91 polished protection lists -->
   <!-- v84 safe next paycheck -->
   <!-- v82 expected income actuals -->
   <!-- v81 fix csv amount sort -->
@@ -1815,6 +1815,75 @@
       /* v88: overdue unpaid bills count before next paycheck */
 
       /* v90: fixed blank dashboard risk from undefined owner helper */
+
+      .kb-list-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+        gap: 1rem;
+        margin-bottom: 1rem;
+      }
+      .kb-money-card {
+        padding: 1.1rem;
+      }
+      .kb-money-table {
+        margin-top: .7rem;
+        display: grid;
+        border: 1px solid rgba(80,70,55,.18);
+        border-radius: 1rem;
+        overflow: hidden;
+        background: rgba(255,255,255,.52);
+      }
+      .kb-money-header,
+      .kb-money-row,
+      .kb-money-total {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 8.5rem;
+        gap: 1rem;
+        align-items: center;
+      }
+      .kb-money-header {
+        padding: .55rem .85rem;
+        background: rgba(80,70,55,.08);
+        font-size: .78rem;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: .04em;
+        color: var(--muted);
+      }
+      .kb-money-row {
+        padding: .7rem .85rem;
+        border-bottom: 1px solid rgba(80,70,55,.16);
+      }
+      .kb-money-name {
+        min-width: 0;
+        overflow-wrap: anywhere;
+      }
+      .kb-money-amount {
+        text-align: right;
+        font-weight: 800;
+        white-space: nowrap;
+      }
+      .kb-money-total {
+        padding: .75rem .85rem;
+        background: rgba(80,70,55,.07);
+        font-weight: 900;
+      }
+      .kb-money-total span:last-child {
+        text-align: right;
+        white-space: nowrap;
+      }
+      @media (max-width: 560px) {
+        .kb-money-header,
+        .kb-money-row,
+        .kb-money-total {
+          grid-template-columns: minmax(0, 1fr) 7.5rem;
+        }
+        .kb-money-card {
+          padding: .95rem;
+        }
+      }
+      /* v91: polished protection lists with real item/amount layout */
+
 </style>
   
   <link rel="manifest" href="/manifest.webmanifest">
@@ -3446,19 +3515,34 @@
       }
 
       function billLineName(line) {
-        return escapeHtml(line.payee || line.name || line.category || "Bill");
+        const raw = line.payee || line.name || line.category || "Bill";
+        return escapeHtml(String(raw).replace(/\s+/g, " ").trim());
       }
 
       function twoColumnMoneyList(title, rows, emptyText = "Nothing to show.") {
         const total = rows.reduce((sumSoFar, row) => sumSoFar + Number(row.amount || 0), 0);
         const body = rows.length
-          ? rows.map(row => `<div class="kb-two-col-row"><span>${row.name}</span><strong>${money.format(row.amount)}</strong></div>`).join("")
+          ? rows.map(row => `
+              <div class="kb-money-row" style="display:grid;grid-template-columns:minmax(0,1fr) 8.5rem;gap:1rem;align-items:center;padding:.7rem .85rem;border-bottom:1px solid rgba(80,70,55,.16);">
+                <div class="kb-money-name" style="min-width:0;overflow-wrap:anywhere;">${row.name}</div>
+                <div class="kb-money-amount" style="text-align:right;font-weight:800;white-space:nowrap;">${money.format(row.amount)}</div>
+              </div>`).join("")
           : `<div class="empty small">${escapeHtml(emptyText)}</div>`;
 
         return `
-          <div class="card kb-two-col-card">
-            <div class="section-title"><h3>${escapeHtml(title)}</h3><span>${money.format(total)}</span></div>
-            <div class="kb-two-col-list">${body}</div>
+          <div class="card kb-money-card">
+            <div class="section-title">
+              <h3>${escapeHtml(title)}</h3>
+              <span>${money.format(total)}</span>
+            </div>
+            <div class="kb-money-table" style="display:grid;border:1px solid rgba(80,70,55,.18);border-radius:1rem;overflow:hidden;background:rgba(255,255,255,.52);">
+              <div class="kb-money-header" style="display:grid;grid-template-columns:minmax(0,1fr) 8.5rem;gap:1rem;padding:.55rem .85rem;background:rgba(80,70,55,.08);font-size:.78rem;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);">
+                <span>Item</span>
+                <span style="text-align:right;">Amount</span>
+              </div>
+              ${body}
+              ${rows.length ? `<div class="kb-money-total" style="display:grid;grid-template-columns:minmax(0,1fr) 8.5rem;gap:1rem;padding:.75rem .85rem;background:rgba(80,70,55,.07);font-weight:900;"><span>Total</span><span style="text-align:right;white-space:nowrap;">${money.format(total)}</span></div>` : ""}
+            </div>
           </div>`;
       }
 
@@ -3471,11 +3555,11 @@
 
         unpaidActiveBudgetRows(month).filter(isLivingNeedLine).forEach(line => {
           const amount = remainingForLine(line);
-          if (amount > 0) rows.push({ name: `${billLineName(line)} left`, amount });
+          if (amount > 0) rows.push({ name: `${billLineName(line)}`, amount });
         });
 
         const personalLeft = Math.max(0, dashboardPersonalBudget(month, "Everyone") - actualPersonalSpending(month));
-        if (personalLeft > 0) rows.push({ name: "Personal Money left", amount: personalLeft });
+        if (personalLeft > 0) rows.push({ name: "Personal Money remaining", amount: personalLeft });
 
         return rows.filter(row => row.amount > 0.005);
       }
@@ -3490,28 +3574,28 @@
 
         activeBudgetLines(allBudgetLines(month)).filter(isLivingNeedLine).forEach(line => {
           const base = Number(line.amount || 0);
-          if (base > 0) rows.push({ name: `${billLineName(line)} prorated 10/${days}`, amount: base * 10 / days });
+          if (base > 0) rows.push({ name: `${billLineName(line)} — 10-day estimate`, amount: base * 10 / days });
         });
 
         const personalBase = dashboardPersonalBudget(month, "Everyone");
-        if (personalBase > 0) rows.push({ name: `Personal Money prorated 10/${days}`, amount: personalBase * 10 / days });
+        if (personalBase > 0) rows.push({ name: `Personal Money — 10-day estimate`, amount: personalBase * 10 / days });
 
         if (plan.mortgageGapAfterVault > 0) {
-          rows.push({ name: "Mortgage not already in vault", amount: plan.mortgageGapAfterVault });
+          rows.push({ name: "Mortgage gap after vault", amount: plan.mortgageGapAfterVault });
         }
 
         return rows.filter(row => row.amount > 0.005);
       }
 
       function renderProtectionLists(month = currentMonth(), plan = safeNextPaycheckPlan(month)) {
-        return safeRenderDashboardBlock("Protection Details", () => `
+        return safeRenderDashboardBlock("Cash Protection Details", () => `
           <div class="section-title" style="margin:.25rem 0 .15rem">
-            <h3>Protection Details</h3>
-            <span>The two lists below add up to Money to protect</span>
+            <h3>Cash Protection Details</h3>
+            <span>These lists explain the Money to protect number</span>
           </div>
           <div class="kb-list-grid">
             ${twoColumnMoneyList("Still Needed This Month", currentMonthProtectedRows(month, plan), "Nothing still needed this month.")}
-            ${twoColumnMoneyList("Early Next-Month Protection", earlyNextMonthProtectedRows(month, plan), "No early next-month protection lines.")}
+            ${twoColumnMoneyList("Early Next-Month Estimate", earlyNextMonthProtectedRows(month, plan), "No early next-month protection lines.")}
           </div>`);
       }
 

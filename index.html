@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Kingdom Builder</title>
-  <!-- v85 simple dashboard -->
+  <!-- v86 dashboard month next safe -->
   <!-- v84 safe next paycheck -->
   <!-- v82 expected income actuals -->
   <!-- v81 fix csv amount sort -->
@@ -1807,6 +1807,8 @@
       /* v84: Safe After Next Paycheck dynamic protection plan */
 
       /* v85: Dashboard decluttered to Safe Money only; no buffer in safe calculation */
+
+      /* v86: Dashboard has This Month and Keep Safe for Next Month */
 </style>
   
   <link rel="manifest" href="/manifest.webmanifest">
@@ -3358,33 +3360,48 @@
         };
       }
 
+
+      function currentMonthPlannedPaidLeft(month = currentMonth()) {
+        const rows = dashboardBudgetLines(month, "Everyone");
+        const planned = sum(rows, row => Number(row.amount || 0));
+        const paid = sum(rows, row => Number(row.paidAmount || 0));
+        const left = Math.max(0, planned - paid);
+        return { rows, planned, paid, left };
+      }
+
+      function nextSafeBreakdownLabel(plan) {
+        return `Current living ${money.format(plan.currentLiving)} · bills before paycheck ${money.format(plan.billsBeforePay)} · next 1–10 fixed bills ${money.format(plan.earlyFixed)} · next 1–10 living ${money.format(plan.earlyLiving)} · mortgage not in vault ${money.format(plan.mortgageGapAfterVault)}.`;
+      }
+
+
+
       function renderSafeNextPaycheckPlan(plan) {
         if (!plan.paycheck) {
-          return `<div class="card"><div class="section-title"><h3>Safe Money</h3><span>No future paycheck found</span></div><div class="empty">Add a future paycheck bucket to calculate this number.</div></div>`;
+          return `<div class="card"><div class="section-title"><h3>Keep Safe for Next Month</h3><span>No future paycheck found</span></div><div class="empty">Add a future paycheck bucket to calculate this number.</div></div>`;
         }
 
         const statusText = plan.leftAfterProtectedNeeds >= 0
-          ? `This is what is left after protecting the money needed for bills, living, and mortgage.`
-          : `This is what is still missing after counting checking, the next paycheck, and Janis.`;
+          ? `Left after protecting this month needs and next-month keep-safe needs.`
+          : `Still missing after counting checking, the next paycheck, and Janis.`;
 
         return `
           <div class="section-title" style="margin:.25rem 0 .15rem">
-            <h3>Safe Money</h3>
-            <span>Simple view: account + income coming − money to keep safe</span>
+            <h3>Keep Safe for Next Month</h3>
+            <span>Checking + income coming − protected needs. No buffer included.</span>
           </div>
 
           <div class="cards kb-simple-dashboard-cards">
             <div class="card metric">
               <div class="label">What we have in checking</div>
               <div class="value">${money.format(plan.checking)}</div>
-              <div class="hint">Enter the real posted balance today.</div>
+              <div class="hint">Real posted checking balance today.</div>
               <input id="todayCheckingBalanceInput" type="number" step="0.01" value="${escapeHtml(state.jointAccountBalance ?? "")}" placeholder="0.00" style="margin-top:.7rem;width:100%">
             </div>
 
             ${metric("Income coming", plan.incomeComing, `${escapeHtml(plan.paycheck.owner || "Income")} ${escapeHtml(shortMonthDay(plan.paycheck.date))}: ${money.format(plan.paycheckAmount)} · Janis assumption: ${money.format(plan.janisExpected)}.`, "green")}
-            ${metric("Need to keep safe", plan.amountToKeepSafe, `Bills before paycheck ${money.format(plan.billsBeforePay)} · current living ${money.format(plan.currentLiving)} · next 1–10 fixed bills ${money.format(plan.earlyFixed)} · next 1–10 living ${money.format(plan.earlyLiving)} · mortgage not in vault ${money.format(plan.mortgageGapAfterVault)}.`, "yellow")}
-            ${metric(plan.leftAfterProtectedNeeds >= 0 ? "Safe after protected needs" : "Still short", plan.leftAfterProtectedNeeds, statusText, plan.leftAfterProtectedNeeds < 0 ? "red" : "green")}
-            ${metric("Cannot touch", plan.cannotTouch, `Mortgage vault ${money.format(plan.mortgageVault)}${plan.futureReserve > 0 ? ` · future/quarterly reserve ${money.format(plan.futureReserve)}` : ""}. This money is protected, not spending money.`, "yellow")}
+            ${metric("Need to keep safe", plan.amountToKeepSafe, nextSafeBreakdownLabel(plan), "yellow")}
+            ${metric(plan.leftAfterProtectedNeeds >= 0 ? "Left after keep-safe money" : "Still short", plan.leftAfterProtectedNeeds, statusText, plan.leftAfterProtectedNeeds < 0 ? "red" : "green")}
+            ${metric("Cannot touch", plan.cannotTouch, `Mortgage vault ${money.format(plan.mortgageVault)}${plan.futureReserve > 0 ? ` · future/quarterly reserve ${money.format(plan.futureReserve)}` : ""}. This is protected money, not spending money.`, "yellow")}
           </div>`;
       }
 
@@ -3394,9 +3411,21 @@
         applyBillPaymentStatuses(month);
 
         const count = unreconciledCount(month);
+        const monthPlan = currentMonthPlannedPaidLeft(month);
         const safePaycheckPlan = safeNextPaycheckPlan(month);
 
         document.querySelector("#dashboard").innerHTML = `
+          <div class="section-title" style="margin:.25rem 0 .15rem">
+            <h3>This Month</h3>
+            <span>Simple monthly bill picture</span>
+          </div>
+
+          <div class="cards kb-simple-dashboard-cards">
+            ${metric("Planned", monthPlan.planned, "Total planned bills for this budget month, not including income details.")}
+            ${metric("Paid", monthPlan.paid, "Bills already matched or marked paid for this month.", "green")}
+            ${metric("Left to be paid", monthPlan.left, "This is the one monthly bills-left number.", monthPlan.left > 0 ? "yellow" : "green")}
+          </div>
+
           ${renderSafeNextPaycheckPlan(safePaycheckPlan)}
 
           <div class="card">

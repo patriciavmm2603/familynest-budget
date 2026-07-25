@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Kingdom Builder</title>
-  <!-- v89 cash protection dashboard -->
+  <!-- v90 fix blank dashboard -->
   <!-- v84 safe next paycheck -->
   <!-- v82 expected income actuals -->
   <!-- v81 fix csv amount sort -->
@@ -1813,6 +1813,8 @@
       /* v87: Dashboard reads actual income, vault money, paid, and personal by person */
 
       /* v88: overdue unpaid bills count before next paycheck */
+
+      /* v90: fixed blank dashboard risk from undefined owner helper */
 </style>
   
   <link rel="manifest" href="/manifest.webmanifest">
@@ -3408,7 +3410,8 @@
       function actualPersonalSpendingByOwner(month = currentMonth()) {
         const rows = (month.transactions || []).filter(isPersonalTransaction);
         return rows.reduce((acc, txn) => {
-          const owner = cleanOwner(txn.owner || txn.person || txn.assignedTo || "Unassigned");
+          const rawOwner = txn.owner || txn.person || txn.assignedTo || "Unassigned";
+          const owner = String(rawOwner || "Unassigned").trim() || "Unassigned";
           acc[owner] = (acc[owner] || 0) + Math.abs(Number(txn.amount || 0));
           return acc;
         }, {});
@@ -3432,6 +3435,15 @@
         return `Current living ${money.format(plan.currentLiving)} · overdue + bills before paycheck ${money.format(plan.billsBeforePay)} · next 1–10 fixed bills ${money.format(plan.earlyFixed)} · next 1–10 living ${money.format(plan.earlyLiving)} · mortgage not in vault ${money.format(plan.mortgageGapAfterVault)}.`;
       }
 
+
+      function safeRenderDashboardBlock(label, fn) {
+        try {
+          return fn();
+        } catch (error) {
+          console.error(`Dashboard block failed: ${label}`, error);
+          return `<div class="card"><div class="section-title"><h3>${escapeHtml(label)}</h3><span>Needs review</span></div><div class="empty small">This block could not render, but the rest of the dashboard is safe.</div></div>`;
+        }
+      }
 
       function billLineName(line) {
         return escapeHtml(line.payee || line.name || line.category || "Bill");
@@ -3492,7 +3504,7 @@
       }
 
       function renderProtectionLists(month = currentMonth(), plan = safeNextPaycheckPlan(month)) {
-        return `
+        return safeRenderDashboardBlock("Protection Details", () => `
           <div class="section-title" style="margin:.25rem 0 .15rem">
             <h3>Protection Details</h3>
             <span>The two lists below add up to Money to protect</span>
@@ -3500,7 +3512,7 @@
           <div class="kb-list-grid">
             ${twoColumnMoneyList("Still Needed This Month", currentMonthProtectedRows(month, plan), "Nothing still needed this month.")}
             ${twoColumnMoneyList("Early Next-Month Protection", earlyNextMonthProtectedRows(month, plan), "No early next-month protection lines.")}
-          </div>`;
+          </div>`);
       }
 
 

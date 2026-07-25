@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Kingdom Builder</title>
-  <!-- v91 polished protection lists -->
+  <!-- v92 money to protect breakdown -->
   <!-- v84 safe next paycheck -->
   <!-- v82 expected income actuals -->
   <!-- v81 fix csv amount sort -->
@@ -1884,6 +1884,8 @@
       }
       /* v91: polished protection lists with real item/amount layout */
 
+
+      /* v92: money to protect breakdown reconciles to card */
 </style>
   
   <link rel="manifest" href="/manifest.webmanifest">
@@ -3514,7 +3516,11 @@
         }
       }
 
-      function billLineName(line) {
+            function moneyRowsTotal(rows) {
+        return rows.reduce((total, row) => total + Number(row.amount || 0), 0);
+      }
+
+function billLineName(line) {
         const raw = line.payee || line.name || line.category || "Bill";
         return escapeHtml(String(raw).replace(/\s+/g, " ").trim());
       }
@@ -3588,15 +3594,37 @@
       }
 
       function renderProtectionLists(month = currentMonth(), plan = safeNextPaycheckPlan(month)) {
-        return safeRenderDashboardBlock("Cash Protection Details", () => `
-          <div class="section-title" style="margin:.25rem 0 .15rem">
-            <h3>Cash Protection Details</h3>
-            <span>These lists explain the Money to protect number</span>
-          </div>
-          <div class="kb-list-grid">
-            ${twoColumnMoneyList("Still Needed This Month", currentMonthProtectedRows(month, plan), "Nothing still needed this month.")}
-            ${twoColumnMoneyList("Early Next-Month Estimate", earlyNextMonthProtectedRows(month, plan), "No early next-month protection lines.")}
-          </div>`);
+        return safeRenderDashboardBlock("Money to Protect Breakdown", () => {
+          const currentRows = currentMonthProtectedRows(month, plan);
+          const nextRows = earlyNextMonthProtectedRows(month, plan);
+          const currentTotal = moneyRowsTotal(currentRows);
+          const nextTotal = moneyRowsTotal(nextRows);
+          const listTotal = currentTotal + nextTotal;
+          const difference = listTotal - Number(plan.amountToKeepSafe || 0);
+          const matches = Math.abs(difference) < 0.01;
+
+          return `
+            <div class="section-title" style="margin:.25rem 0 .15rem">
+              <h3>Money to Protect Breakdown</h3>
+              <span>${money.format(currentTotal)} + ${money.format(nextTotal)} = ${money.format(listTotal)}</span>
+            </div>
+            <p class="muted small" style="margin-top:-.25rem">
+              This is the detail behind the <strong>Money to protect</strong> card: what still needs to be covered before the next paycheck, plus what we need to hold for early next month.
+            </p>
+            <div class="kb-list-grid">
+              ${twoColumnMoneyList("Needed Before Next Paycheck", currentRows, "Nothing still needed before the next paycheck.")}
+              ${twoColumnMoneyList("Hold for Early Next Month", nextRows, "No early next-month protection lines.")}
+            </div>
+            <div class="card kb-reconcile-card" style="padding:1rem;margin-top:.4rem">
+              <div class="kb-money-total" style="display:grid;grid-template-columns:minmax(0,1fr) 9rem;gap:1rem;align-items:center;font-weight:900;">
+                <span>Breakdown total</span>
+                <span style="text-align:right;white-space:nowrap;">${money.format(listTotal)}</span>
+              </div>
+              <div class="small muted" style="margin-top:.35rem">
+                ${matches ? "Matches Money to protect." : `Does not match Money to protect by ${money.format(difference)} — review the list rules.`}
+              </div>
+            </div>`;
+        });
       }
 
 
@@ -3627,7 +3655,7 @@
             </div>
 
             ${metric("Money coming in", plan.incomeComing, `${escapeHtml(plan.paycheck.owner || "Income")} ${escapeHtml(shortMonthDay(plan.paycheck.date))}: ${money.format(plan.paycheckAmount)} · Janis assumption: ${money.format(plan.janisExpected)}.`, "green")}
-            ${metric("Money to protect", plan.amountToKeepSafe, nextSafeBreakdownLabel(plan), "yellow")}
+            ${metric("Money to protect", plan.amountToKeepSafe, "This equals Needed before next paycheck + Hold for early next month below.", "yellow")}
             ${metric(plan.leftAfterProtectedNeeds >= 0 ? "Safe after protected needs" : "Still short", plan.leftAfterProtectedNeeds, statusText, plan.leftAfterProtectedNeeds < 0 ? "red" : "green")}
             ${metric("Cannot touch", plan.cannotTouch, `Mortgage vault ${money.format(plan.mortgageVault)}${plan.futureReserve > 0 ? ` · future/quarterly reserve ${money.format(plan.futureReserve)}` : ""}. This is protected money, not spending money.`, "yellow")}
           </div>`;

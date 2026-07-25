@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Kingdom Builder</title>
-  <!-- v86 dashboard month next safe -->
+  <!-- v89 cash protection dashboard -->
   <!-- v84 safe next paycheck -->
   <!-- v82 expected income actuals -->
   <!-- v81 fix csv amount sort -->
@@ -1809,6 +1809,10 @@
       /* v85: Dashboard decluttered to Safe Money only; no buffer in safe calculation */
 
       /* v86: Dashboard has This Month and Keep Safe for Next Month */
+
+      /* v87: Dashboard reads actual income, vault money, paid, and personal by person */
+
+      /* v88: overdue unpaid bills count before next paycheck */
 </style>
   
   <link rel="manifest" href="/manifest.webmanifest">
@@ -3227,14 +3231,15 @@
 
       function datedBillsDueThroughPaycheck(month = currentMonth(), paycheck = firstUpcomingPaycheck(month)) {
         if (!paycheck) return [];
-        const status = activeMonthStatus();
-        const todayDay = status === "current" ? new Date().getDate() : 1;
         const payDay = paycheck.date.getDate();
+
+        // Include overdue unpaid bills too.
+        // Anything with a due day on or before the next paycheck still needs to be protected.
         return unpaidActiveBudgetRows(month).filter(line => {
           if (isLivingNeedLine(line)) return false;
           const day = dueDayNumber(line.dueDay);
           if (!day) return false;
-          return day >= todayDay && day <= payDay;
+          return day <= payDay;
         });
       }
 
@@ -3323,8 +3328,8 @@
         const paycheckAmount = Number(paycheck?.amount || 0);
         const janisExpected = janisExpectedMortgagePortion(month);
 
-        // No buffer in the simple dashboard number.
-        // Janis is the only assumed future money, and it is shown as income coming.
+        // Dynamic protection number. No buffer in the dashboard number.
+        // Janis is the only assumed future money, and it is shown as money coming in.
         const incomeComing = paycheckAmount + janisExpected;
 
         const billsBeforePay = datedBillsDueThroughPaycheckTotal(month, paycheck);
@@ -3369,38 +3374,165 @@
         return { rows, planned, paid, left };
       }
 
-      function nextSafeBreakdownLabel(plan) {
-        return `Current living ${money.format(plan.currentLiving)} · bills before paycheck ${money.format(plan.billsBeforePay)} · next 1–10 fixed bills ${money.format(plan.earlyFixed)} · next 1–10 living ${money.format(plan.earlyLiving)} · mortgage not in vault ${money.format(plan.mortgageGapAfterVault)}.`;
+
+      function dashboardActualIncomeReceived(month = currentMonth()) {
+        return actualJobIncomeTotal(month) + actualSideHustleIncomeTotal(month) + actualOtherIncomeTotal(month);
       }
+
+      function dashboardActualIncomeLabel(month = currentMonth()) {
+        const job = actualJobIncomeTotal(month);
+        const side = actualSideHustleIncomeTotal(month);
+        const other = actualOtherIncomeTotal(month);
+        const parts = [];
+        if (job) parts.push(`Job ${money.format(job)}`);
+        if (side) parts.push(`Side hustle ${money.format(side)}`);
+        if (other) parts.push(`Other ${money.format(other)}`);
+        return parts.length ? parts.join(" · ") : "No reconciled actual income received yet.";
+      }
+
+      function dashboardVaultMoneyTotal(month = currentMonth()) {
+        return smartNextMonthMortgageReserveTotal(month) + Math.max(0, futureReserveTotal(month)) + smartCurrentMonthReserveTotal(month);
+      }
+
+      function dashboardVaultMoneyLabel(month = currentMonth()) {
+        const currentReserve = smartCurrentMonthReserveTotal(month);
+        const mortgageReserve = smartNextMonthMortgageReserveTotal(month);
+        const futureReserve = Math.max(0, futureReserveTotal(month));
+        const parts = [];
+        if (currentReserve) parts.push(`This-month reserve ${money.format(currentReserve)}`);
+        if (mortgageReserve) parts.push(`Next mortgage vault ${money.format(mortgageReserve)}`);
+        if (futureReserve) parts.push(`Future/quarterly reserve ${money.format(futureReserve)}`);
+        return parts.length ? parts.join(" · ") : "No vault/reserve money found for this month.";
+      }
+
+      function actualPersonalSpendingByOwner(month = currentMonth()) {
+        const rows = (month.transactions || []).filter(isPersonalTransaction);
+        return rows.reduce((acc, txn) => {
+          const owner = cleanOwner(txn.owner || txn.person || txn.assignedTo || "Unassigned");
+          acc[owner] = (acc[owner] || 0) + Math.abs(Number(txn.amount || 0));
+          return acc;
+        }, {});
+      }
+
+      function actualPersonalSpendingByOwnerLabel(month = currentMonth()) {
+        const byOwner = actualPersonalSpendingByOwner(month);
+        const owners = Object.keys(byOwner).sort((a, b) => byOwner[b] - byOwner[a]);
+        return owners.length
+          ? owners.map(owner => `${escapeHtml(owner)} ${money.format(byOwner[owner])}`).join(" · ")
+          : "No reconciled Personal Money spending yet.";
+      }
+
+      function dashboardAlreadyPaidLabel(monthPlan) {
+        return `${money.format(monthPlan.paid)} paid out of ${money.format(monthPlan.planned)} planned.`;
+      }
+
+
+
+      function nextSafeBreakdownLabel(plan) {
+        return `Current living ${money.format(plan.currentLiving)} · overdue + bills before paycheck ${money.format(plan.billsBeforePay)} · next 1–10 fixed bills ${money.format(plan.earlyFixed)} · next 1–10 living ${money.format(plan.earlyLiving)} · mortgage not in vault ${money.format(plan.mortgageGapAfterVault)}.`;
+      }
+
+
+      function billLineName(line) {
+        return escapeHtml(line.payee || line.name || line.category || "Bill");
+      }
+
+      function twoColumnMoneyList(title, rows, emptyText = "Nothing to show.") {
+        const total = rows.reduce((sumSoFar, row) => sumSoFar + Number(row.amount || 0), 0);
+        const body = rows.length
+          ? rows.map(row => `<div class="kb-two-col-row"><span>${row.name}</span><strong>${money.format(row.amount)}</strong></div>`).join("")
+          : `<div class="empty small">${escapeHtml(emptyText)}</div>`;
+
+        return `
+          <div class="card kb-two-col-card">
+            <div class="section-title"><h3>${escapeHtml(title)}</h3><span>${money.format(total)}</span></div>
+            <div class="kb-two-col-list">${body}</div>
+          </div>`;
+      }
+
+      function currentMonthProtectedRows(month = currentMonth(), plan = safeNextPaycheckPlan(month)) {
+        const rows = [];
+
+        datedBillsDueThroughPaycheck(month, plan.paycheck).forEach(line => {
+          rows.push({ name: billLineName(line), amount: remainingForLine(line) });
+        });
+
+        unpaidActiveBudgetRows(month).filter(isLivingNeedLine).forEach(line => {
+          const amount = remainingForLine(line);
+          if (amount > 0) rows.push({ name: `${billLineName(line)} left`, amount });
+        });
+
+        const personalLeft = Math.max(0, dashboardPersonalBudget(month, "Everyone") - actualPersonalSpending(month));
+        if (personalLeft > 0) rows.push({ name: "Personal Money left", amount: personalLeft });
+
+        return rows.filter(row => row.amount > 0.005);
+      }
+
+      function earlyNextMonthProtectedRows(month = currentMonth(), plan = safeNextPaycheckPlan(month)) {
+        const rows = [];
+        const days = daysInNextMonthFromActive();
+
+        earlyNextMonthFixedBills(month).forEach(line => {
+          rows.push({ name: billLineName(line), amount: Number(line.amount || 0) });
+        });
+
+        activeBudgetLines(allBudgetLines(month)).filter(isLivingNeedLine).forEach(line => {
+          const base = Number(line.amount || 0);
+          if (base > 0) rows.push({ name: `${billLineName(line)} prorated 10/${days}`, amount: base * 10 / days });
+        });
+
+        const personalBase = dashboardPersonalBudget(month, "Everyone");
+        if (personalBase > 0) rows.push({ name: `Personal Money prorated 10/${days}`, amount: personalBase * 10 / days });
+
+        if (plan.mortgageGapAfterVault > 0) {
+          rows.push({ name: "Mortgage not already in vault", amount: plan.mortgageGapAfterVault });
+        }
+
+        return rows.filter(row => row.amount > 0.005);
+      }
+
+      function renderProtectionLists(month = currentMonth(), plan = safeNextPaycheckPlan(month)) {
+        return `
+          <div class="section-title" style="margin:.25rem 0 .15rem">
+            <h3>Protection Details</h3>
+            <span>The two lists below add up to Money to protect</span>
+          </div>
+          <div class="kb-list-grid">
+            ${twoColumnMoneyList("Still Needed This Month", currentMonthProtectedRows(month, plan), "Nothing still needed this month.")}
+            ${twoColumnMoneyList("Early Next-Month Protection", earlyNextMonthProtectedRows(month, plan), "No early next-month protection lines.")}
+          </div>`;
+      }
+
+
 
 
 
       function renderSafeNextPaycheckPlan(plan) {
         if (!plan.paycheck) {
-          return `<div class="card"><div class="section-title"><h3>Keep Safe for Next Month</h3><span>No future paycheck found</span></div><div class="empty">Add a future paycheck bucket to calculate this number.</div></div>`;
+          return `<div class="card"><div class="section-title"><h3>Cash Protection Plan</h3><span>No future paycheck found</span></div><div class="empty">Add a future paycheck bucket to calculate this number.</div></div>`;
         }
 
         const statusText = plan.leftAfterProtectedNeeds >= 0
-          ? `Left after protecting this month needs and next-month keep-safe needs.`
+          ? `Left after protecting what is needed from now through the early part of next month.`
           : `Still missing after counting checking, the next paycheck, and Janis.`;
 
         return `
           <div class="section-title" style="margin:.25rem 0 .15rem">
-            <h3>Keep Safe for Next Month</h3>
-            <span>Checking + income coming − protected needs. No buffer included.</span>
+            <h3>Cash Protection Plan</h3>
+            <span>Now through early next month. Dynamic. No buffer included.</span>
           </div>
 
           <div class="cards kb-simple-dashboard-cards">
             <div class="card metric">
-              <div class="label">What we have in checking</div>
+              <div class="label">Checking</div>
               <div class="value">${money.format(plan.checking)}</div>
               <div class="hint">Real posted checking balance today.</div>
               <input id="todayCheckingBalanceInput" type="number" step="0.01" value="${escapeHtml(state.jointAccountBalance ?? "")}" placeholder="0.00" style="margin-top:.7rem;width:100%">
             </div>
 
-            ${metric("Income coming", plan.incomeComing, `${escapeHtml(plan.paycheck.owner || "Income")} ${escapeHtml(shortMonthDay(plan.paycheck.date))}: ${money.format(plan.paycheckAmount)} · Janis assumption: ${money.format(plan.janisExpected)}.`, "green")}
-            ${metric("Need to keep safe", plan.amountToKeepSafe, nextSafeBreakdownLabel(plan), "yellow")}
-            ${metric(plan.leftAfterProtectedNeeds >= 0 ? "Left after keep-safe money" : "Still short", plan.leftAfterProtectedNeeds, statusText, plan.leftAfterProtectedNeeds < 0 ? "red" : "green")}
+            ${metric("Money coming in", plan.incomeComing, `${escapeHtml(plan.paycheck.owner || "Income")} ${escapeHtml(shortMonthDay(plan.paycheck.date))}: ${money.format(plan.paycheckAmount)} · Janis assumption: ${money.format(plan.janisExpected)}.`, "green")}
+            ${metric("Money to protect", plan.amountToKeepSafe, nextSafeBreakdownLabel(plan), "yellow")}
+            ${metric(plan.leftAfterProtectedNeeds >= 0 ? "Safe after protected needs" : "Still short", plan.leftAfterProtectedNeeds, statusText, plan.leftAfterProtectedNeeds < 0 ? "red" : "green")}
             ${metric("Cannot touch", plan.cannotTouch, `Mortgage vault ${money.format(plan.mortgageVault)}${plan.futureReserve > 0 ? ` · future/quarterly reserve ${money.format(plan.futureReserve)}` : ""}. This is protected money, not spending money.`, "yellow")}
           </div>`;
       }
@@ -3413,20 +3545,38 @@
         const count = unreconciledCount(month);
         const monthPlan = currentMonthPlannedPaidLeft(month);
         const safePaycheckPlan = safeNextPaycheckPlan(month);
+        const actualIncomeReceived = dashboardActualIncomeReceived(month);
+        const vaultMoney = dashboardVaultMoneyTotal(month);
+        const personalByOwner = actualPersonalSpendingByOwner(month);
+        const personalTotal = Object.values(personalByOwner).reduce((total, amount) => total + Number(amount || 0), 0);
 
         document.querySelector("#dashboard").innerHTML = `
           <div class="section-title" style="margin:.25rem 0 .15rem">
-            <h3>This Month</h3>
-            <span>Simple monthly bill picture</span>
+            <h3>Current Month Snapshot</h3>
+            <span>Actuals from this month</span>
+          </div>
+
+          <div class="cards kb-simple-dashboard-cards">
+            ${metric("Actual income received", actualIncomeReceived, dashboardActualIncomeLabel(month), "green")}
+            ${metric("Vault / reserve money", vaultMoney, dashboardVaultMoneyLabel(month), vaultMoney > 0 ? "yellow" : "green")}
+            ${metric("Already paid", monthPlan.paid, dashboardAlreadyPaidLabel(monthPlan), "green")}
+            ${metric("Personal Money actual", personalTotal, actualPersonalSpendingByOwnerLabel(month), personalTotal > 0 ? "yellow" : "green")}
+          </div>
+
+          <div class="section-title" style="margin:.25rem 0 .15rem">
+            <h3>This Month Bills</h3>
+            <span>Planned, paid, and still due</span>
           </div>
 
           <div class="cards kb-simple-dashboard-cards">
             ${metric("Planned", monthPlan.planned, "Total planned bills for this budget month, not including income details.")}
             ${metric("Paid", monthPlan.paid, "Bills already matched or marked paid for this month.", "green")}
-            ${metric("Left to be paid", monthPlan.left, "This is the one monthly bills-left number.", monthPlan.left > 0 ? "yellow" : "green")}
+            ${metric("Still due", monthPlan.left, "This is the one monthly bills-left number.", monthPlan.left > 0 ? "yellow" : "green")}
           </div>
 
           ${renderSafeNextPaycheckPlan(safePaycheckPlan)}
+
+          ${renderProtectionLists(month, safePaycheckPlan)}
 
           <div class="card">
             <div class="section-title"><h3>Quick actions</h3><span>Details live in the other tabs</span></div>
@@ -3497,7 +3647,7 @@
           </div>
           <div class="cards" style="margin-bottom:.8rem">
             ${metric("Keep in account", info.keepInAccount, `${money.format(info.billsTotal)} bills + ${money.format(info.flexTotal)} prorated + ${money.format(info.buffer)} buffer`)}
-            ${metric("Bills before paycheck", info.billsTotal, `${info.bills.length} unpaid bill${info.bills.length === 1 ? "" : "s"} through day ${info.nextDepositDay}. ${info.assumedPaidBills?.length ? info.assumedPaidBills.length + " assumed paid." : ""}`)}
+            ${metric("Overdue + bills before paycheck", info.billsTotal, `${info.bills.length} unpaid bill${info.bills.length === 1 ? "" : "s"} through day ${info.nextDepositDay}. ${info.assumedPaidBills?.length ? info.assumedPaidBills.length + " assumed paid." : ""}`)}
             ${metric("Prorated flexible", info.flexTotal, `Gas, groceries, and personal money for ${info.coveredDays} day${info.coveredDays === 1 ? "" : "s"}.`)}
             ${metric(hasBalance ? "Over / short" : "Balance check", cushion ?? 0, hasBalance ? "Current balance minus keep-in-account target." : "Enter the joint account balance to see if you are safe.", hasBalance ? cushionClass : "")}
           </div>
@@ -3775,7 +3925,7 @@
           ${assumedPaidSummary(info)}
           <div class="cards" style="margin-bottom:.8rem">
             ${metric("Keep in account", info.keepInAccount, `${money.format(info.billsTotal)} bills + ${money.format(info.flexTotal)} prorated + ${money.format(info.buffer)} buffer`)}
-            ${metric("Bills before paycheck", info.billsTotal, `${info.bills.length} unpaid bill${info.bills.length === 1 ? "" : "s"} through day ${info.nextDepositDay}. ${info.assumedPaidBills?.length ? info.assumedPaidBills.length + " assumed paid." : ""}`)}
+            ${metric("Overdue + bills before paycheck", info.billsTotal, `${info.bills.length} unpaid bill${info.bills.length === 1 ? "" : "s"} through day ${info.nextDepositDay}. ${info.assumedPaidBills?.length ? info.assumedPaidBills.length + " assumed paid." : ""}`)}
             ${metric("Prorated flexible", info.flexTotal, `Gas, groceries, and personal money for ${info.coveredDays} day${info.coveredDays === 1 ? "" : "s"}.`)}
             ${metric(hasBalance ? "Over / short" : "Balance check", cushion ?? 0, hasBalance ? "Current balance minus keep-in-account target." : "Enter the joint account balance to see if you are safe.", hasBalance ? cushionClass : "")}
           </div>

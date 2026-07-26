@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Kingdom Builder</title>
-  <!-- v105 personal split no mortgage gap -->
+  <!-- v106 fix ignore readd achieva -->
   <!-- v84 safe next paycheck -->
   <!-- v82 expected income actuals -->
   <!-- v81 fix csv amount sort -->
@@ -2179,6 +2179,8 @@
       }
       /* v105: personal split by person, ignored rows excluded, mortgage gap removed from list */
 
+
+      /* v106: ignore total fixed and Achieva re-added as flexible */
 </style>
   
   <link rel="manifest" href="/manifest.webmanifest">
@@ -3753,8 +3755,7 @@
 
       function isMortgageFundingLine(line) {
         const text = [line.payee, line.name, line.category, line.paymentType, line.notes, line.description, line.vendor, line.merchant].join(" ").toLowerCase();
-        // For this dashboard, mortgage funding means Patricia's PennyMac and Alec's Truist.
-        // Achieva is intentionally NOT mortgage funding and should not be pulled into this section.
+        // Mortgage funding means PennyMac and Truist only. Achieva is intentionally not mortgage funding.
         return /pennymac|truist/.test(text);
       }
 
@@ -3918,9 +3919,10 @@ function billLineName(line) {
       }
 
       function protectionRowsTotal(rows) {
-        return rows.reduce((total, row) => {
-          if (row.ignored) return total;
-          return total + Number(row.protectAmount ?? row.amount ?? 0);
+        return (rows || []).reduce((total, row) => {
+          if (Boolean(row.ignored)) return total;
+          const value = Number(row.protectAmount ?? row.amount ?? 0);
+          return total + (Number.isFinite(value) ? value : 0);
         }, 0);
       }
 
@@ -3964,11 +3966,11 @@ function billLineName(line) {
       }
 
       function ensureMonthlyProtectionSettings(month = currentMonth()) {
-        // v99 uses a new namespace so previous test overrides are reset to default/original numbers.
-        month.protectionSettingsV99 = month.protectionSettingsV99 && typeof month.protectionSettingsV99 === "object" ? month.protectionSettingsV99 : {};
-        month.protectionSettingsV99.lines = month.protectionSettingsV99.lines && typeof month.protectionSettingsV99.lines === "object" ? month.protectionSettingsV99.lines : {};
-        month.protectionSettingsV99.manualLines = Array.isArray(month.protectionSettingsV99.manualLines) ? month.protectionSettingsV99.manualLines : [];
-        return month.protectionSettingsV99;
+        // v106 uses a fresh namespace so old test overrides/ignore flags reset cleanly.
+        month.protectionSettingsV106 = month.protectionSettingsV106 && typeof month.protectionSettingsV106 === "object" ? month.protectionSettingsV106 : {};
+        month.protectionSettingsV106.lines = month.protectionSettingsV106.lines && typeof month.protectionSettingsV106.lines === "object" ? month.protectionSettingsV106.lines : {};
+        month.protectionSettingsV106.manualLines = Array.isArray(month.protectionSettingsV106.manualLines) ? month.protectionSettingsV106.manualLines : [];
+        return month.protectionSettingsV106;
       }
 
       function protectionLineKey(line, prefix = "line") {
@@ -4249,7 +4251,18 @@ function currentMonthProtectedRows(month = currentMonth(), plan = safeNextPayche
         return rows.filter(row => Number(row.amountLeft ?? row.amount ?? 0) > 0.005);
       }
 
-      function earlyNextMonthProtectedRows(month = currentMonth(), plan = safeNextPaycheckPlan(month)) {
+      
+      function isAchievaLine(line) {
+        const text = [line.payee, line.name, line.category, line.paymentType, line.notes, line.description, line.vendor, line.merchant].join(" ").toLowerCase();
+        return /achieva/.test(text);
+      }
+
+      function achievaProtectionRows(month = currentMonth()) {
+        return activeBudgetLines(allBudgetLines(month)).filter(line => isAchievaLine(line) && Number(line.amount || 0) > 0);
+      }
+
+
+function earlyNextMonthProtectedRows(month = currentMonth(), plan = safeNextPaycheckPlan(month)) {
         const rows = [];
         const days = daysInNextMonthFromActive();
 
@@ -4272,7 +4285,27 @@ function currentMonthProtectedRows(month = currentMonth(), plan = safeNextPayche
           });
         });
 
-        activeBudgetLines(allBudgetLines(month)).filter(line => expenseTypeForLine(line) === "Flexible" && !isMortgageFundingLine(line)).forEach(line => {
+        // Achieva comes back as Flexible, not mortgage and not fixed.
+        achievaProtectionRows(month).forEach(line => {
+          const key = scopedProtectionKey(line, "next-achieva");
+          const fallback = Number(line.amount || 0);
+          const protectAmount = protectionAmountForKey(key, fallback, month);
+          rows.push({
+            name: billLineName(line),
+            dueDate: dueDisplayForLine(line),
+            amountLeft: fallback,
+            amount: protectAmount,
+            protectAmount,
+            defaultAmount: fallback,
+            controlKey: key,
+            ignored: isProtectionKeyIgnored(key, month),
+            overrideValue: protectionAmountOverrideForKey(key, month),
+            expenseType: "Flexible",
+            showExpenseType: false
+          });
+        });
+
+        activeBudgetLines(allBudgetLines(month)).filter(line => expenseTypeForLine(line) === "Flexible" && !isMortgageFundingLine(line) && !isAchievaLine(line)).forEach(line => {
           const key = scopedProtectionKey(line, "next");
           const base = Number(line.amount || 0);
           const fallback = base * 10 / days;

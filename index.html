@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Kingdom Builder</title>
-  <!-- v109 stabilized dashboard -->
+  <!-- v110 single total source -->
   <!-- v84 safe next paycheck -->
   <!-- v82 expected income actuals -->
   <!-- v81 fix csv amount sort -->
@@ -2186,7 +2186,7 @@
 
       /* v108: unified table, breakdown, and card totals */
 
-      /* v109: stabilized dashboard rules */
+      /* v110: single total source for ignored-row math */
 </style>
   
   <link rel="manifest" href="/manifest.webmanifest">
@@ -3951,15 +3951,9 @@ function billLineName(line) {
 
       
 
-      function protectionRowCountedAmount(row) {
-        if (!row || row.ignored === true) return 0;
-        const value = Number(row.protectAmount ?? row.amount ?? row.amountLeft ?? 0);
-        return Number.isFinite(value) ? value : 0;
-      }
+      
 
-      function protectionRowsTotal(rows) {
-        return (rows || []).reduce((total, row) => total + protectionRowCountedAmount(row), 0);
-      }
+      
 
 
 
@@ -3978,9 +3972,7 @@ function billLineName(line) {
         return parts.filter(Boolean).join(" · ");
       }
 
-      function protectionRowsTotal(rows) {
-        return rows.reduce((total, row) => total + Number(row.amount || 0), 0);
-      }
+      
 
 
 
@@ -4001,12 +3993,26 @@ function billLineName(line) {
       }
 
       function ensureMonthlyProtectionSettings(month = currentMonth()) {
-        // v109 fresh namespace: stable protection state and clean test slate.
-        month.protectionSettingsV109 = month.protectionSettingsV109 && typeof month.protectionSettingsV109 === "object" ? month.protectionSettingsV109 : {};
-        month.protectionSettingsV109.lines = month.protectionSettingsV109.lines && typeof month.protectionSettingsV109.lines === "object" ? month.protectionSettingsV109.lines : {};
-        month.protectionSettingsV109.manualLines = Array.isArray(month.protectionSettingsV109.manualLines) ? month.protectionSettingsV109.manualLines : [];
-        return month.protectionSettingsV109;
+        // v110 fresh namespace: one clean protection state.
+        month.protectionSettingsV110 = month.protectionSettingsV110 && typeof month.protectionSettingsV110 === "object" ? month.protectionSettingsV110 : {};
+        month.protectionSettingsV110.lines = month.protectionSettingsV110.lines && typeof month.protectionSettingsV110.lines === "object" ? month.protectionSettingsV110.lines : {};
+        month.protectionSettingsV110.manualLines = Array.isArray(month.protectionSettingsV110.manualLines) ? month.protectionSettingsV110.manualLines : [];
+        return month.protectionSettingsV110;
       }
+
+      function protectionRowCountedAmount(row) {
+        if (!row) return 0;
+        if (row.ignored === true) return 0;
+        const raw = row.protectAmount ?? row.amount ?? row.amountLeft ?? 0;
+        const value = Number(raw);
+        return Number.isFinite(value) ? value : 0;
+      }
+
+      function protectionRowsTotal(rows) {
+        return (rows || []).reduce((total, row) => total + protectionRowCountedAmount(row), 0);
+      }
+
+
 
       function protectionLineKey(line, prefix = "line") {
         return String(line.id || line.paycheckId || line.billId || line.sourceRow || `${prefix}-${line.payee || line.category || line.name || "item"}`).replace(/\s+/g, "-");
@@ -4129,7 +4135,11 @@ function billLineName(line) {
 
       function twoColumnMoneyList(title, rows, emptyText = "Nothing to show.") {
         const visibleRows = rows || [];
-        const total = protectionRowsTotal(visibleRows);
+        const total = visibleRows.reduce((sum, row) => {
+          if (row && row.ignored === true) return sum;
+          const value = Number(row?.protectAmount ?? row?.amount ?? row?.amountLeft ?? 0);
+          return sum + (Number.isFinite(value) ? value : 0);
+        }, 0);
 
         const body = visibleRows.length
           ? visibleRows.map(row => {
@@ -4142,7 +4152,7 @@ function billLineName(line) {
                     ${row.controlKey && row.showExpenseType ? `<select data-expense-type="${escapeHtml(row.controlKey)}"><option value="Fixed" ${row.expenseType === "Fixed" ? "selected" : ""}>Fixed</option><option value="Flexible" ${row.expenseType === "Flexible" ? "selected" : ""}>Flexible</option></select>` : escapeHtml(row.expenseType || "—")}
                   </div>
                   <div class="kb-cell kb-money-num">${money.format(row.amountLeft ?? row.amount ?? 0)}</div>
-                  <div class="kb-cell kb-protect-edit">${controls.amountInput}</div>
+                  <div class="kb-cell kb-protect-edit">${controls.amountInput}${row.ignored ? `<div class="small muted">Not counted</div>` : ""}</div>
                   <div class="kb-cell kb-ignore">${controls.ignoreInput}</div>
                 </div>`;
             }).join("")
@@ -4433,9 +4443,9 @@ function renderProtectionLists(month = currentMonth(), plan = safeNextPaycheckPl
           const totals = buildProtectionTotals(month, plan);
           const currentRows = totals.currentRows;
           const nextRows = totals.nextRows;
-          const currentTotal = totals.currentTotal;
-          const nextTotal = totals.nextTotal;
-          const listTotal = totals.total;
+          const currentTotal = protectionRowsTotal(currentRows);
+          const nextTotal = protectionRowsTotal(nextRows);
+          const listTotal = currentTotal + nextTotal;
           const difference = listTotal - Number(plan.amountToKeepSafe || 0);
           const matches = Math.abs(difference) < 0.01;
 

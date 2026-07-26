@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Kingdom Builder</title>
-  <!-- v106 fix ignore readd achieva -->
+  <!-- v107 hard fix ignore total -->
   <!-- v84 safe next paycheck -->
   <!-- v82 expected income actuals -->
   <!-- v81 fix csv amount sort -->
@@ -2181,6 +2181,8 @@
 
 
       /* v106: ignore total fixed and Achieva re-added as flexible */
+
+      /* v107: hard fixed ignored row totals */
 </style>
   
   <link rel="manifest" href="/manifest.webmanifest">
@@ -3918,12 +3920,14 @@ function billLineName(line) {
         return day ? String(day) : "—";
       }
 
+      function protectionRowCountedAmount(row) {
+        if (!row || Boolean(row.ignored)) return 0;
+        const value = Number(row.protectAmount ?? row.amount ?? row.amountLeft ?? 0);
+        return Number.isFinite(value) ? value : 0;
+      }
+
       function protectionRowsTotal(rows) {
-        return (rows || []).reduce((total, row) => {
-          if (Boolean(row.ignored)) return total;
-          const value = Number(row.protectAmount ?? row.amount ?? 0);
-          return total + (Number.isFinite(value) ? value : 0);
-        }, 0);
+        return (rows || []).reduce((total, row) => total + protectionRowCountedAmount(row), 0);
       }
 
 
@@ -3966,11 +3970,11 @@ function billLineName(line) {
       }
 
       function ensureMonthlyProtectionSettings(month = currentMonth()) {
-        // v106 uses a fresh namespace so old test overrides/ignore flags reset cleanly.
-        month.protectionSettingsV106 = month.protectionSettingsV106 && typeof month.protectionSettingsV106 === "object" ? month.protectionSettingsV106 : {};
-        month.protectionSettingsV106.lines = month.protectionSettingsV106.lines && typeof month.protectionSettingsV106.lines === "object" ? month.protectionSettingsV106.lines : {};
-        month.protectionSettingsV106.manualLines = Array.isArray(month.protectionSettingsV106.manualLines) ? month.protectionSettingsV106.manualLines : [];
-        return month.protectionSettingsV106;
+        // v107 fresh namespace. Ignore/override starts from default again.
+        month.protectionSettingsV107 = month.protectionSettingsV107 && typeof month.protectionSettingsV107 === "object" ? month.protectionSettingsV107 : {};
+        month.protectionSettingsV107.lines = month.protectionSettingsV107.lines && typeof month.protectionSettingsV107.lines === "object" ? month.protectionSettingsV107.lines : {};
+        month.protectionSettingsV107.manualLines = Array.isArray(month.protectionSettingsV107.manualLines) ? month.protectionSettingsV107.manualLines : [];
+        return month.protectionSettingsV107;
       }
 
       function protectionLineKey(line, prefix = "line") {
@@ -4093,10 +4097,13 @@ function billLineName(line) {
 
 
       function twoColumnMoneyList(title, rows, emptyText = "Nothing to show.") {
-        const total = protectionRowsTotal(rows);
-        const body = rows.length
-          ? rows.map(row => {
+        const visibleRows = rows || [];
+        const total = visibleRows.reduce((sum, row) => sum + protectionRowCountedAmount(row), 0);
+
+        const body = visibleRows.length
+          ? visibleRows.map(row => {
               const controls = renderProtectionControls(row);
+              const countedAmount = protectionRowCountedAmount(row);
               return `
                 <div class="kb-protection-row ${row.ignored ? "is-ignored" : ""}">
                   <div class="kb-cell kb-bill-name">${row.name}</div>
@@ -4127,7 +4134,7 @@ function billLineName(line) {
                 <div>Ignore</div>
               </div>
               ${body}
-              ${rows.length ? `<div class="kb-protection-total"><div>Total counted</div><div>${money.format(total)}</div></div>` : ""}
+              ${visibleRows.length ? `<div class="kb-protection-total"><div>Total counted</div><div>${money.format(total)}</div></div>` : ""}
             </div>
           </div>`;
       }

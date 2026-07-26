@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Kingdom Builder</title>
-  <!-- v102 no mortgage funding edit personal -->
+  <!-- v105 personal split no mortgage gap -->
   <!-- v84 safe next paycheck -->
   <!-- v82 expected income actuals -->
   <!-- v81 fix csv amount sort -->
@@ -2157,6 +2157,28 @@
       /* v101: mortgage funding is PennyMac and Truist only; Achieva not fixed */
 
       /* v102: removed mortgage funding section and made personal editable */
+
+      .kb-protection-row.is-ignored .kb-protect-edit input {
+        text-decoration: line-through;
+      }
+      .kb-protection-row.is-ignored .kb-money-num,
+      .kb-protection-row.is-ignored .kb-protect-edit {
+        color: var(--muted);
+      }
+      /* v103: personal money split by person; ignored rows excluded from total */
+
+
+      /* v104: personal actual tiles split by person */
+
+      .kb-protection-row.is-ignored .kb-protect-edit input {
+        text-decoration: line-through;
+      }
+      .kb-protection-row.is-ignored .kb-money-num,
+      .kb-protection-row.is-ignored .kb-protect-edit {
+        color: var(--muted);
+      }
+      /* v105: personal split by person, ignored rows excluded, mortgage gap removed from list */
+
 </style>
   
   <link rel="manifest" href="/manifest.webmanifest">
@@ -3838,6 +3860,15 @@
         }, {});
       }
 
+
+      
+
+      
+
+      
+
+
+
       function actualPersonalSpendingByOwnerLabel(month = currentMonth()) {
         const byOwner = actualPersonalSpendingByOwner(month);
         const owners = Object.keys(byOwner).sort((a, b) => byOwner[b] - byOwner[a]);
@@ -3845,6 +3876,11 @@
           ? owners.map(owner => `${escapeHtml(owner)} ${money.format(byOwner[owner])}`).join(" · ")
           : "No reconciled Personal Money spending yet.";
       }
+
+
+      
+
+
 
       function dashboardAlreadyPaidLabel(monthPlan) {
         return `${money.format(monthPlan.paid)} paid out of ${money.format(monthPlan.planned)} planned.`;
@@ -3882,7 +3918,10 @@ function billLineName(line) {
       }
 
       function protectionRowsTotal(rows) {
-        return rows.reduce((total, row) => total + (row.ignored ? 0 : Number(row.protectAmount ?? row.amount ?? 0)), 0);
+        return rows.reduce((total, row) => {
+          if (row.ignored) return total;
+          return total + Number(row.protectAmount ?? row.amount ?? 0);
+        }, 0);
       }
 
 
@@ -4091,7 +4130,81 @@ function billLineName(line) {
           </div>`;
       }
 
-      function currentMonthProtectedRows(month = currentMonth(), plan = safeNextPaycheckPlan(month)) {
+      
+      function normalizedOwnerName(name) {
+        const raw = String(name || "").trim();
+        if (/alec/i.test(raw)) return "Alec";
+        if (/patricia|pat/i.test(raw)) return "Patricia";
+        return raw || "Unassigned";
+      }
+
+      function personalBudgetByOwner(month = currentMonth()) {
+        const out = { Alec: 0, Patricia: 0 };
+        const sources = [month.personalMoney, month.allowances, month.personalAllowances, state.personalMoney, state.allowances, state.personalAllowances];
+
+        sources.forEach(raw => {
+          if (Array.isArray(raw)) {
+            raw.forEach(row => {
+              const owner = normalizedOwnerName(row.owner || row.name || row.person || row.assignedTo);
+              const amount = Number(row.monthlyLimit ?? row.limit ?? row.amount ?? row.budget ?? 0);
+              if ((owner === "Alec" || owner === "Patricia") && Number.isFinite(amount) && amount > 0) out[owner] = Math.max(out[owner], amount);
+            });
+          } else if (raw && typeof raw === "object") {
+            Object.entries(raw).forEach(([ownerKey, value]) => {
+              const owner = normalizedOwnerName(value?.owner || value?.name || ownerKey);
+              const amount = Number(value?.monthlyLimit ?? value?.limit ?? value?.amount ?? value?.budget ?? value ?? 0);
+              if ((owner === "Alec" || owner === "Patricia") && Number.isFinite(amount) && amount > 0) out[owner] = Math.max(out[owner], amount);
+            });
+          }
+        });
+
+        const combined = Number(dashboardPersonalBudget(month, "Everyone") || 0);
+        if (combined > 0) {
+          if (!out.Alec && !out.Patricia) {
+            out.Alec = combined / 2;
+            out.Patricia = combined / 2;
+          } else {
+            if (!out.Alec) out.Alec = Math.max(0, combined - out.Patricia);
+            if (!out.Patricia) out.Patricia = Math.max(0, combined - out.Alec);
+          }
+        }
+
+        if (!out.Alec && !out.Patricia) {
+          out.Alec = 400;
+          out.Patricia = 400;
+        }
+
+        return out;
+      }
+
+      function personalSpentForOwner(month = currentMonth(), ownerName = "") {
+        const target = normalizedOwnerName(ownerName);
+        return (month.transactions || [])
+          .filter(isPersonalTransaction)
+          .filter(txn => normalizedOwnerName(txn.owner || txn.person || txn.assignedTo) === target)
+          .reduce((total, txn) => total + Math.abs(Number(txn.amount || 0)), 0);
+      }
+
+      function personalRemainingRowsByOwner(month = currentMonth()) {
+        const budgets = personalBudgetByOwner(month);
+        return ["Alec", "Patricia"].map(owner => {
+          const budget = Number(budgets[owner] || 0);
+          const spent = personalSpentForOwner(month, owner);
+          return { owner, budget, spent, remaining: Math.max(0, budget - spent) };
+        }).filter(row => row.budget > 0 || row.spent > 0 || row.remaining > 0);
+      }
+
+      function personalMoneyActualTiles(month = currentMonth()) {
+        return ["Alec", "Patricia"].map(owner => {
+          const budget = Number(personalBudgetByOwner(month)[owner] || 0);
+          const spent = personalSpentForOwner(month, owner);
+          const remaining = Math.max(0, budget - spent);
+          return metric(`${owner} Personal Money`, spent, `Budget ${money.format(budget)} · Remaining ${money.format(remaining)}.`, spent > 0 ? "yellow" : "green");
+        }).join("");
+      }
+
+
+function currentMonthProtectedRows(month = currentMonth(), plan = safeNextPaycheckPlan(month)) {
         const rows = [];
 
         notFullyPaidMonthlyRows(month).forEach(line => {
@@ -4113,25 +4226,25 @@ function billLineName(line) {
           });
         });
 
-        const personalLeft = Math.max(0, dashboardPersonalBudget(month, "Everyone") - actualPersonalSpending(month));
-        if (personalLeft > 0) {
-          const personalLine = { id: "personal-money-current", payee: "Personal Money remaining", category: "Personal", expenseType: "Flexible" };
+        personalRemainingRowsByOwner(month).forEach(personal => {
+          if (personal.remaining <= 0) return;
+          const personalLine = { id: `personal-money-current-${personal.owner}`, payee: `Personal Money — ${personal.owner}`, category: "Personal", expenseType: "Flexible" };
           const key = scopedProtectionKey(personalLine, "current");
-          const protectAmount = protectionAmountForKey(key, personalLeft, month);
+          const protectAmount = protectionAmountForKey(key, personal.remaining, month);
           rows.push({
-            name: "Personal Money remaining",
+            name: `Personal Money — ${escapeHtml(personal.owner)}`,
             dueDate: "—",
-            amountLeft: personalLeft,
+            amountLeft: personal.remaining,
             amount: protectAmount,
             protectAmount,
-            defaultAmount: personalLeft,
+            defaultAmount: personal.remaining,
             controlKey: key,
             ignored: isProtectionKeyIgnored(key, month),
             overrideValue: protectionAmountOverrideForKey(key, month),
             expenseType: "Flexible",
             showExpenseType: false
           });
-        }
+        });
 
         return rows.filter(row => Number(row.amountLeft ?? row.amount ?? 0) > 0.005);
       }
@@ -4159,7 +4272,7 @@ function billLineName(line) {
           });
         });
 
-        activeBudgetLines(allBudgetLines(month)).filter(line => expenseTypeForLine(line) === "Flexible" && !isMortgageBillLine(line)).forEach(line => {
+        activeBudgetLines(allBudgetLines(month)).filter(line => expenseTypeForLine(line) === "Flexible" && !isMortgageFundingLine(line)).forEach(line => {
           const key = scopedProtectionKey(line, "next");
           const base = Number(line.amount || 0);
           const fallback = base * 10 / days;
@@ -4179,14 +4292,16 @@ function billLineName(line) {
           });
         });
 
-        const personalBase = dashboardPersonalBudget(month, "Everyone");
-        if (personalBase > 0) {
-          const fallback = personalBase * 10 / days;
-          const personalLine = { id: "personal-money-next-window", payee: "Personal Money — 10-day estimate", category: "Personal", expenseType: "Flexible" };
+        const personalBudgets = personalBudgetByOwner(month);
+        ["Alec", "Patricia"].forEach(owner => {
+          const base = Number(personalBudgets[owner] || 0);
+          if (base <= 0) return;
+          const fallback = base * 10 / days;
+          const personalLine = { id: `personal-money-next-window-${owner}`, payee: `Personal Money — ${owner} — 10-day estimate`, category: "Personal", expenseType: "Flexible" };
           const key = scopedProtectionKey(personalLine, "next");
           const protectAmount = protectionAmountForKey(key, fallback, month);
           rows.push({
-            name: "Personal Money — 10-day estimate",
+            name: `Personal Money — ${escapeHtml(owner)} — 10-day estimate`,
             dueDate: "—",
             amountLeft: fallback,
             amount: protectAmount,
@@ -4198,26 +4313,7 @@ function billLineName(line) {
             expenseType: "Flexible",
             showExpenseType: false
           });
-        }
-
-        if (plan.mortgageGapAfterVault > 0) {
-          const mortgageGapLine = { id: "mortgage-gap-after-vault-janis", payee: "Mortgage gap after vault + Janis", category: "Mortgage", expenseType: "Fixed" };
-          const key = scopedProtectionKey(mortgageGapLine, "next");
-          const protectAmount = protectionAmountForKey(key, plan.mortgageGapAfterVault, month);
-          rows.push({
-            name: "Mortgage gap after vault + Janis",
-            dueDate: "—",
-            amountLeft: plan.mortgageGapAfterVault,
-            amount: protectAmount,
-            protectAmount,
-            defaultAmount: plan.mortgageGapAfterVault,
-            controlKey: key,
-            ignored: isProtectionKeyIgnored(key, month),
-            overrideValue: protectionAmountOverrideForKey(key, month),
-            expenseType: "Fixed",
-            showExpenseType: false
-          });
-        }
+        });
 
         return rows.concat(manualProtectionRows(month)).filter(row => Number(row.amountLeft ?? row.amount ?? 0) > 0.005);
       }
@@ -4274,7 +4370,7 @@ function renderProtectionLists(month = currentMonth(), plan = safeNextPaycheckPl
               <span>${money.format(currentTotal)} + ${money.format(nextTotal)} = ${money.format(listTotal)}</span>
             </div>
             <p class="muted small" style="margin-top:-.25rem">
-              Ignore keeps a row visible but removes it from the counted total. Personal Money and mortgage gap can be edited here.
+              Ignore keeps a row visible but removes it from the counted total. Personal Money can be edited by person.
             </p>
             <div style="display:flex;justify-content:flex-end;margin:.5rem 0 .75rem">
               <button type="button" class="secondary" id="addManualProtectionLineBtn">+ Add protection line</button>
@@ -4311,7 +4407,7 @@ function renderProtectionLists(month = currentMonth(), plan = safeNextPaycheckPl
         return `
           <div class="section-title" style="margin:.25rem 0 .15rem">
             <h3>Cash Protection Plan</h3>
-            <span>No buffer included. Janis reduces the mortgage gap inside the protection list.</span>
+            <span>No buffer included. Janis stays out of spendable cash.</span>
           </div>
 
           <div class="cards kb-simple-dashboard-cards">
@@ -4339,8 +4435,6 @@ function renderProtectionLists(month = currentMonth(), plan = safeNextPaycheckPl
         const safePaycheckPlan = safeNextPaycheckPlan(month);
         const actualIncomeReceived = dashboardActualIncomeReceived(month);
         const vaultMoney = dashboardVaultMoneyTotal(month);
-        const personalByOwner = actualPersonalSpendingByOwner(month);
-        const personalTotal = Object.values(personalByOwner).reduce((total, amount) => total + Number(amount || 0), 0);
 
         document.querySelector("#dashboard").innerHTML = `
           <div class="section-title" style="margin:.25rem 0 .15rem">
@@ -4352,7 +4446,7 @@ function renderProtectionLists(month = currentMonth(), plan = safeNextPaycheckPl
             ${metric("Actual income received", actualIncomeReceived, dashboardActualIncomeLabel(month), "green")}
             ${metric("Vault / reserve money", vaultMoney, dashboardVaultMoneyLabel(month), vaultMoney > 0 ? "yellow" : "green")}
             ${metric("Already paid", monthPlan.paid, dashboardAlreadyPaidLabel(monthPlan), "green")}
-            ${metric("Personal Money actual", personalTotal, actualPersonalSpendingByOwnerLabel(month), personalTotal > 0 ? "yellow" : "green")}
+            ${personalMoneyActualTiles(month)}
           </div>
 
           <div class="section-title" style="margin:.25rem 0 .15rem">

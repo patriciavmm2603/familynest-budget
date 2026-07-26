@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Kingdom Builder</title>
-  <!-- v98 all not fully paid -->
+  <!-- v101 pennymac truist mortgage only -->
   <!-- v84 safe next paycheck -->
   <!-- v82 expected income actuals -->
   <!-- v81 fix csv amount sort -->
@@ -2053,6 +2053,108 @@
       /* v97: left list includes all unpaid partial monthly lines */
 
       /* v98: left list includes every not fully paid monthly line */
+
+      .kb-list-stack {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 1.25rem;
+        margin-bottom: 1rem;
+      }
+      .kb-protection-card {
+        padding: 1rem;
+        overflow: hidden;
+      }
+      .kb-protection-table {
+        margin-top: .75rem;
+        border: 1px solid rgba(80,70,55,.16);
+        border-radius: 1rem;
+        overflow: hidden;
+        background: rgba(255,255,255,.6);
+      }
+      .kb-protection-header,
+      .kb-protection-row {
+        display: grid;
+        grid-template-columns: minmax(220px, 2fr) 4.5rem 8rem 8.5rem 9rem 4.5rem;
+        gap: .75rem;
+        align-items: center;
+      }
+      .kb-protection-header {
+        padding: .65rem .85rem;
+        background: rgba(80,70,55,.08);
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: .04em;
+        font-size: .74rem;
+        font-weight: 900;
+      }
+      .kb-protection-row {
+        padding: .7rem .85rem;
+        border-bottom: 1px solid rgba(80,70,55,.13);
+      }
+      .kb-protection-row.is-ignored {
+        opacity: .58;
+        background: rgba(80,70,55,.035);
+      }
+      .kb-bill-name {
+        font-weight: 800;
+        overflow-wrap: anywhere;
+      }
+      .kb-due,
+      .kb-type,
+      .kb-ignore {
+        color: var(--muted);
+        font-weight: 750;
+      }
+      .kb-type select,
+      .kb-protect-amount-input {
+        width: 100%;
+        min-height: 2.15rem;
+        padding: .25rem .5rem;
+        border-radius: .65rem;
+      }
+      .kb-money-num,
+      .kb-protect-edit,
+      .kb-ignore,
+      .kb-protection-header div:nth-child(4),
+      .kb-protection-header div:nth-child(5),
+      .kb-protection-header div:nth-child(6) {
+        text-align: right;
+      }
+      .kb-ignore {
+        display: flex;
+        justify-content: flex-end;
+      }
+      .kb-protection-total {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 1rem;
+        padding: .85rem;
+        background: rgba(80,70,55,.07);
+        font-weight: 950;
+      }
+      @media (max-width: 900px) {
+        .kb-protection-table {
+          overflow-x: auto;
+        }
+        .kb-protection-header,
+        .kb-protection-row {
+          grid-template-columns: 240px 4.5rem 8rem 8.5rem 9rem 4.5rem;
+          min-width: 720px;
+        }
+      }
+      /* v99: stacked protection tables, visible ignored rows, reset overrides */
+
+
+      .kb-protection-row.is-funding-row {
+        background: rgba(40,120,80,.06);
+      }
+      .kb-protection-row.is-funding-row .kb-bill-name {
+        color: var(--muted);
+      }
+      /* v100: mortgage funding separated from regular protection lists */
+
+
+      /* v101: mortgage funding is PennyMac and Truist only; Achieva not fixed */
 </style>
   
   <link rel="manifest" href="/manifest.webmanifest">
@@ -3511,9 +3613,11 @@
 
       function earlyNextMonthFixedBills(month = currentMonth()) {
         return activeBudgetLines(allBudgetLines(month)).filter(line => {
-          if (isMortgageBillLine(line)) return false;
+          if (isMortgageFundingLine(line)) return false;
           if (isLivingNeedLine(line)) return false;
           if (isEarlyNextMonthExcludedLine(line)) return false;
+          const text = textForLine(line);
+          if (/achieva/.test(text)) return false;
           const day = dueDayNumber(line.dueDay);
           return day >= 1 && day <= 10 && Number(line.amount || 0) > 0;
         });
@@ -3548,7 +3652,7 @@
       }
 
       function mortgageNeedForNextMonth(month = currentMonth()) {
-        return sum(activeBudgetLines(allBudgetLines(month)).filter(isMortgageBillLine), line => Number(line.amount || 0));
+        return sum(mortgageBillRows(month), line => Number(line.amount || 0));
       }
 
       function janisExpectedMortgagePortion(month = currentMonth()) {
@@ -3568,8 +3672,7 @@
         const paycheckAmount = Number(paycheck?.amount || 0);
         const janisExpected = janisExpectedMortgagePortion(month);
 
-        // Janis is mortgage-only money. She is not spendable income.
-        const cashComingIn = paycheckAmount;
+        const cashComingIn = paycheckAmount; // Janis is mortgage-only, not spendable cash.
 
         const billsBeforePay = datedBillsDueThroughPaycheckTotal(month, paycheck);
         const currentLiving = currentLivingNeedLeft(month);
@@ -3600,17 +3703,12 @@
           futureReserve: Math.max(0, futureReserveTotal(month))
         };
 
-        // Important: Money to protect must equal the editable breakdown lists.
         const currentRows = currentMonthProtectedRows(month, basePlan);
         const nextRows = earlyNextMonthProtectedRows(month, basePlan);
-        const amountToKeepSafe = protectionRowsTotal(currentRows) + protectionRowsTotal(nextRows);
+        const amountToKeepSafe = protectionRowsTotal(currentRows) + protectionRowsTotal(nextRows) + mortgageGapAfterVault;
         const leftAfterProtectedNeeds = checking + cashComingIn - amountToKeepSafe;
 
-        return {
-          ...basePlan,
-          amountToKeepSafe,
-          leftAfterProtectedNeeds
-        };
+        return { ...basePlan, amountToKeepSafe, leftAfterProtectedNeeds };
       }
 
 
@@ -3624,8 +3722,76 @@
 
       function notFullyPaidMonthlyRows(month = currentMonth()) {
         return dashboardBudgetLines(month, "Everyone")
+          .filter(line => !isMortgageFundingLine(line))
           .filter(line => remainingForLine(line) > 0.005);
       }
+
+
+      function isMortgageFundingLine(line) {
+        const text = [line.payee, line.name, line.category, line.paymentType, line.notes, line.description, line.vendor, line.merchant].join(" ").toLowerCase();
+        // For this dashboard, mortgage funding means Patricia's PennyMac and Alec's Truist.
+        // Achieva is intentionally NOT mortgage funding and should not be pulled into this section.
+        return /pennymac|truist/.test(text);
+      }
+
+      function mortgageBillRows(month = currentMonth()) {
+        return dashboardBudgetLines(month, "Everyone")
+          .filter(line => isMortgageFundingLine(line));
+      }
+
+      function mortgageFundingDetailRows(month = currentMonth(), plan = safeNextPaycheckPlan(month)) {
+        const rows = mortgageBillRows(month).map(line => ({
+          name: billLineName(line),
+          dueDate: dueDisplayForLine(line),
+          amountLeft: Number(line.amount || 0),
+          amount: Number(line.amount || 0),
+          protectAmount: Number(line.amount || 0),
+          expenseType: "Mortgage",
+          ignored: false
+        }));
+
+        if (plan.mortgageVault > 0) {
+          rows.push({
+            name: "Mortgage vault already saved",
+            dueDate: "—",
+            amountLeft: -plan.mortgageVault,
+            amount: -plan.mortgageVault,
+            protectAmount: -plan.mortgageVault,
+            expenseType: "Funding",
+            ignored: false
+          });
+        }
+
+        if (plan.janisExpected > 0) {
+          rows.push({
+            name: "Janis mortgage portion",
+            dueDate: "—",
+            amountLeft: -plan.janisExpected,
+            amount: -plan.janisExpected,
+            protectAmount: -plan.janisExpected,
+            expenseType: "Funding",
+            ignored: false
+          });
+        }
+
+        rows.push({
+          name: "Mortgage gap from us",
+          dueDate: "—",
+          amountLeft: plan.mortgageGapAfterVault,
+          amount: plan.mortgageGapAfterVault,
+          protectAmount: plan.mortgageGapAfterVault,
+          expenseType: "Need",
+          ignored: false
+        });
+
+        return rows;
+      }
+
+      function mortgageFundingRowsTotal(rows) {
+        return rows.reduce((total, row) => total + Number(row.amount || 0), 0);
+      }
+
+
 
 
 
@@ -3708,6 +3874,18 @@ function billLineName(line) {
       }
 
 
+      function dueDisplayForLine(line) {
+        const day = dueDayNumber(line?.dueDay);
+        return day ? String(day) : "—";
+      }
+
+      function protectionRowsTotal(rows) {
+        return rows.reduce((total, row) => total + (row.ignored ? 0 : Number(row.protectAmount ?? row.amount ?? 0)), 0);
+      }
+
+
+
+
       function dueLabelForLine(line) {
         const day = dueDayNumber(line?.dueDay);
         return day ? `Due ${day}` : "";
@@ -3735,6 +3913,7 @@ function billLineName(line) {
 
       function defaultExpenseTypeForLine(line) {
         const text = flexibleKeywordText(line);
+        if (/achieva/.test(text)) return "Flexible";
         if (/grocer|food|fuel|gas|skating|patinada|personal|allowance|household|eating|restaurant|fun|misc|shopping|kids|clothes|beauty|gifts/.test(text)) return "Flexible";
         return "Fixed";
       }
@@ -3744,10 +3923,11 @@ function billLineName(line) {
       }
 
       function ensureMonthlyProtectionSettings(month = currentMonth()) {
-        month.protectionSettings = month.protectionSettings && typeof month.protectionSettings === "object" ? month.protectionSettings : {};
-        month.protectionSettings.lines = month.protectionSettings.lines && typeof month.protectionSettings.lines === "object" ? month.protectionSettings.lines : {};
-        month.protectionSettings.manualLines = Array.isArray(month.protectionSettings.manualLines) ? month.protectionSettings.manualLines : [];
-        return month.protectionSettings;
+        // v99 uses a new namespace so previous test overrides are reset to default/original numbers.
+        month.protectionSettingsV99 = month.protectionSettingsV99 && typeof month.protectionSettingsV99 === "object" ? month.protectionSettingsV99 : {};
+        month.protectionSettingsV99.lines = month.protectionSettingsV99.lines && typeof month.protectionSettingsV99.lines === "object" ? month.protectionSettingsV99.lines : {};
+        month.protectionSettingsV99.manualLines = Array.isArray(month.protectionSettingsV99.manualLines) ? month.protectionSettingsV99.manualLines : [];
+        return month.protectionSettingsV99;
       }
 
       function protectionLineKey(line, prefix = "line") {
@@ -3809,9 +3989,17 @@ function billLineName(line) {
       function manualProtectionRows(month = currentMonth()) {
         const settings = ensureMonthlyProtectionSettings(month);
         return settings.manualLines
-          .filter(row => !row.ignore)
-          .map(row => ({ name: escapeHtml(row.name || "Manual protection line"), amount: Math.max(0, Number(row.amount || 0)), manualId: row.id }))
-          .filter(row => row.amount > 0.005);
+          .map(row => ({
+            name: escapeHtml(row.name || "Manual protection line"),
+            dueDate: "—",
+            amountLeft: Math.max(0, Number(row.amount || 0)),
+            amount: Math.max(0, Number(row.amount || 0)),
+            protectAmount: Math.max(0, Number(row.amount || 0)),
+            manualId: row.id,
+            expenseType: row.expenseType || "Flexible",
+            ignored: Boolean(row.ignore)
+          }))
+          .filter(row => row.amountLeft > 0.005);
       }
 
       function addManualProtectionLine() {
@@ -3851,45 +4039,52 @@ function billLineName(line) {
       }
 
       function renderProtectionControls(row) {
-        if (!row.controlKey) return "";
+        if (!row.controlKey) return { amountInput: "", ignoreInput: `<input type="checkbox" disabled ${row.ignored ? "checked" : ""}>` };
         const amountValue = row.overrideValue === null || row.overrideValue === undefined ? "" : String(row.overrideValue);
-        return `
-          <div class="kb-protect-controls">
-            ${row.showExpenseType ? `<label class="kb-control-field"><span>Type</span><select data-expense-type="${escapeHtml(row.controlKey)}"><option value="Fixed" ${row.expenseType === "Fixed" ? "selected" : ""}>Fixed</option><option value="Flexible" ${row.expenseType === "Flexible" ? "selected" : ""}>Flexible</option></select></label>` : ""}
-            <label class="kb-check-field"><input type="checkbox" data-protect-ignore="${escapeHtml(row.controlKey)}" ${row.ignored ? "checked" : ""}> Ignore</label>
-            <label class="kb-control-field"><span>Override</span><input type="number" step="0.01" data-protect-amount="${escapeHtml(row.controlKey)}" value="${escapeHtml(amountValue)}" placeholder="${Number(row.defaultAmount || row.amount || 0).toFixed(2)}"></label>
-          </div>`;
+        return {
+          amountInput: `<input class="kb-protect-amount-input" type="number" step="0.01" data-protect-amount="${escapeHtml(row.controlKey)}" value="${escapeHtml(amountValue)}" placeholder="${Number(row.defaultAmount || row.protectAmount || 0).toFixed(2)}">`,
+          ignoreInput: `<input type="checkbox" data-protect-ignore="${escapeHtml(row.controlKey)}" ${row.ignored ? "checked" : ""} title="Ignore in Money to protect">`
+        };
       }
 
 
 
       function twoColumnMoneyList(title, rows, emptyText = "Nothing to show.") {
-        const total = rows.reduce((sumSoFar, row) => sumSoFar + Number(row.amount || 0), 0);
+        const total = protectionRowsTotal(rows);
         const body = rows.length
-          ? rows.map(row => `
-              <div class="kb-money-row">
-                <div class="kb-money-main">
-                  <div class="kb-money-name">${row.name}</div>
-                  ${row.meta ? `<div class="kb-money-meta">${escapeHtml(row.meta)}</div>` : ""}
-                  ${renderProtectionControls(row)}
-                </div>
-                <div class="kb-money-amount">${money.format(row.amount)}</div>
-              </div>`).join("")
+          ? rows.map(row => {
+              const controls = renderProtectionControls(row);
+              return `
+                <div class="kb-protection-row ${row.ignored ? "is-ignored" : ""}">
+                  <div class="kb-cell kb-bill-name">${row.name}</div>
+                  <div class="kb-cell kb-due">${escapeHtml(row.dueDate || "—")}</div>
+                  <div class="kb-cell kb-type">
+                    ${row.controlKey && row.showExpenseType ? `<select data-expense-type="${escapeHtml(row.controlKey)}"><option value="Fixed" ${row.expenseType === "Fixed" ? "selected" : ""}>Fixed</option><option value="Flexible" ${row.expenseType === "Flexible" ? "selected" : ""}>Flexible</option></select>` : escapeHtml(row.expenseType || "—")}
+                  </div>
+                  <div class="kb-cell kb-money-num">${money.format(row.amountLeft ?? row.amount ?? 0)}</div>
+                  <div class="kb-cell kb-protect-edit">${controls.amountInput}</div>
+                  <div class="kb-cell kb-ignore">${controls.ignoreInput}</div>
+                </div>`;
+            }).join("")
           : `<div class="empty small">${escapeHtml(emptyText)}</div>`;
 
         return `
-          <div class="card kb-money-card">
+          <div class="card kb-protection-card">
             <div class="section-title">
               <h3>${escapeHtml(title)}</h3>
               <span>${money.format(total)}</span>
             </div>
-            <div class="kb-money-table">
-              <div class="kb-money-header">
-                <span>Item</span>
-                <span>Amount</span>
+            <div class="kb-protection-table">
+              <div class="kb-protection-header">
+                <div>Bill name</div>
+                <div>Due</div>
+                <div>Type</div>
+                <div>Amount left</div>
+                <div>Protect amount</div>
+                <div>Ignore</div>
               </div>
               ${body}
-              ${rows.length ? `<div class="kb-money-total"><span>Total</span><span>${money.format(total)}</span></div>` : ""}
+              ${rows.length ? `<div class="kb-protection-total"><div>Total counted</div><div>${money.format(total)}</div></div>` : ""}
             </div>
           </div>`;
       }
@@ -3897,20 +4092,19 @@ function billLineName(line) {
       function currentMonthProtectedRows(month = currentMonth(), plan = safeNextPaycheckPlan(month)) {
         const rows = [];
 
-        // Left side means every monthly plan line that is not fully paid.
-        // If the Monthly Plan shows a remaining amount, it belongs here.
         notFullyPaidMonthlyRows(month).forEach(line => {
           const key = scopedProtectionKey(line, "current");
-          if (isProtectionKeyIgnored(key, month)) return;
           const fallback = remainingForLine(line);
-          const amount = protectionAmountForKey(key, fallback, month);
-          if (amount > 0) rows.push({
+          const protectAmount = protectionAmountForKey(key, fallback, month);
+          rows.push({
             name: billLineName(line),
-            meta: lineMetaParts(line, "This month"),
-            amount,
+            dueDate: dueDisplayForLine(line),
+            amountLeft: fallback,
+            amount: protectAmount,
+            protectAmount,
             defaultAmount: fallback,
             controlKey: key,
-            ignored: false,
+            ignored: isProtectionKeyIgnored(key, month),
             overrideValue: protectionAmountOverrideForKey(key, month),
             expenseType: expenseTypeForLine(line),
             showExpenseType: true
@@ -3918,9 +4112,19 @@ function billLineName(line) {
         });
 
         const personalLeft = Math.max(0, dashboardPersonalBudget(month, "Everyone") - actualPersonalSpending(month));
-        if (personalLeft > 0) rows.push({ name: "Personal Money remaining", meta: "This month · Flexible", amount: personalLeft });
+        if (personalLeft > 0) {
+          rows.push({
+            name: "Personal Money remaining",
+            dueDate: "—",
+            amountLeft: personalLeft,
+            amount: personalLeft,
+            protectAmount: personalLeft,
+            expenseType: "Flexible",
+            ignored: false
+          });
+        }
 
-        return rows.filter(row => row.amount > 0.005);
+        return rows.filter(row => Number(row.amountLeft ?? row.amount ?? 0) > 0.005);
       }
 
       function earlyNextMonthProtectedRows(month = currentMonth(), plan = safeNextPaycheckPlan(month)) {
@@ -3929,35 +4133,37 @@ function billLineName(line) {
 
         earlyNextMonthFixedBills(month).forEach(line => {
           const key = scopedProtectionKey(line, "next");
-          if (isProtectionKeyIgnored(key, month)) return;
           const fallback = Number(line.amount || 0);
-          const amount = protectionAmountForKey(key, fallback, month);
+          const protectAmount = protectionAmountForKey(key, fallback, month);
           rows.push({
             name: billLineName(line),
-            meta: lineMetaParts(line, "Next window"),
-            amount,
+            dueDate: dueDisplayForLine(line),
+            amountLeft: fallback,
+            amount: protectAmount,
+            protectAmount,
             defaultAmount: fallback,
             controlKey: key,
-            ignored: false,
+            ignored: isProtectionKeyIgnored(key, month),
             overrideValue: protectionAmountOverrideForKey(key, month),
             expenseType: expenseTypeForLine(line),
             showExpenseType: true
           });
         });
 
-        activeBudgetLines(allBudgetLines(month)).filter(line => expenseTypeForLine(line) === "Flexible").forEach(line => {
+        activeBudgetLines(allBudgetLines(month)).filter(line => expenseTypeForLine(line) === "Flexible" && !isMortgageBillLine(line)).forEach(line => {
           const key = scopedProtectionKey(line, "next");
-          if (isProtectionKeyIgnored(key, month)) return;
           const base = Number(line.amount || 0);
           const fallback = base * 10 / days;
-          const amount = protectionAmountForKey(key, fallback, month);
-          if (amount > 0) rows.push({
-            name: billLineName(line),
-            meta: `Next window · 10-day estimate · ${expenseTypeForLine(line)}`,
-            amount,
+          const protectAmount = protectionAmountForKey(key, fallback, month);
+          if (fallback > 0) rows.push({
+            name: `${billLineName(line)} — 10-day estimate`,
+            dueDate: "—",
+            amountLeft: fallback,
+            amount: protectAmount,
+            protectAmount,
             defaultAmount: fallback,
             controlKey: key,
-            ignored: false,
+            ignored: isProtectionKeyIgnored(key, month),
             overrideValue: protectionAmountOverrideForKey(key, month),
             expenseType: expenseTypeForLine(line),
             showExpenseType: true
@@ -3965,38 +4171,83 @@ function billLineName(line) {
         });
 
         const personalBase = dashboardPersonalBudget(month, "Everyone");
-        if (personalBase > 0) rows.push({ name: "Personal Money", meta: `Next window · 10-day estimate · Flexible`, amount: personalBase * 10 / days });
-
-        if (plan.mortgageGapAfterVault > 0) {
-          rows.push({ name: "Mortgage gap after vault", meta: "Mortgage funding · Janis mortgage-only", amount: plan.mortgageGapAfterVault });
+        if (personalBase > 0) {
+          rows.push({
+            name: "Personal Money — 10-day estimate",
+            dueDate: "—",
+            amountLeft: personalBase * 10 / days,
+            amount: personalBase * 10 / days,
+            protectAmount: personalBase * 10 / days,
+            expenseType: "Flexible",
+            ignored: false
+          });
         }
 
-        return rows.concat(manualProtectionRows(month)).filter(row => row.amount > 0.005);
+        return rows.concat(manualProtectionRows(month)).filter(row => Number(row.amountLeft ?? row.amount ?? 0) > 0.005);
       }
 
-      function renderProtectionLists(month = currentMonth(), plan = safeNextPaycheckPlan(month)) {
+      
+      function mortgageFundingTable(title, rows, plan) {
+        const needRows = rows.filter(row => Number(row.amount || 0) > 0 && row.expenseType === "Mortgage");
+        const fundingRows = rows.filter(row => Number(row.amount || 0) < 0);
+        return `
+          <div class="card kb-protection-card">
+            <div class="section-title">
+              <h3>${escapeHtml(title)}</h3>
+              <span>Gap from us: ${money.format(plan.mortgageGapAfterVault)}</span>
+            </div>
+            <div class="kb-protection-table">
+              <div class="kb-protection-header">
+                <div>Mortgage item</div>
+                <div>Due</div>
+                <div>Type</div>
+                <div>Amount</div>
+                <div>Funding</div>
+                <div>Gap</div>
+              </div>
+              ${rows.map(row => `
+                <div class="kb-protection-row ${row.amount < 0 ? "is-funding-row" : ""}">
+                  <div class="kb-cell kb-bill-name">${row.name}</div>
+                  <div class="kb-cell kb-due">${escapeHtml(row.dueDate || "—")}</div>
+                  <div class="kb-cell kb-type">${escapeHtml(row.expenseType || "—")}</div>
+                  <div class="kb-cell kb-money-num">${row.amount > 0 ? money.format(row.amount) : "—"}</div>
+                  <div class="kb-cell kb-money-num">${row.amount < 0 ? money.format(Math.abs(row.amount)) : "—"}</div>
+                  <div class="kb-cell kb-money-num">${row.name === "Mortgage gap from us" ? money.format(row.amount) : "—"}</div>
+                </div>`).join("")}
+              <div class="kb-protection-total">
+                <div>Mortgage need ${money.format(plan.mortgageNeed)} − funding ${money.format(plan.mortgageCovered)}</div>
+                <div>${money.format(plan.mortgageGapAfterVault)}</div>
+              </div>
+            </div>
+          </div>`;
+      }
+
+function renderProtectionLists(month = currentMonth(), plan = safeNextPaycheckPlan(month)) {
         return safeRenderDashboardBlock("Money to Protect Breakdown", () => {
           const currentRows = currentMonthProtectedRows(month, plan);
           const nextRows = earlyNextMonthProtectedRows(month, plan);
-          const currentTotal = moneyRowsTotal(currentRows);
-          const nextTotal = moneyRowsTotal(nextRows);
-          const listTotal = currentTotal + nextTotal;
+          const mortgageRows = mortgageFundingDetailRows(month, plan);
+          const currentTotal = protectionRowsTotal(currentRows);
+          const nextTotal = protectionRowsTotal(nextRows);
+          const mortgageGap = Number(plan.mortgageGapAfterVault || 0);
+          const listTotal = currentTotal + nextTotal + mortgageGap;
           const difference = listTotal - Number(plan.amountToKeepSafe || 0);
           const matches = Math.abs(difference) < 0.01;
 
           return `
             <div class="section-title" style="margin:.25rem 0 .15rem">
               <h3>Money to Protect Breakdown</h3>
-              <span>${money.format(currentTotal)} + ${money.format(nextTotal)} = ${money.format(listTotal)}</span>
+              <span>${money.format(currentTotal)} + ${money.format(nextTotal)} + mortgage ${money.format(mortgageGap)} = ${money.format(listTotal)}</span>
             </div>
             <p class="muted small" style="margin-top:-.25rem">
-              Left side is every monthly plan line not fully paid. Right side is the next paycheck/early-month protection window. Editing a row updates the Money to protect card immediately. Overrides are separate for each side. Janis reduces only the mortgage gap.
+              Mortgage Funding includes PennyMac and Truist only. Janis stays here as mortgage-only funding. Achieva is not treated as mortgage funding.
             </p>
             <div style="display:flex;justify-content:flex-end;margin:.5rem 0 .75rem">
               <button type="button" class="secondary" id="addManualProtectionLineBtn">+ Add protection line</button>
             </div>
-            <div class="kb-list-grid">
-              ${twoColumnMoneyList("This Month Not Fully Paid", currentRows, "Everything in the monthly plan is fully paid.")}
+            <div class="kb-list-stack">
+              ${twoColumnMoneyList("This Month Not Fully Paid — Non-Mortgage", currentRows, "Everything non-mortgage in the monthly plan is fully paid.")}
+              ${mortgageFundingTable("Mortgage Funding", mortgageRows, plan)}
               ${twoColumnMoneyList("Hold for Early Next Paycheck", nextRows, "No early protection lines.")}
             </div>
             <div class="card kb-reconcile-card" style="padding:1rem;margin-top:.4rem">

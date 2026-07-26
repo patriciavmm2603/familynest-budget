@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Kingdom Builder</title>
-  <!-- v101 pennymac truist mortgage only -->
+  <!-- v102 no mortgage funding edit personal -->
   <!-- v84 safe next paycheck -->
   <!-- v82 expected income actuals -->
   <!-- v81 fix csv amount sort -->
@@ -2155,6 +2155,8 @@
 
 
       /* v101: mortgage funding is PennyMac and Truist only; Achieva not fixed */
+
+      /* v102: removed mortgage funding section and made personal editable */
 </style>
   
   <link rel="manifest" href="/manifest.webmanifest">
@@ -3705,7 +3707,7 @@
 
         const currentRows = currentMonthProtectedRows(month, basePlan);
         const nextRows = earlyNextMonthProtectedRows(month, basePlan);
-        const amountToKeepSafe = protectionRowsTotal(currentRows) + protectionRowsTotal(nextRows) + mortgageGapAfterVault;
+        const amountToKeepSafe = protectionRowsTotal(currentRows) + protectionRowsTotal(nextRows);
         const leftAfterProtectedNeeds = checking + cashComingIn - amountToKeepSafe;
 
         return { ...basePlan, amountToKeepSafe, leftAfterProtectedNeeds };
@@ -4113,14 +4115,21 @@ function billLineName(line) {
 
         const personalLeft = Math.max(0, dashboardPersonalBudget(month, "Everyone") - actualPersonalSpending(month));
         if (personalLeft > 0) {
+          const personalLine = { id: "personal-money-current", payee: "Personal Money remaining", category: "Personal", expenseType: "Flexible" };
+          const key = scopedProtectionKey(personalLine, "current");
+          const protectAmount = protectionAmountForKey(key, personalLeft, month);
           rows.push({
             name: "Personal Money remaining",
             dueDate: "—",
             amountLeft: personalLeft,
-            amount: personalLeft,
-            protectAmount: personalLeft,
+            amount: protectAmount,
+            protectAmount,
+            defaultAmount: personalLeft,
+            controlKey: key,
+            ignored: isProtectionKeyIgnored(key, month),
+            overrideValue: protectionAmountOverrideForKey(key, month),
             expenseType: "Flexible",
-            ignored: false
+            showExpenseType: false
           });
         }
 
@@ -4172,14 +4181,41 @@ function billLineName(line) {
 
         const personalBase = dashboardPersonalBudget(month, "Everyone");
         if (personalBase > 0) {
+          const fallback = personalBase * 10 / days;
+          const personalLine = { id: "personal-money-next-window", payee: "Personal Money — 10-day estimate", category: "Personal", expenseType: "Flexible" };
+          const key = scopedProtectionKey(personalLine, "next");
+          const protectAmount = protectionAmountForKey(key, fallback, month);
           rows.push({
             name: "Personal Money — 10-day estimate",
             dueDate: "—",
-            amountLeft: personalBase * 10 / days,
-            amount: personalBase * 10 / days,
-            protectAmount: personalBase * 10 / days,
+            amountLeft: fallback,
+            amount: protectAmount,
+            protectAmount,
+            defaultAmount: fallback,
+            controlKey: key,
+            ignored: isProtectionKeyIgnored(key, month),
+            overrideValue: protectionAmountOverrideForKey(key, month),
             expenseType: "Flexible",
-            ignored: false
+            showExpenseType: false
+          });
+        }
+
+        if (plan.mortgageGapAfterVault > 0) {
+          const mortgageGapLine = { id: "mortgage-gap-after-vault-janis", payee: "Mortgage gap after vault + Janis", category: "Mortgage", expenseType: "Fixed" };
+          const key = scopedProtectionKey(mortgageGapLine, "next");
+          const protectAmount = protectionAmountForKey(key, plan.mortgageGapAfterVault, month);
+          rows.push({
+            name: "Mortgage gap after vault + Janis",
+            dueDate: "—",
+            amountLeft: plan.mortgageGapAfterVault,
+            amount: protectAmount,
+            protectAmount,
+            defaultAmount: plan.mortgageGapAfterVault,
+            controlKey: key,
+            ignored: isProtectionKeyIgnored(key, month),
+            overrideValue: protectionAmountOverrideForKey(key, month),
+            expenseType: "Fixed",
+            showExpenseType: false
           });
         }
 
@@ -4226,28 +4262,25 @@ function renderProtectionLists(month = currentMonth(), plan = safeNextPaycheckPl
         return safeRenderDashboardBlock("Money to Protect Breakdown", () => {
           const currentRows = currentMonthProtectedRows(month, plan);
           const nextRows = earlyNextMonthProtectedRows(month, plan);
-          const mortgageRows = mortgageFundingDetailRows(month, plan);
           const currentTotal = protectionRowsTotal(currentRows);
           const nextTotal = protectionRowsTotal(nextRows);
-          const mortgageGap = Number(plan.mortgageGapAfterVault || 0);
-          const listTotal = currentTotal + nextTotal + mortgageGap;
+          const listTotal = currentTotal + nextTotal;
           const difference = listTotal - Number(plan.amountToKeepSafe || 0);
           const matches = Math.abs(difference) < 0.01;
 
           return `
             <div class="section-title" style="margin:.25rem 0 .15rem">
               <h3>Money to Protect Breakdown</h3>
-              <span>${money.format(currentTotal)} + ${money.format(nextTotal)} + mortgage ${money.format(mortgageGap)} = ${money.format(listTotal)}</span>
+              <span>${money.format(currentTotal)} + ${money.format(nextTotal)} = ${money.format(listTotal)}</span>
             </div>
             <p class="muted small" style="margin-top:-.25rem">
-              Mortgage Funding includes PennyMac and Truist only. Janis stays here as mortgage-only funding. Achieva is not treated as mortgage funding.
+              Ignore keeps a row visible but removes it from the counted total. Personal Money and mortgage gap can be edited here.
             </p>
             <div style="display:flex;justify-content:flex-end;margin:.5rem 0 .75rem">
               <button type="button" class="secondary" id="addManualProtectionLineBtn">+ Add protection line</button>
             </div>
             <div class="kb-list-stack">
-              ${twoColumnMoneyList("This Month Not Fully Paid — Non-Mortgage", currentRows, "Everything non-mortgage in the monthly plan is fully paid.")}
-              ${mortgageFundingTable("Mortgage Funding", mortgageRows, plan)}
+              ${twoColumnMoneyList("This Month Not Fully Paid", currentRows, "Everything in the monthly plan is fully paid.")}
               ${twoColumnMoneyList("Hold for Early Next Paycheck", nextRows, "No early protection lines.")}
             </div>
             <div class="card kb-reconcile-card" style="padding:1rem;margin-top:.4rem">
@@ -4278,7 +4311,7 @@ function renderProtectionLists(month = currentMonth(), plan = safeNextPaycheckPl
         return `
           <div class="section-title" style="margin:.25rem 0 .15rem">
             <h3>Cash Protection Plan</h3>
-            <span>Janis is mortgage-only. No buffer included.</span>
+            <span>No buffer included. Janis reduces the mortgage gap inside the protection list.</span>
           </div>
 
           <div class="cards kb-simple-dashboard-cards">
@@ -4290,7 +4323,6 @@ function renderProtectionLists(month = currentMonth(), plan = safeNextPaycheckPl
             </div>
 
             ${metric("Cash coming in", plan.cashComingIn, `${escapeHtml(plan.paycheck.owner || "Income")} ${escapeHtml(shortMonthDay(plan.paycheck.date))}: ${money.format(plan.paycheckAmount)}. Janis is not included here.`, "green")}
-            ${metric("Mortgage funding", plan.mortgageCovered, `Mortgage need ${money.format(plan.mortgageNeed)} · vault ${money.format(plan.mortgageVault)} · Janis mortgage portion ${money.format(plan.janisExpected)} · gap from us ${money.format(plan.mortgageGapAfterVault)}.`, plan.mortgageGapAfterVault > 0 ? "yellow" : "green")}
             ${metric("Money to protect", plan.amountToKeepSafe, "This Month Not Fully Paid + Hold for Early Next Paycheck + mortgage gap from us.", "yellow")}
             ${metric(plan.leftAfterProtectedNeeds >= 0 ? "Safe after protected needs" : "Still short", plan.leftAfterProtectedNeeds, statusText, plan.leftAfterProtectedNeeds < 0 ? "red" : "green")}
             ${metric("Cannot touch", plan.cannotTouch, `Mortgage vault ${money.format(plan.mortgageVault)}${plan.futureReserve > 0 ? ` · future/quarterly reserve ${money.format(plan.futureReserve)}` : ""}. This is protected money, not spending money.`, "yellow")}

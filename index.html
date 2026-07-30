@@ -1684,6 +1684,19 @@
         }
       }
 
+      .kb-income-summary-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: .85rem;
+        margin-bottom: 1rem;
+      }
+
+      @media (max-width: 980px) {
+        .kb-income-summary-grid {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+      }
+
       @media (max-width: 760px) {
         .kb-simple-dashboard-cards {
           grid-template-columns: 1fr !important;
@@ -1691,6 +1704,10 @@
 
         .kb-simple-dashboard-cards .metric {
           min-height: auto !important;
+        }
+
+        .kb-income-summary-grid {
+          grid-template-columns: 1fr !important;
         }
 
         .kb-simple-row {
@@ -6333,22 +6350,16 @@ function renderProtectionLists(month = currentMonth(), plan = safeNextPaycheckPl
 
         document.querySelector("#income").innerHTML = [
           `<div class="section-title" style="margin:.25rem 0 .15rem">
-            <h3>Current Month Snapshot</h3>
-            <span>Moved from Dashboard</span>
+            <h3>Income snapshot</h3>
+            <span>Monthly view, grouped for planning</span>
           </div>
-          <div class="cards kb-simple-dashboard-cards">
-            ${metric("Actual income received", actualIncomeReceived, dashboardActualIncomeLabel(month), "green")}
-            ${metric("Vault / reserve money", vaultMoney, dashboardVaultMoneyLabel(month), vaultMoney > 0 ? "yellow" : "green")}
-            ${metric("Already paid", monthPlan.paid, dashboardAlreadyPaidLabel(monthPlan), "green")}
-            ${personalMoneyActualTiles(month)}
-          </div>`,
-
-          `<div class="cards">
+          <div class="kb-income-summary-grid">
             ${metric("Planned job income", plannedJob, "Reliable salary/paycheck money.")}
-            ${metric("Planned other income", plannedOther, "Vault, savings, quarterly, reimbursements, or one-time planned money.")}
             ${metric("Actual job income", actualJobTotal, actualJobRows.length + " statement deposit" + (actualJobRows.length === 1 ? "" : "s") + " classified as Job Income.", "green")}
-            ${metric("Actual other income", actualOtherTotal, actualOtherRows.length + " deposit" + (actualOtherRows.length === 1 ? "" : "s") + " from vaults or other non-job / non-side-hustle money.", "green")}
+            ${metric("Actual income received", actualIncomeReceived, dashboardActualIncomeLabel(month), "green")}
             ${metric("Side hustle gross", paypalGross, "PayPal side hustle gross. Patricia: " + money.format(sideByOwner.Patricia || 0) + " · Alec: " + money.format(sideByOwner.Alec || 0))}
+            ${metric("Vault / reserve money", vaultMoney, dashboardVaultMoneyLabel(month), vaultMoney > 0 ? "yellow" : "green")}
+            ${metric("Planned other income", plannedOther, "Vault, savings, quarterly, reimbursements, or one-time planned money.")}
           </div>`,
 
           `<div class="card">

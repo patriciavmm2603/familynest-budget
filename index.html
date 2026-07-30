@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Kingdom Builder</title>
-  <!-- v120 dashboard direct safe -->
+  <!-- v121 rollback careful dashboard -->
   <!-- v84 safe next paycheck -->
   <!-- v82 expected income actuals -->
   <!-- v81 fix csv amount sort -->
@@ -2226,7 +2226,7 @@
       /* v114: monthly plan remaining cell shows overage instead of zero */
 
 
-      /* v120 dashboard direct safe: cleaner dark mode and mobile readability */
+      /* v121 rollback careful dashboard: cleaner dark mode and mobile readability */
       @media (prefers-color-scheme: dark) {
         :root {
           --bg: #14120f;
@@ -3021,358 +3021,6 @@
       }
 
 
-      function kbSafeNumber(value, fallback = 0) {
-        const amount = Number(value);
-        return Number.isFinite(amount) ? amount : fallback;
-      }
-
-
-
-      function kbV118Today() {
-        const now = new Date();
-        return new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      }
-
-      function kbV118DateOnly(date) {
-        const d = date instanceof Date ? date : new Date(date);
-        return new Date(d.getFullYear(), d.getMonth(), d.getDate());
-      }
-
-      function kbV118AddDays(date, days) {
-        const d = kbV118DateOnly(date);
-        d.setDate(d.getDate() + Number(days || 0));
-        return d;
-      }
-
-      function kbV118MonthKey(date) {
-        const d = date instanceof Date ? date : new Date(date);
-        return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0");
-      }
-
-      function kbV118Parts(key) {
-        const [year, month] = String(key || state.activeMonth || "").split("-").map(Number);
-        return { year, month };
-      }
-
-      function kbV118DaysInMonth(key) {
-        const { year, month } = kbV118Parts(key);
-        return year && month ? new Date(year, month, 0).getDate() : 31;
-      }
-
-      function kbV118DateInMonth(key, day) {
-        const { year, month } = kbV118Parts(key);
-        if (!year || !month || !day) return null;
-        return new Date(year, month - 1, day);
-      }
-
-      function kbV118MonthKeysBetween(startDate, endDate) {
-        const keys = [];
-        const cursor = kbV118DateInMonth(kbV118MonthKey(startDate), 1);
-        const endKey = kbV118MonthKey(endDate);
-        while (cursor && keys.length < 4) {
-          const key = kbV118MonthKey(cursor);
-          keys.push(key);
-          if (key === endKey) break;
-          cursor.setMonth(cursor.getMonth() + 1);
-        }
-        return keys;
-      }
-
-      function kbV118CompareDates(left, right) {
-        return kbV118DateOnly(left).getTime() - kbV118DateOnly(right).getTime();
-      }
-
-      function kbV118DateInWindow(date, start, end) {
-        const value = kbV118DateOnly(date).getTime();
-        return value >= kbV118DateOnly(start).getTime() && value <= kbV118DateOnly(end).getTime();
-      }
-
-      function kbV118WindowDays(start, end) {
-        return Math.max(1, Math.round((kbV118DateOnly(end) - kbV118DateOnly(start)) / 86400000) + 1);
-      }
-
-      function kbV118MonthForKey(key) {
-        if (state.months && state.months[key]) return state.months[key];
-        const template = state.baseTemplate || {};
-        const current = currentMonth();
-        return {
-          label: key,
-          budgetLines: (template.budgetLines || current.budgetLines || []).map(line => ({
-            ...line,
-            paidAmount: 0,
-            remainingAmount: Number(line.amount || 0),
-            manualPaid: false,
-            status: String(line.payee || "").toLowerCase().includes("pennymac") ? "Committed" : "Not Paid",
-            expenseType: expenseTypeForLine(line)
-          })),
-          paychecks: (template.paychecks || current.paychecks || defaultPaychecks()).map(row => ({ ...row })),
-          allowances: (template.allowances || current.allowances || []).map(row => ({ ...row })),
-          transactions: [],
-          sideGigs: [],
-          contributions: []
-        };
-      }
-
-      function kbV118BiweeklyThursdayPaydays(key) {
-        const { year, month } = kbV118Parts(key);
-        if (!year || !month) return [];
-        const anchor = new Date(2026, 6, 2);
-        const out = [];
-        for (let day = 1; day <= kbV118DaysInMonth(key); day += 1) {
-          const d = new Date(year, month - 1, day);
-          const diffDays = Math.round((d - anchor) / 86400000);
-          if (diffDays % 14 === 0) out.push(d);
-        }
-        return out;
-      }
-
-      function kbV118PaycheckOccurrencesForRow(row, key) {
-        const { year, month } = kbV118Parts(key);
-        if (!year || !month || Number(row.amount || 0) <= 0) return [];
-        const text = [row.owner, row.label, row.expectedDay, row.frequency, row.notes].join(" ").toLowerCase();
-        const amount = Number(row.amount || 0);
-        const owner = row.owner || "";
-        const label = row.label || "paycheck";
-        const out = [];
-        const add = day => {
-          if (!day || day < 1 || day > kbV118DaysInMonth(key)) return;
-          out.push({ date: new Date(year, month - 1, day), amount, owner, label, monthKey: key });
-        };
-
-        if (/patricia/.test(text) && (/twice|semi|10.*24|24.*10/.test(text))) {
-          add(10); add(24);
-          return out;
-        }
-
-        const explicitDay = firstDayNumber(row.expectedDay || row.label || row.notes);
-        if (explicitDay && !/every other thursday|biweekly/.test(text)) {
-          add(explicitDay);
-          return out;
-        }
-
-        if (/every other thursday|biweekly|every other|thursday/.test(text)) {
-          return kbV118BiweeklyThursdayPaydays(key).map(date => ({ date, amount, owner, label, monthKey: key }));
-        }
-
-        if (explicitDay) add(explicitDay);
-        return out;
-      }
-
-      function kbV118SamePaycheckOwner(expected, actual) {
-        const left = String(expected?.owner || "").trim().toLowerCase();
-        const right = String(actual?.owner || "").trim().toLowerCase();
-        if (!left || !right || left === "shared" || right === "shared" || left === "unassigned" || right === "unassigned") return true;
-        return left === right;
-      }
-
-      function kbV118ActualJobRowsForKey(key) {
-        const month = state.months && state.months[key] ? state.months[key] : null;
-        return month ? actualJobDepositsForExpectedIncome(month) : [];
-      }
-
-      function kbV118WasPaycheckReceived(expected, actualRows, used) {
-        for (let index = 0; index < actualRows.length; index += 1) {
-          if (used.has(index)) continue;
-          const actual = actualRows[index];
-          const actualDate = actual._dateObject || transactionDateObject(actual);
-          if (!actualDate || Number.isNaN(actualDate.getTime())) continue;
-          if (!kbV118SamePaycheckOwner(expected, actual)) continue;
-          if (!isActualJobIncomeForPaycheck(actual)) continue;
-          const diffDays = Math.round((expected.date - actualDate) / 86400000);
-          if (diffDays >= -1 && diffDays <= 7) { used.add(index); return true; }
-          if (diffDays >= -3 && diffDays <= 10 && closePaycheckAmount(expected.amount, actual.amount)) { used.add(index); return true; }
-        }
-        return false;
-      }
-
-      function kbV118ExpectedPaychecksForKey(key) {
-        const month = kbV118MonthForKey(key);
-        const actualRows = kbV118ActualJobRowsForKey(key);
-        const used = new Set();
-        const seen = new Set();
-        return (month.paychecks || defaultPaychecks())
-          .flatMap(row => kbV118PaycheckOccurrencesForRow(row, key))
-          .sort((a, b) => a.date - b.date)
-          .filter(item => {
-            const unique = `${String(item.owner || "").toLowerCase()}|${dateOnlyKey(item.date)}|${Number(item.amount || 0).toFixed(2)}`;
-            if (seen.has(unique)) return false;
-            seen.add(unique);
-            return true;
-          })
-          .filter(item => !kbV118WasPaycheckReceived(item, actualRows, used));
-      }
-
-      function kbV118NextPaycheck() {
-        const today = kbV118Today();
-        const startKey = state.activeMonth || kbV118MonthKey(today);
-        const startDate = kbV118DateInMonth(startKey, 1) || today;
-        const keys = [];
-        const cursor = new Date(Math.min(startDate.getTime(), today.getTime()));
-        cursor.setDate(1);
-        for (let i = 0; i < 4; i += 1) {
-          const key = kbV118MonthKey(cursor);
-          if (!keys.includes(key)) keys.push(key);
-          cursor.setMonth(cursor.getMonth() + 1);
-        }
-        return keys.flatMap(kbV118ExpectedPaychecksForKey)
-          .filter(row => kbV118CompareDates(row.date, today) >= 0)
-          .sort((a, b) => a.date - b.date)[0] || null;
-      }
-
-      function kbV118ProtectionWindow(paycheck = kbV118NextPaycheck()) {
-        const start = kbV118Today();
-        const end = paycheck ? kbV118AddDays(paycheck.date, -1) : kbV118AddDays(start, 9);
-        return {
-          start,
-          end,
-          days: kbV118WindowDays(start, end),
-          label: `${shortMonthDay(start)} – ${shortMonthDay(end)}`,
-          paycheck
-        };
-      }
-
-      function kbV118DueDateForLine(line, key) {
-        const day = dueDayNumber(line?.dueDay);
-        return day ? kbV118DateInMonth(key, day) : null;
-      }
-
-      function kbV118ProtectionWindowBillItems(month = currentMonth(), plan = null) {
-        const window = plan?.window || kbV118ProtectionWindow(plan?.paycheck);
-        return kbV118MonthKeysBetween(window.start, window.end).flatMap(key => {
-          const sourceMonth = kbV118MonthForKey(key);
-          const realMonthExists = Boolean(state.months && state.months[key]);
-          return activeBudgetLines(allBudgetLines(sourceMonth))
-            .filter(line => !isMortgageFundingLine(line))
-            .map(line => ({ line, key, dueDate: kbV118DueDateForLine(line, key), realMonthExists }))
-            .filter(item => item.dueDate && kbV118DateInWindow(item.dueDate, window.start, window.end))
-            .map(item => ({
-              ...item,
-              fallback: Math.max(0, roundMoney(item.realMonthExists ? remainingForLine(item.line) : Number(item.line.amount || 0)))
-            }))
-            .filter(item => item.fallback > 0.005);
-        });
-      }
-
-      function kbV118WindowFlexibleRows(month = currentMonth(), plan = null) {
-        const window = plan?.window || kbV118ProtectionWindow(plan?.paycheck);
-        const startKey = kbV118MonthKey(window.start);
-        const sourceMonth = kbV118MonthForKey(startKey);
-        const days = window.days || 1;
-        const monthDays = kbV118DaysInMonth(startKey);
-        const rows = [];
-
-        activeBudgetLines(allBudgetLines(sourceMonth))
-          .filter(line => expenseTypeForLine(line) === "Flexible")
-          .filter(line => !isMortgageFundingLine(line))
-          .filter(line => !kbV118DueDateForLine(line, startKey))
-          .forEach(line => {
-            const fallback = roundMoney(Number(line.amount || 0) * days / monthDays);
-            if (fallback <= 0.005) return;
-            const controlLine = { ...line, id: `v118-window-flex-${startKey}-${protectionLineKey(line)}` };
-            const controlKey = scopedProtectionKey(controlLine, "window");
-            const protectAmount = protectionAmountForKey(controlKey, fallback, month);
-            rows.push({
-              name: `${billLineName(line)} — ${days}-day estimate`,
-              dueDate: window.label,
-              amountLeft: fallback,
-              amount: protectAmount,
-              protectAmount,
-              defaultAmount: fallback,
-              controlKey,
-              ignored: isProtectionKeyIgnored(controlKey, month),
-              overrideValue: protectionAmountOverrideForKey(controlKey, month),
-              expenseType: expenseTypeForLine(line),
-              showExpenseType: true
-            });
-          });
-
-        const personalBudgets = personalBudgetByOwner(sourceMonth);
-        ["Alec", "Patricia"].forEach(owner => {
-          const base = Number(personalBudgets[owner] || 0);
-          if (base <= 0) return;
-          const fallback = roundMoney(base * days / monthDays);
-          const line = { id: `v118-window-personal-${startKey}-${owner}`, payee: `Personal Money — ${owner}`, category: "Personal", expenseType: "Flexible" };
-          const controlKey = scopedProtectionKey(line, "window");
-          const protectAmount = protectionAmountForKey(controlKey, fallback, month);
-          rows.push({
-            name: `Personal Money — ${escapeHtml(owner)} — ${days}-day estimate`,
-            dueDate: window.label,
-            amountLeft: fallback,
-            amount: protectAmount,
-            protectAmount,
-            defaultAmount: fallback,
-            controlKey,
-            ignored: isProtectionKeyIgnored(controlKey, month),
-            overrideValue: protectionAmountOverrideForKey(controlKey, month),
-            expenseType: "Flexible",
-            showExpenseType: false
-          });
-        });
-
-        return rows;
-      }
-
-      function kbV118RolloverRows(month = currentMonth(), plan = null) {
-        const today = kbV118Today();
-        const activeKey = state.activeMonth || kbV118MonthKey(today);
-        const rows = [];
-
-        activeBudgetLines(allBudgetLines(month))
-          .filter(line => !isMortgageFundingLine(line))
-          .filter(line => {
-            const dueDate = kbV118DueDateForLine(line, activeKey);
-            return dueDate && kbV118CompareDates(dueDate, today) <= 0;
-          })
-          .forEach(line => {
-            const fallback = remainingForLine(line);
-            if (fallback <= 0.005) return;
-            const key = scopedProtectionKey(line, "now");
-            const protectAmount = protectionAmountForKey(key, fallback, month);
-            rows.push({
-              name: billLineName(line),
-              dueDate: dueDisplayForLine(line),
-              amountLeft: fallback,
-              amount: protectAmount,
-              protectAmount,
-              defaultAmount: fallback,
-              controlKey: key,
-              ignored: isProtectionKeyIgnored(key, month),
-              overrideValue: protectionAmountOverrideForKey(key, month),
-              expenseType: expenseTypeForLine(line),
-              showExpenseType: true
-            });
-          });
-
-        const priorKey = previousMonthKey(activeKey);
-        const priorMonth = state.months && state.months[priorKey] ? state.months[priorKey] : null;
-        if (priorMonth) {
-          activeBudgetLines(allBudgetLines(priorMonth))
-            .filter(line => !isMortgageFundingLine(line))
-            .filter(line => remainingForLine(line) > 0.005)
-            .forEach(line => {
-              const fallback = remainingForLine(line);
-              const key = `rollover:${priorKey}:${protectionLineKey(line)}`;
-              const protectAmount = protectionAmountForKey(key, fallback, month);
-              rows.push({
-                name: `Rollover — ${billLineName(line)}`,
-                dueDate: priorKey,
-                amountLeft: fallback,
-                amount: protectAmount,
-                protectAmount,
-                defaultAmount: fallback,
-                controlKey: key,
-                ignored: isProtectionKeyIgnored(key, month),
-                overrideValue: protectionAmountOverrideForKey(key, month),
-                expenseType: expenseTypeForLine(line),
-                showExpenseType: true
-              });
-            });
-        }
-
-        return rows;
-      }
-
-
       function isPlaceholderBudgetLine(line) { return Number(line?.amount || 0) <= 0 && !String(line?.dueDay || "").trim(); }
       function activeBudgetLines(lines) { return (lines || []).filter(line => !isPlaceholderBudgetLine(line)); }
       function allBudgetLines(month = currentMonth()) { return month.budgetLines || []; }
@@ -3513,48 +3161,33 @@
       function escapeHtml(value) { return String(value ?? "").replace(/[&<>"']/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" }[ch])); }
 
       // ── DUE SOON ALERT ──────────────────────────────────────────────────────
-      function render() {
-        renderShell();
-        document.querySelectorAll(".view").forEach(view => view.classList.toggle("active", view.id === state.activeView));
-        const meta = {
-          dashboard: ["Dashboard", "Plan the month, upload transactions, categorize each line, and protect personal spending money."],
-          cashguard: ["Keep in Account", "Know what must stay in the joint account this month hits."],
-          template: ["Base Template", "Edit the reusable budget lines that new months can start from."],
-          budget: ["Monthly Plan", "Edit lines, add one-time items, and keep Patricia/Alec sections clear."],
-          transactions: ["CSV Review", "Upload bank CSVs and give every line a category, owner, and home."],
-          allowance: ["Personal Money", "Protect guilt-free personal spending so extra money does not disappear."],
-          debt: ["Debt Tracker", "Track balances, minimums, and who owns each debt."],
-          income: ["Income", "Separate reliable income, side gigs, and daughters' expected contributions."],
-          compare: ["Compare Months", "See whether cash flow, spending, debt, and contributions are moving the right direction."],
-          closeout: ["Monthly Closeout", "A calm checklist before copying the next month."]
-        }[state.activeView] || ["Dashboard", "Plan the month, upload transactions, categorize each line, and protect personal spending money."];
-        document.querySelector("#pageTitle").textContent = meta[0];
-        document.querySelector("#pageSubtitle").textContent = meta[1];
+      function renderDueSoonAlert() {
+        const today = new Date();
+        const activeKey = state.activeMonth;
+        const currentKey = today.getFullYear() + "-" + String(today.getMonth() + 1).padStart(2, "0");
+        if (activeKey !== currentKey) { document.getElementById("dueSoonAlert").classList.add("hidden"); return; }
+        const todayDay = today.getDate();
+        const month = currentMonth();
+        applyBillPaymentStatuses(month);
 
-        const renderers = {
-          dashboard: renderDashboard,
-          cashguard: renderCashGuard,
-          template: renderTemplate,
-          budget: renderBudget,
-          transactions: renderTransactions,
-          allowance: renderAllowance,
-          debt: renderDebt,
-          income: renderIncome,
-          compare: renderCompare,
-          closeout: renderCloseout
-        };
+        // Show anything unpaid that is overdue, due today, or due in the next 3 days.
+        // This keeps bills like Truist visible if the due date already passed but the bill
+        // has not been matched/marked paid yet. It does not add a separate missing-date warning.
+        const alertRows = activeBudgetLines(allBudgetLines(month)).map(line => {
+          if (["Paid", "Skipped"].includes(line.status)) return null;
+          const days = billDayNumbers(line.dueDay);
+          const matchingDays = days.filter(d => d <= todayDay + 3);
+          if (!matchingDays.length) return null;
+          const bestDay = matchingDays.sort((a, b) => Math.abs(a - todayDay) - Math.abs(b - todayDay))[0];
+          const timing = bestDay < todayDay ? "Overdue day " + bestDay : bestDay === todayDay ? "Due today" : "Day " + bestDay;
+          return { ...line, alertDay: bestDay, timing };
+        }).filter(Boolean).sort((a, b) => a.alertDay - b.alertDay || String(a.payee).localeCompare(String(b.payee)));
 
-        try {
-          (renderers[state.activeView] || renderDashboard)();
-        } catch (error) {
-          console.error("Kingdom Builder active view failed", state.activeView, error);
-          const target = document.querySelector(`#${state.activeView}`) || document.querySelector("#dashboard");
-          if (target) {
-            target.innerHTML = `<div class="card"><h3>Something needs a fix</h3><p class="muted small">${escapeHtml(error?.message || String(error))}</p></div>`;
-          }
-        }
-
-        saveState();
+        const alertEl = document.getElementById("dueSoonAlert");
+        if (!alertRows.length) { alertEl.classList.add("hidden"); return; }
+        alertEl.classList.remove("hidden");
+        document.getElementById("dueSoonTitle").textContent = alertRows.length + " unpaid bill" + (alertRows.length > 1 ? "s" : "") + " due now or soon";
+        document.getElementById("dueSoonBody").textContent = alertRows.map(b => b.payee + " · " + money.format(b.amount) + " · " + b.timing).join(" · ");
       }
 
 
@@ -3655,6 +3288,7 @@
         renderIncome();
         renderCompare();
         renderCloseout();
+        kbV121DashboardEmptyGuard();
         saveState();
       }
 
@@ -4134,7 +3768,7 @@ function actualJobDepositsForExpectedIncome(month = currentMonth()) {
 
       /* v84 Safe After Next Paycheck helpers */
       function firstUpcomingPaycheck(month = currentMonth()) {
-        return kbV118NextPaycheck();
+        return expectedPaychecksLeft(month).slice().sort((a, b) => a.date - b.date)[0] || null;
       }
 
       function dueDayNumber(value) {
@@ -4305,16 +3939,16 @@ function actualJobDepositsForExpectedIncome(month = currentMonth()) {
 
       function safeNextPaycheckBasePlan(month = currentMonth()) {
         const paycheck = firstUpcomingPaycheck(month);
-        const window = kbV118ProtectionWindow(paycheck);
-        const checking = roundMoney(Number(state.jointAccountBalance || 0));
-        const paycheckAmount = roundMoney(Number(paycheck?.amount || 0));
+        const checking = Number(state.jointAccountBalance || 0);
+        const paycheckAmount = Number(paycheck?.amount || 0);
         const janisExpected = janisExpectedMortgagePortion(month);
 
         const cashComingIn = paycheckAmount;
-        const billsBeforePay = roundMoney(sum(kbV118ProtectionWindowBillItems(month, { paycheck, window }), row => Number(row.fallback || 0)));
-        const currentLiving = 0;
-        const earlyFixed = 0;
-        const earlyLiving = roundMoney(sum(kbV118WindowFlexibleRows(month, { paycheck, window }), row => Number(row.defaultAmount || row.amountLeft || 0)));
+
+        const billsBeforePay = datedBillsDueThroughPaycheckTotal(month, paycheck);
+        const currentLiving = currentLivingNeedLeft(month);
+        const earlyFixed = earlyNextMonthFixedBillsTotal(month);
+        const earlyLiving = proratedEarlyNextMonthLivingTotal(month, 10);
 
         const mortgageNeed = mortgageNeedForNextMonth(month);
         const mortgageVault = smartNextMonthMortgageReserveTotal(month);
@@ -4323,11 +3957,6 @@ function actualJobDepositsForExpectedIncome(month = currentMonth()) {
 
         return {
           paycheck,
-          window,
-          windowStart: window.start,
-          windowEnd: window.end,
-          windowDays: window.days,
-          windowLabel: window.label,
           checking,
           paycheckAmount,
           janisExpected,
@@ -4341,7 +3970,7 @@ function actualJobDepositsForExpectedIncome(month = currentMonth()) {
           mortgageVault,
           mortgageCovered,
           mortgageGapAfterVault,
-          cannotTouch: roundMoney(mortgageVault + Math.max(0, futureReserveTotal(month))),
+          cannotTouch: mortgageVault + Math.max(0, futureReserveTotal(month)),
           futureReserve: Math.max(0, futureReserveTotal(month))
         };
       }
@@ -4365,12 +3994,15 @@ function actualJobDepositsForExpectedIncome(month = currentMonth()) {
       function safeNextPaycheckPlan(month = currentMonth()) {
         const basePlan = safeNextPaycheckBasePlan(month);
         const totals = buildProtectionTotals(month, basePlan);
-        const amountToKeepSafe = totals.total;
-        const leftAfterProtectedNeeds = basePlan.checking + basePlan.cashComingIn - amountToKeepSafe;
+        const amountToKeepSafe = roundMoney(totals.total);
+        const safeToSpendBeforePaycheck = roundMoney(basePlan.checking - amountToKeepSafe);
+        const afterPaycheckForecast = roundMoney(basePlan.checking + basePlan.cashComingIn - amountToKeepSafe);
         return {
           ...basePlan,
           amountToKeepSafe,
-          leftAfterProtectedNeeds,
+          safeToSpendBeforePaycheck,
+          afterPaycheckForecast,
+          leftAfterProtectedNeeds: afterPaycheckForecast,
           protectionCurrentTotal: totals.currentTotal,
           protectionNextTotal: totals.nextTotal
         };
@@ -4903,7 +4535,48 @@ function renderProtectionControls(row) {
 
 
 function currentMonthProtectedRows(month = currentMonth(), plan = safeNextPaycheckBasePlan(month)) {
-        return kbV118RolloverRows(month, plan);
+        const rows = [];
+
+        notFullyPaidMonthlyRows(month).forEach(line => {
+          const key = scopedProtectionKey(line, "current");
+          const fallback = remainingForLine(line);
+          const protectAmount = protectionAmountForKey(key, fallback, month);
+          rows.push({
+            name: billLineName(line),
+            dueDate: dueDisplayForLine(line),
+            amountLeft: fallback,
+            amount: protectAmount,
+            protectAmount,
+            defaultAmount: fallback,
+            controlKey: key,
+            ignored: isProtectionKeyIgnored(key, month),
+            overrideValue: protectionAmountOverrideForKey(key, month),
+            expenseType: expenseTypeForLine(line),
+            showExpenseType: true
+          });
+        });
+
+        personalRemainingRowsByOwner(month).forEach(personal => {
+          if (personal.remaining <= 0) return;
+          const personalLine = { id: `personal-money-current-${personal.owner}`, payee: `Personal Money — ${personal.owner}`, category: "Personal", expenseType: "Flexible" };
+          const key = scopedProtectionKey(personalLine, "current");
+          const protectAmount = protectionAmountForKey(key, personal.remaining, month);
+          rows.push({
+            name: `Personal Money — ${escapeHtml(personal.owner)}`,
+            dueDate: "—",
+            amountLeft: personal.remaining,
+            amount: protectAmount,
+            protectAmount,
+            defaultAmount: personal.remaining,
+            controlKey: key,
+            ignored: isProtectionKeyIgnored(key, month),
+            overrideValue: protectionAmountOverrideForKey(key, month),
+            expenseType: "Flexible",
+            showExpenseType: false
+          });
+        });
+
+        return rows.filter(row => Number(row.amountLeft ?? row.amount ?? 0) > 0.005);
       }
 
       
@@ -4919,16 +4592,15 @@ function currentMonthProtectedRows(month = currentMonth(), plan = safeNextPayche
 
 function earlyNextMonthProtectedRows(month = currentMonth(), plan = safeNextPaycheckBasePlan(month)) {
         const rows = [];
+        const days = daysInNextMonthFromActive();
 
-        kbV118ProtectionWindowBillItems(month, plan).forEach(item => {
-          const line = item.line;
-          const controlLine = { ...line, id: `v118-window-bill-${item.key}-${protectionLineKey(line)}` };
-          const key = scopedProtectionKey(controlLine, "window");
-          const fallback = item.fallback;
+        earlyNextMonthFixedBills(month).forEach(line => {
+          const key = scopedProtectionKey(line, "next");
+          const fallback = Number(line.amount || 0);
           const protectAmount = protectionAmountForKey(key, fallback, month);
           rows.push({
             name: billLineName(line),
-            dueDate: shortMonthDay(item.dueDate),
+            dueDate: dueDisplayForLine(line),
             amountLeft: fallback,
             amount: protectAmount,
             protectAmount,
@@ -4941,10 +4613,74 @@ function earlyNextMonthProtectedRows(month = currentMonth(), plan = safeNextPayc
           });
         });
 
-        kbV118WindowFlexibleRows(month, plan).forEach(row => rows.push(row));
-        manualProtectionRows(month).forEach(row => rows.push(row));
+        // Achieva belongs here as Flexible. It is not mortgage funding and not fixed.
+        achievaProtectionRows(month).forEach(line => {
+          const key = scopedProtectionKey(line, "next-achieva");
+          const fallback = Number(line.amount || 0);
+          const protectAmount = protectionAmountForKey(key, fallback, month);
+          rows.push({
+            name: billLineName(line),
+            dueDate: dueDisplayForLine(line),
+            amountLeft: fallback,
+            amount: protectAmount,
+            protectAmount,
+            defaultAmount: fallback,
+            controlKey: key,
+            ignored: isProtectionKeyIgnored(key, month),
+            overrideValue: protectionAmountOverrideForKey(key, month),
+            expenseType: "Flexible",
+            showExpenseType: false
+          });
+        });
 
-        return rows.filter(row => Number(row.amountLeft ?? row.amount ?? 0) > 0.005 || row.ignored);
+        activeBudgetLines(allBudgetLines(month))
+          .filter(line => expenseTypeForLine(line) === "Flexible")
+          .filter(line => !isMortgageFundingLine(line))
+          .filter(line => !isAchievaLine(line))
+          .forEach(line => {
+            const key = scopedProtectionKey(line, "next");
+            const base = Number(line.amount || 0);
+            const fallback = base * 10 / days;
+            const protectAmount = protectionAmountForKey(key, fallback, month);
+            if (fallback > 0) rows.push({
+              name: `${billLineName(line)} — 10-day estimate`,
+              dueDate: "—",
+              amountLeft: fallback,
+              amount: protectAmount,
+              protectAmount,
+              defaultAmount: fallback,
+              controlKey: key,
+              ignored: isProtectionKeyIgnored(key, month),
+              overrideValue: protectionAmountOverrideForKey(key, month),
+              expenseType: expenseTypeForLine(line),
+              showExpenseType: true
+            });
+          });
+
+        const personalBudgets = personalBudgetByOwner(month);
+        ["Alec", "Patricia"].forEach(owner => {
+          const base = Number(personalBudgets[owner] || 0);
+          if (base <= 0) return;
+          const fallback = base * 10 / days;
+          const personalLine = { id: `personal-money-next-window-${owner}`, payee: `Personal Money — ${owner} — 10-day estimate`, category: "Personal", expenseType: "Flexible" };
+          const key = scopedProtectionKey(personalLine, "next");
+          const protectAmount = protectionAmountForKey(key, fallback, month);
+          rows.push({
+            name: `Personal Money — ${escapeHtml(owner)} — 10-day estimate`,
+            dueDate: "—",
+            amountLeft: fallback,
+            amount: protectAmount,
+            protectAmount,
+            defaultAmount: fallback,
+            controlKey: key,
+            ignored: isProtectionKeyIgnored(key, month),
+            overrideValue: protectionAmountOverrideForKey(key, month),
+            expenseType: "Flexible",
+            showExpenseType: false
+          });
+        });
+
+        return rows.concat(manualProtectionRows(month)).filter(row => Number(row.amountLeft ?? row.amount ?? 0) > 0.005);
       }
 
       
@@ -4960,7 +4696,6 @@ function renderProtectionLists(month = currentMonth(), plan = safeNextPaycheckPl
           const listTotal = currentTotal + nextTotal;
           const difference = listTotal - Number(plan.amountToKeepSafe || 0);
           const matches = Math.abs(difference) < 0.01;
-          const windowLabel = plan.windowLabel || plan.window?.label || "window";
 
           return `
             <div class="section-title" style="margin:.25rem 0 .15rem">
@@ -4974,8 +4709,8 @@ function renderProtectionLists(month = currentMonth(), plan = safeNextPaycheckPl
               <button type="button" class="secondary" id="addManualProtectionLineBtn">+ Add protection line</button>
             </div>
             <div class="kb-list-stack">
-              ${twoColumnMoneyList("Still Needed Now / Rollover", currentRows, "Nothing pending from now or the prior month.")}
-              ${twoColumnMoneyList(`Needed Before Next Paycheck (${windowLabel})`, nextRows, "No protection lines before the next paycheck.")}
+              ${twoColumnMoneyList("This Month Not Fully Paid", currentRows, "Everything in the monthly plan is fully paid.")}
+              ${twoColumnMoneyList("Hold for Early Next Paycheck", nextRows, "No early protection lines.")}
             </div>
             <div class="card kb-reconcile-card" style="padding:1rem;margin-top:.4rem">
               <div class="kb-money-total" style="display:grid;grid-template-columns:minmax(0,1fr) 9rem;gap:1rem;align-items:center;font-weight:900;">
@@ -4995,19 +4730,22 @@ function renderProtectionLists(month = currentMonth(), plan = safeNextPaycheckPl
 
       function renderSafeNextPaycheckPlan(plan) {
         const hasPaycheck = Boolean(plan.paycheck);
-        const windowLabel = plan.windowLabel || plan.window?.label || "protection window";
+        const safeBeforePay = roundMoney(Number(plan.safeToSpendBeforePaycheck ?? (plan.checking - plan.amountToKeepSafe)));
+        const afterPayForecast = roundMoney(Number(plan.afterPaycheckForecast ?? plan.leftAfterProtectedNeeds ?? 0));
+        const payName = hasPaycheck ? escapeHtml(plan.paycheck.owner || "Income") : "No paycheck found";
+        const payDate = hasPaycheck ? escapeHtml(shortMonthDay(plan.paycheck.date)) : "—";
         const incomingHint = hasPaycheck
-          ? `${escapeHtml(plan.paycheck.owner || "Income")} ${escapeHtml(shortMonthDay(plan.paycheck.date))}: ${money.format(plan.paycheckAmount)}. Protect cash through ${escapeHtml(shortMonthDay(plan.windowEnd || plan.paycheck.date))}. Janis is not included.`
-          : `No future paycheck found. Showing a ${Number(plan.windowDays || 10)}-day protection window with $0 incoming.`;
+          ? `${payName} ${payDate}: ${money.format(plan.paycheckAmount)}. This is future money, not safe-to-spend until it posts. Janis is not included here.`
+          : "No future paycheck left in this month. Forecast uses $0 coming in.";
 
-        const statusText = plan.leftAfterProtectedNeeds >= 0
-          ? `Cash available now + next paycheck coming in - protected needs for ${escapeHtml(windowLabel)}.`
-          : `Still missing after counting checking, next paycheck, and protected needs for ${escapeHtml(windowLabel)}.`;
+        const safeHint = safeBeforePay >= 0
+          ? `Be careful: this is the max safe spending before ${payDate}.`
+          : `Careful: you are short before ${payDate}. Do not spend extra unless something changes.`;
 
         return `
           <div class="section-title" style="margin:.25rem 0 .15rem">
-            <h3>Cash Protection Until Next Paycheck</h3>
-            <span>Window: ${escapeHtml(windowLabel)}${hasPaycheck ? ` · next paycheck ${escapeHtml(shortMonthDay(plan.paycheck.date))}` : ""}</span>
+            <h3>Cash Protection Before Next Paycheck</h3>
+            <span>Focus on what is safe before the paycheck actually posts.</span>
           </div>
 
           <div class="cards kb-simple-dashboard-cards">
@@ -5018,148 +4756,109 @@ function renderProtectionLists(month = currentMonth(), plan = safeNextPaycheckPl
               <input id="todayCheckingBalanceInput" type="number" step="0.01" value="${escapeHtml(state.jointAccountBalance ?? "")}" placeholder="0.00" style="margin-top:.7rem;width:100%">
             </div>
 
-            ${metric("Next paycheck coming", plan.cashComingIn, incomingHint, plan.cashComingIn > 0 ? "green" : "")}
-            ${metric("Money to protect", plan.amountToKeepSafe, `Needed from today through ${escapeHtml(shortMonthDay(plan.windowEnd || new Date()))}.`, "yellow")}
-            ${metric(plan.leftAfterProtectedNeeds >= 0 ? "Safe after protected needs" : "Still short", plan.leftAfterProtectedNeeds, statusText, plan.leftAfterProtectedNeeds < 0 ? "red" : "green")}
+            ${metric("Next paycheck", plan.cashComingIn, incomingHint, plan.cashComingIn > 0 ? "green" : "")}
+            ${metric("Must protect before paycheck", plan.amountToKeepSafe, "This Month Not Fully Paid + Hold for Early Next Paycheck.", "yellow")}
+            ${metric(safeBeforePay >= 0 ? "Safe to spend before paycheck" : "Short before paycheck", safeBeforePay, safeHint, safeBeforePay < 0 ? "red" : "green")}
+            ${metric("After paycheck forecast", afterPayForecast, "Cash available now + next paycheck - protected needs. Not today's safe spending.", afterPayForecast < 0 ? "red" : "green")}
             ${metric("Cannot touch", plan.cannotTouch, `Mortgage vault ${money.format(plan.mortgageVault)}${plan.futureReserve > 0 ? ` · future/quarterly reserve ${money.format(plan.futureReserve)}` : ""}. This is protected money, not spending money.`, "yellow")}
+          </div>
+
+          <div class="banner" style="margin-top:-.25rem;margin-bottom:1rem">
+            <div>
+              <strong>${safeBeforePay >= 0 ? `Be careful: ${money.format(safeBeforePay)} is the safe spending limit before payday.` : `Careful: you are short ${money.format(Math.abs(safeBeforePay))} before payday.`}</strong>
+              <span>The next paycheck is future money. Do not treat it as available until it posts.</span>
+            </div>
           </div>`;
       }
 
 
             function renderDashboard() {
-        const target = document.querySelector("#dashboard");
-        if (!target) return;
+        const month = currentMonth();
+        applyBillPaymentStatuses(month);
 
-        try {
-          const month = currentMonth();
-          applyBillPaymentStatuses(month);
+        const count = unreconciledCount(month);
+        const monthPlan = currentMonthPlannedPaidLeft(month);
+        const safePaycheckPlan = safeNextPaycheckPlan(month);
 
-          const count = unreconciledCount(month);
-          const monthPlan = currentMonthPlannedPaidLeft(month);
-          const plan = safeNextPaycheckPlan(month);
+        document.querySelector("#dashboard").innerHTML = `
+          <div class="section-title" style="margin:.25rem 0 .15rem">
+            <h3>This Month Bills</h3>
+            <span>Planned, paid, and still due</span>
+          </div>
 
-          const cashNow = roundMoney(kbSafeNumber(plan.checking, Number(state.jointAccountBalance || 0)));
-          const mustProtect = roundMoney(kbSafeNumber(plan.amountToKeepSafe, 0));
-          const nextPaycheck = roundMoney(kbSafeNumber(plan.cashComingIn, 0));
-          const safeBeforePaycheck = roundMoney(cashNow - mustProtect);
-          const afterPaycheckForecast = roundMoney(cashNow + nextPaycheck - mustProtect);
-          const hasPaycheck = Boolean(plan.paycheck);
-          const payName = hasPaycheck ? escapeHtml(plan.paycheck.owner || "Income") : "No paycheck found";
-          const payDate = hasPaycheck ? escapeHtml(shortMonthDay(plan.paycheck.date)) : "—";
-          const windowLabel = plan.windowLabel || plan.window?.label || "protection window";
+          <div class="cards kb-simple-dashboard-cards">
+            ${metric("Planned", monthPlan.planned, "Total planned bills for this budget month, not including income details.")}
+            ${metric("Paid", monthPlan.paid, "Bills already matched or marked paid for this month.", "green")}
+            ${metric("Still due", monthPlan.left, monthPlan.overpaid > 0 ? `Line-by-line remaining. Overpaid bills add ${money.format(monthPlan.overpaid)} but do not reduce other bills.` : "Line-by-line remaining for this month.", monthPlan.left > 0 ? "yellow" : "green")}
+          </div>
 
-          target.innerHTML = `
-            <div class="section-title" style="margin:.25rem 0 .15rem">
-              <h3>This Month Bills</h3>
-              <span>Line-by-line remaining</span>
+          ${renderSafeNextPaycheckPlan(safePaycheckPlan)}
+
+          ${renderProtectionLists(month, safePaycheckPlan)}
+
+          <div class="card">
+            <div class="section-title"><h3>Quick actions</h3><span>Details live in the other tabs</span></div>
+            <div class="kb-action-grid">
+              <button type="button" data-jump="income">Income</button>
+              <button type="button" data-jump="budget">Monthly Plan</button>
+              <button type="button" data-jump="transactions">CSV Review</button>
+              <button type="button" data-jump="allowance">Personal Money</button>
+              <button type="button" data-jump="debt">Debt Tracker</button>
+              <button type="button" data-jump="compare">Compare Months</button>
             </div>
+          </div>
 
-            <div class="cards kb-simple-dashboard-cards">
-              ${metric("Planned", monthPlan.planned, "Total planned bills for this budget month, not including income details.")}
-              ${metric("Paid", monthPlan.paid, "Bills already matched or marked paid for this month.", "green")}
-              ${metric("Still due", monthPlan.left, monthPlan.overpaid > 0 ? `Line-by-line remaining. Overpaid bills add ${money.format(monthPlan.overpaid)} but do not reduce other bills.` : "Line-by-line remaining for this month.", monthPlan.left > 0 ? "yellow" : "green")}
-            </div>
+          ${count ? `<div class="banner"><div><strong>${count} imported lines still need a home</strong><span>Review category, owner, and income type before trusting the dashboard totals.</span></div><button type="button" class="secondary" data-jump="transactions">Go to Review</button></div>` : ""}
+        `;
 
-            <div class="section-title" style="margin:.25rem 0 .15rem">
-              <h3>Cash Protection Before Next Paycheck</h3>
-              <span>Be careful until ${hasPaycheck ? `${payName} gets paid on ${payDate}` : "the next paycheck is known"} · Window: ${escapeHtml(windowLabel)}</span>
-            </div>
-
-            <div class="cards kb-simple-dashboard-cards">
-              <div class="card metric">
-                <div class="label">Cash available now</div>
-                <div class="value">${money.format(cashNow)}</div>
-                <div class="hint">Real posted checking balance today.</div>
-                <input id="todayCheckingBalanceInput" type="number" step="0.01" value="${escapeHtml(state.jointAccountBalance ?? "")}" placeholder="0.00" style="margin-top:.7rem;width:100%">
-              </div>
-              ${metric("Next paycheck", nextPaycheck, hasPaycheck ? `${payName} ${payDate}: ${money.format(nextPaycheck)}. This is not safe-to-spend yet.` : "No future paycheck found.", nextPaycheck > 0 ? "green" : "")}
-              ${metric("Must protect before paycheck", mustProtect, `Needed from today through ${escapeHtml(shortMonthDay(plan.windowEnd || new Date()))}.`, "yellow")}
-              ${metric(safeBeforePaycheck >= 0 ? "Safe to spend before paycheck" : "Short before paycheck", safeBeforePaycheck, safeBeforePaycheck >= 0 ? `Be careful: this is the max safe spending before ${payDate}.` : `Careful: you are short before ${payDate}. Do not spend extra.`, safeBeforePaycheck < 0 ? "red" : "green")}
-              ${metric("After paycheck forecast", afterPaycheckForecast, hasPaycheck ? `Forecast after the ${payDate} paycheck posts. Not today's safe spending.` : "No paycheck included in this forecast.", afterPaycheckForecast < 0 ? "red" : "green")}
-              ${metric("Cannot touch", plan.cannotTouch, `Mortgage vault ${money.format(plan.mortgageVault)}${plan.futureReserve > 0 ? ` · future/quarterly reserve ${money.format(plan.futureReserve)}` : ""}. Protected money, not spending money.`, "yellow")}
-            </div>
-
-            <div class="banner" style="margin-top:-.25rem;margin-bottom:1rem">
-              <div>
-                <strong>${safeBeforePaycheck >= 0 ? `Be careful: ${money.format(safeBeforePaycheck)} is the safe spending limit before payday.` : `Careful: you are short ${money.format(Math.abs(safeBeforePaycheck))} before payday.`}</strong>
-                <span>The next paycheck is future money. Do not treat it as available until it posts.</span>
-              </div>
-            </div>
-
-            ${renderProtectionLists(month, plan)}
-
-            <div class="card">
-              <div class="section-title"><h3>Quick actions</h3><span>Details live in the other tabs</span></div>
-              <div class="kb-action-grid">
-                <button type="button" data-jump="income">Income</button>
-                <button type="button" data-jump="budget">Monthly Plan</button>
-                <button type="button" data-jump="transactions">CSV Review</button>
-                <button type="button" data-jump="allowance">Personal Money</button>
-                <button type="button" data-jump="debt">Debt Tracker</button>
-                <button type="button" data-jump="compare">Compare Months</button>
-              </div>
-            </div>
-
-            ${count ? `<div class="banner"><div><strong>${count} imported lines still need a home</strong><span>Review category, owner, and income type before trusting the dashboard totals.</span></div><button type="button" class="secondary" data-jump="transactions">Go to Review</button></div>` : ""}
-          `;
-
-          ["catChart", "ownerChart", "incVsPlanChart", "incomeBarChart"].forEach(destroyChart);
-          document.querySelectorAll("[data-jump]").forEach(btn => btn.addEventListener("click", () => { state.activeView = btn.dataset.jump; render(); saveState(); }));
-          const todayBalanceInput = document.querySelector("#todayCheckingBalanceInput");
-          if (todayBalanceInput) {
-            todayBalanceInput.addEventListener("change", event => {
-              state.jointAccountBalance = event.target.value;
-              renderDashboard();
-              saveState();
-            });
-            todayBalanceInput.addEventListener("keydown", event => {
-              if (event.key !== "Enter") return;
-              event.preventDefault();
-              state.jointAccountBalance = event.target.value;
-              renderDashboard();
-              saveState();
-            });
-          }
-
-          document.querySelectorAll("[data-protect-ignore]").forEach(input => {
-            input.addEventListener("change", event => updateProtectionOverride(event.target.dataset.protectIgnore, "ignore", event.target.checked));
+        ["catChart", "ownerChart", "incVsPlanChart", "incomeBarChart"].forEach(destroyChart);
+        document.querySelectorAll("[data-jump]").forEach(btn => btn.addEventListener("click", () => { state.activeView = btn.dataset.jump; render(); saveState(); }));
+        const todayBalanceInput = document.querySelector("#todayCheckingBalanceInput");
+        if (todayBalanceInput) {
+          todayBalanceInput.addEventListener("change", event => {
+            state.jointAccountBalance = event.target.value;
+            renderDashboard();
+            saveState();
           });
-          document.querySelectorAll("[data-protect-amount]").forEach(input => {
-            input.addEventListener("change", event => updateProtectionOverride(event.target.dataset.protectAmount, "amountOverride", event.target.value));
-            input.addEventListener("keydown", event => {
-              if (event.key !== "Enter") return;
-              event.preventDefault();
-              updateProtectionOverride(event.target.dataset.protectAmount, "amountOverride", event.target.value);
-            });
+          todayBalanceInput.addEventListener("keydown", event => {
+            if (event.key !== "Enter") return;
+            event.preventDefault();
+            state.jointAccountBalance = event.target.value;
+            renderDashboard();
+            saveState();
           });
-          document.querySelectorAll("[data-manual-protect-ignore]").forEach(input => {
-            input.addEventListener("change", event => updateManualProtectionLine(event.target.dataset.manualProtectIgnore, "ignore", event.target.checked));
-          });
-          document.querySelectorAll("[data-manual-protect-amount]").forEach(input => {
-            input.addEventListener("change", event => updateManualProtectionLine(event.target.dataset.manualProtectAmount, "amount", event.target.value));
-            input.addEventListener("keydown", event => {
-              if (event.key !== "Enter") return;
-              event.preventDefault();
-              updateManualProtectionLine(event.target.dataset.manualProtectAmount, "amount", event.target.value);
-            });
-          });
-          document.querySelectorAll("[data-manual-protect-delete]").forEach(btn => {
-            btn.addEventListener("click", () => deleteManualProtectionLine(btn.dataset.manualProtectDelete));
-          });
-          document.querySelectorAll("[data-expense-type]").forEach(select => {
-            select.addEventListener("change", event => updateExpenseTypeByKey(event.target.dataset.expenseType, event.target.value));
-          });
-          const addManualProtectionBtn = document.querySelector("#addManualProtectionLineBtn");
-          if (addManualProtectionBtn) addManualProtectionBtn.addEventListener("click", addManualProtectionLine);
-        } catch (error) {
-          console.error("Kingdom Builder dashboard failed", error);
-          target.innerHTML = `
-            <div class="card">
-              <h3>Dashboard needs a fix</h3>
-              <p class="muted small">${escapeHtml(error?.message || String(error))}</p>
-              <p class="muted small">Your data was not reset. Use Income, Monthly Plan, or CSV Review while this section is fixed.</p>
-            </div>`;
         }
+
+        document.querySelectorAll("[data-protect-ignore]").forEach(input => {
+          input.addEventListener("change", event => updateProtectionOverride(event.target.dataset.protectIgnore, "ignore", event.target.checked));
+        });
+        document.querySelectorAll("[data-protect-amount]").forEach(input => {
+          input.addEventListener("change", event => updateProtectionOverride(event.target.dataset.protectAmount, "amountOverride", event.target.value));
+          input.addEventListener("keydown", event => {
+            if (event.key !== "Enter") return;
+            event.preventDefault();
+            updateProtectionOverride(event.target.dataset.protectAmount, "amountOverride", event.target.value);
+          });
+        });
+        document.querySelectorAll("[data-manual-protect-ignore]").forEach(input => {
+          input.addEventListener("change", event => updateManualProtectionLine(event.target.dataset.manualProtectIgnore, "ignore", event.target.checked));
+        });
+        document.querySelectorAll("[data-manual-protect-amount]").forEach(input => {
+          input.addEventListener("change", event => updateManualProtectionLine(event.target.dataset.manualProtectAmount, "amount", event.target.value));
+          input.addEventListener("keydown", event => {
+            if (event.key !== "Enter") return;
+            event.preventDefault();
+            updateManualProtectionLine(event.target.dataset.manualProtectAmount, "amount", event.target.value);
+          });
+        });
+        document.querySelectorAll("[data-manual-protect-delete]").forEach(btn => {
+          btn.addEventListener("click", () => deleteManualProtectionLine(btn.dataset.manualProtectDelete));
+        });
+        document.querySelectorAll("[data-expense-type]").forEach(select => {
+          select.addEventListener("change", event => updateExpenseTypeByKey(event.target.dataset.expenseType, event.target.value));
+        });
+        const addManualProtectionBtn = document.querySelector("#addManualProtectionLineBtn");
+        if (addManualProtectionBtn) addManualProtectionBtn.addEventListener("click", addManualProtectionLine);
       }
 
             function renderKeepInAccountCard(info) {
@@ -5668,10 +5367,10 @@ function renderProtectionLists(month = currentMonth(), plan = safeNextPaycheckPl
       function budgetRunningTotals(rows) {
         const activeRows = activeBudgetLines(rows);
         return {
-          planned: roundMoney(sum(activeRows, row => row.amount)),
-          matched: roundMoney(sum(activeRows, row => row.paidAmount || 0)),
-          remaining: roundMoney(sum(activeRows, row => remainingForLine(row))),
-          committed: roundMoney(sum(activeRows.filter(row => ["Scheduled","Committed","Auto-pay"].includes(row.status) && Number(row.paidAmount || 0) <= 0), row => row.amount))
+          planned: sum(activeRows, row => row.amount),
+          matched: sum(activeRows, row => row.paidAmount || 0),
+          remaining: sum(activeRows, row => row.remainingAmount || 0),
+          committed: sum(activeRows.filter(row => ["Scheduled","Committed","Auto-pay"].includes(row.status) && Number(row.paidAmount || 0) <= 0), row => row.amount)
         };
       }
 
@@ -7332,6 +7031,19 @@ function renderCompare() {
         const date = new Date(key+"-02T00:00:00");
         date.setMonth(date.getMonth()+1);
         return date.toISOString().slice(0,7);
+      }
+
+
+      function kbV121DashboardEmptyGuard() {
+        const el = document.querySelector("#dashboard");
+        if (!el) return;
+        const visible = String(el.textContent || "").trim();
+        if (visible.length > 20) return;
+        el.innerHTML = `
+          <div class="card">
+            <h3>Dashboard fallback</h3>
+            <p class="muted small">The dashboard did not render, but your data was not reset. Use Monthly Plan, Income, or CSV Review while this is fixed.</p>
+          </div>`;
       }
 
       // ── EVENT LISTENERS ──────────────────────────────────────────────────────

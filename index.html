@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Kingdom Builder</title>
-  <!-- v114 monthly overage visible -->
+  <!-- v115 month end polish -->
   <!-- v84 safe next paycheck -->
   <!-- v82 expected income actuals -->
   <!-- v81 fix csv amount sort -->
@@ -2208,6 +2208,117 @@
       }
       /* v114: monthly plan remaining cell shows overage instead of zero */
 
+
+      /* v115 month-end polish: cleaner dark mode and mobile readability */
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #14120f;
+          --ink: #f6f0e7;
+          --muted: #c2b5a5;
+          --line: #4d4338;
+          --card: #211d18;
+          --card-2: #2d271f;
+          --green-soft: #163a2b;
+          --yellow-soft: #3a2c09;
+          --red-soft: #3b1f1a;
+          --blue-soft: #152b3a;
+          --shadow: 0 16px 40px rgba(0,0,0,.25);
+        }
+        input, select, textarea {
+          background: #171410;
+          color: var(--ink);
+          border-color: #5a5045;
+        }
+        option { background: #171410; color: var(--ink); }
+        th { background: #2a251f; color: #d9ccbd; }
+        td { color: var(--ink); }
+        .table-wrap, .kb-protection-table { background: #1c1814; }
+        .kb-protection-header { background: #2a251f; color: #d9ccbd; }
+        .kb-protection-row, .kb-protection-total { background: #211d18; color: var(--ink); }
+        .kb-protection-row.is-ignored { opacity: .58; }
+        .kb-protect-edit input,
+        .kb-protection-row select {
+          background: #171410;
+          color: var(--ink);
+          border-color: #5a5045;
+        }
+        .mobile-tools-drawer { background: var(--card); border-color: var(--line); }
+        .banner { border-color: var(--line); }
+      }
+
+      .pill.red,
+      .overage,
+      .over-amount {
+        background: rgba(190, 55, 55, .14);
+        color: #9f2d2d;
+        border-color: rgba(190, 55, 55, .22);
+        font-weight: 900;
+      }
+
+      .kb-advanced-tools {
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: .75rem;
+        margin-bottom: .8rem;
+        background: var(--card-2);
+      }
+      .kb-advanced-tools summary {
+        cursor: pointer;
+        font-weight: 900;
+        color: var(--ink);
+      }
+
+      .kb-mini-button {
+        padding: .35rem .5rem;
+        min-height: auto;
+        font-size: .75rem;
+      }
+
+      .kb-month-actions-only-budget {
+        display: none;
+      }
+      body[data-active-view="budget"] .kb-month-actions-only-budget {
+        display: inline-flex;
+      }
+
+      .kb-mobile-create-month {
+        display: none;
+      }
+
+      @media (max-width: 760px) {
+        main { padding: .85rem; padding-bottom: 5.5rem; }
+        .topbar { gap: .7rem; }
+        .topbar .toolbar {
+          width: 100%;
+          justify-content: stretch;
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+        }
+        .topbar .toolbar > * { width: 100%; }
+        .cards, .kb-simple-dashboard-cards {
+          grid-template-columns: 1fr !important;
+        }
+        .split {
+          grid-template-columns: 1fr !important;
+        }
+        .card { padding: .85rem; }
+        .metric .value { font-size: 1.45rem; }
+        table { min-width: 48rem; }
+        .kb-protection-table {
+          overflow-x: auto;
+        }
+        .kb-protection-header,
+        .kb-protection-row {
+          min-width: 48rem;
+        }
+        .kb-action-grid {
+          grid-template-columns: 1fr 1fr;
+        }
+        .kb-mobile-create-month {
+          display: inline-flex;
+        }
+      }
+
 </style>
   
   <link rel="manifest" href="/manifest.webmanifest">
@@ -2245,8 +2356,6 @@
       <button type="button" class="secondary mobile-tools-button">Tools</button>
     </div>
     <div class="mobile-tools-drawer">
-      <button type="button" data-mobile-action="copy-month">Create Month</button>
-      <button type="button" data-mobile-action="delete-month">Delete Month</button>
       <button type="button" data-mobile-action="export">Export Backup</button>
       <label class="secondary" style="cursor:pointer">
         Import Backup
@@ -2296,8 +2405,8 @@
           </div>
           <div class="toolbar">
             <select id="monthSelect" aria-label="Month"></select>
-            <button id="copyMonthBtn" type="button">Create Month</button>
-            <button id="deleteMonthBtn" class="ghost" type="button">Revert / Delete Month</button>
+            <button id="copyMonthBtn" class="kb-month-actions-only-budget" type="button">Create Month</button>
+            <button id="deleteMonthBtn" class="ghost kb-month-actions-only-budget" type="button">Revert / Delete Month</button>
             <button id="exportBtn" class="secondary" type="button">Export Backup</button>
             <label id="importBackupLabel" class="ghost" style="display:inline-flex;align-items:center;gap:.45rem;width:auto;min-height:auto;padding:.6rem .8rem;border-radius:8px;border:1px solid var(--line);color:var(--ink);background:transparent;cursor:pointer">
               Import Backup
@@ -2865,6 +2974,7 @@
           label: "Base Template", lastEdited: new Date().toISOString(),
           budgetLines: (month?.budgetLines || juneTemplate).map(line => ({
             ...line, id: uid("tmpl"), paidAmount: 0, remainingAmount: Number(line.amount || 0),
+            expenseType: expenseTypeForLine(line),
             status: String(line.payee || "").toLowerCase().includes("pennymac") ? "Committed" : (line.status || "Not Paid"),
             paycheckId: line.paycheckId || defaultPaycheckId(line)
           })),
@@ -2934,6 +3044,31 @@
         return /paypal|pay pal|pp\*/.test(text);
       }
       function paypalSideGigRows(month = currentMonth()) { return (month.sideGigs || []).filter(isPaypalSideGig); }
+
+
+      function normalizedSideHustleOwner(owner) {
+        const text = String(owner || "").trim();
+        if (/alec/i.test(text)) return "Alec";
+        if (/patricia|pat/i.test(text)) return "Patricia";
+        return "Patricia";
+      }
+
+      function sideGigOwner(gig, month = currentMonth()) {
+        if (gig?.owner) return normalizedSideHustleOwner(gig.owner);
+        const key = gig?.transactionKey;
+        const txn = key ? (month.transactions || []).find(item => sideGigTransactionKey(item) === key || item.transactionKey === key) : null;
+        return normalizedSideHustleOwner(txn?.owner || "Patricia");
+      }
+
+      function sideHustleGrossByOwner(month = currentMonth()) {
+        return paypalSideGigRows(month).reduce((acc, gig) => {
+          const owner = sideGigOwner(gig, month);
+          acc[owner] = (acc[owner] || 0) + Number(gig.gross || 0);
+          return acc;
+        }, { Patricia: 0, Alec: 0 });
+      }
+
+
       function paypalSideGigGross(month = currentMonth()) { return sum(paypalSideGigRows(month), gig => gig.gross); }
       function paypalSideGigSetAside(month = currentMonth()) { return sum(paypalSideGigRows(month), gig => Number(gig.gross || 0) * PAYPAL_SIDE_HUSTLE_TAX_RATE / 100); }
       function paypalSideGigNet(month = currentMonth()) { return paypalSideGigGross(month) - paypalSideGigSetAside(month); }
@@ -3080,6 +3215,13 @@
           render();
         }));
         renderMobileBottomNav();
+
+        const monthActionDisplay = state.activeView === "budget" ? "" : "none";
+        const createMonthBtn = document.querySelector("#copyMonthBtn");
+        const deleteMonthBtn = document.querySelector("#deleteMonthBtn");
+        if (createMonthBtn) createMonthBtn.style.display = monthActionDisplay;
+        if (deleteMonthBtn) deleteMonthBtn.style.display = monthActionDisplay;
+
         const select = document.querySelector("#monthSelect");
         select.innerHTML = monthOptions().map(key => `<option value="${key}"${key === state.activeMonth ? " selected" : ""}>${state.months[key].label}</option>`).join("");
         select.onchange = () => { state.activeMonth = select.value; saveState(); render(); };
@@ -4145,17 +4287,23 @@ function billLineName(line) {
       function manualProtectionRows(month = currentMonth()) {
         const settings = ensureMonthlyProtectionSettings(month);
         return settings.manualLines
-          .map(row => ({
-            name: escapeHtml(row.name || "Manual protection line"),
-            dueDate: "—",
-            amountLeft: Math.max(0, Number(row.amount || 0)),
-            amount: Math.max(0, Number(row.amount || 0)),
-            protectAmount: Math.max(0, Number(row.amount || 0)),
-            manualId: row.id,
-            expenseType: row.expenseType || "Flexible",
-            ignored: Boolean(row.ignore)
-          }))
-          .filter(row => row.amountLeft > 0.005);
+          .map(row => {
+            const amount = Math.max(0, Number(row.amount || 0));
+            return {
+              name: escapeHtml(row.name || "Manual protection line"),
+              dueDate: "—",
+              amountLeft: amount,
+              amount,
+              protectAmount: amount,
+              defaultAmount: amount,
+              manualId: row.id,
+              controlKey: `manual:${row.id}`,
+              expenseType: row.expenseType || "Flexible",
+              ignored: Boolean(row.ignore),
+              overrideValue: row.amount
+            };
+          })
+          .filter(row => row.amountLeft > 0.005 || row.ignored);
       }
 
       function addManualProtectionLine() {
@@ -4169,7 +4317,7 @@ function billLineName(line) {
           window.alert("Enter a valid amount.");
           return;
         }
-        settings.manualLines.push({ id: `manual-${Date.now()}`, name: name.trim(), amount });
+        settings.manualLines.push({ id: `manual-${Date.now()}`, name: name.trim(), amount, expenseType: "Flexible", ignore: false });
         saveState();
         renderDashboard();
       }
@@ -4194,7 +4342,41 @@ function billLineName(line) {
         }
       }
 
-      function renderProtectionControls(row) {
+      
+      function updateManualProtectionLine(id, field, value) {
+        const month = currentMonth();
+        const settings = ensureMonthlyProtectionSettings(month);
+        const row = settings.manualLines.find(item => item.id === id);
+        if (!row) return;
+        if (field === "amount") {
+          const amount = Number(value);
+          if (!Number.isFinite(amount) || amount < 0) return alert("Enter a valid amount.");
+          row.amount = amount;
+        }
+        if (field === "ignore") row.ignore = Boolean(value);
+        if (field === "expenseType") row.expenseType = value === "Fixed" ? "Fixed" : "Flexible";
+        saveState();
+        renderDashboard();
+      }
+
+      function deleteManualProtectionLine(id) {
+        const month = currentMonth();
+        const settings = ensureMonthlyProtectionSettings(month);
+        const row = settings.manualLines.find(item => item.id === id);
+        if (!row) return;
+        if (!confirm(`Remove "${row.name || "manual protection line"}"?`)) return;
+        settings.manualLines = settings.manualLines.filter(item => item.id !== id);
+        saveState();
+        renderDashboard();
+      }
+
+function renderProtectionControls(row) {
+        if (row.manualId) {
+          return {
+            amountInput: `<input class="kb-protect-amount-input" type="number" step="0.01" data-manual-protect-amount="${escapeHtml(row.manualId)}" value="${Number(row.amount || 0).toFixed(2)}" placeholder="${Number(row.defaultAmount || row.protectAmount || 0).toFixed(2)}">`,
+            ignoreInput: `<div class="toolbar" style="gap:.35rem;justify-content:flex-end;align-items:center"><input type="checkbox" data-manual-protect-ignore="${escapeHtml(row.manualId)}" ${row.ignored ? "checked" : ""} title="Ignore in Money to protect"><button type="button" class="danger kb-mini-button" data-manual-protect-delete="${escapeHtml(row.manualId)}">Remove</button></div>`
+          };
+        }
         if (!row.controlKey) return { amountInput: "", ignoreInput: `<input type="checkbox" disabled ${row.ignored ? "checked" : ""}>` };
         const amountValue = row.overrideValue === null || row.overrideValue === undefined ? "" : String(row.overrideValue);
         return {
@@ -4301,9 +4483,7 @@ function billLineName(line) {
       function personalSpentForOwner(month = currentMonth(), ownerName = "") {
         const target = normalizedOwnerName(ownerName);
         return (month.transactions || [])
-          .filter(isPersonalTransaction)
-          .filter(txn => normalizedOwnerName(txn.owner || txn.person || txn.assignedTo) === target)
-          .reduce((total, txn) => total + Math.abs(Number(txn.amount || 0)), 0);
+          .reduce((total, txn) => total + personalAmountForOwner(txn, target), 0);
       }
 
       function personalRemainingRowsByOwner(month = currentMonth()) {
@@ -4558,22 +4738,8 @@ function renderProtectionLists(month = currentMonth(), plan = safeNextPaycheckPl
         const count = unreconciledCount(month);
         const monthPlan = currentMonthPlannedPaidLeft(month);
         const safePaycheckPlan = safeNextPaycheckPlan(month);
-        const actualIncomeReceived = dashboardActualIncomeReceived(month);
-        const vaultMoney = dashboardVaultMoneyTotal(month);
 
         document.querySelector("#dashboard").innerHTML = `
-          <div class="section-title" style="margin:.25rem 0 .15rem">
-            <h3>Current Month Snapshot</h3>
-            <span>Actuals from this month</span>
-          </div>
-
-          <div class="cards kb-simple-dashboard-cards">
-            ${metric("Actual income received", actualIncomeReceived, dashboardActualIncomeLabel(month), "green")}
-            ${metric("Vault / reserve money", vaultMoney, dashboardVaultMoneyLabel(month), vaultMoney > 0 ? "yellow" : "green")}
-            ${metric("Already paid", monthPlan.paid, dashboardAlreadyPaidLabel(monthPlan), "green")}
-            ${personalMoneyActualTiles(month)}
-          </div>
-
           <div class="section-title" style="margin:.25rem 0 .15rem">
             <h3>This Month Bills</h3>
             <span>Planned, paid, and still due</span>
@@ -4632,6 +4798,20 @@ function renderProtectionLists(month = currentMonth(), plan = safeNextPaycheckPl
             event.preventDefault();
             updateProtectionOverride(event.target.dataset.protectAmount, "amountOverride", event.target.value);
           });
+        });
+        document.querySelectorAll("[data-manual-protect-ignore]").forEach(input => {
+          input.addEventListener("change", event => updateManualProtectionLine(event.target.dataset.manualProtectIgnore, "ignore", event.target.checked));
+        });
+        document.querySelectorAll("[data-manual-protect-amount]").forEach(input => {
+          input.addEventListener("change", event => updateManualProtectionLine(event.target.dataset.manualProtectAmount, "amount", event.target.value));
+          input.addEventListener("keydown", event => {
+            if (event.key !== "Enter") return;
+            event.preventDefault();
+            updateManualProtectionLine(event.target.dataset.manualProtectAmount, "amount", event.target.value);
+          });
+        });
+        document.querySelectorAll("[data-manual-protect-delete]").forEach(btn => {
+          btn.addEventListener("click", () => deleteManualProtectionLine(btn.dataset.manualProtectDelete));
         });
         document.querySelectorAll("[data-expense-type]").forEach(select => {
           select.addEventListener("change", event => updateExpenseTypeByKey(event.target.dataset.expenseType, event.target.value));
@@ -5008,15 +5188,15 @@ function renderProtectionLists(month = currentMonth(), plan = safeNextPaycheckPl
           `<div class="card"><div class="section-title"><h3>Base budget template</h3><span>${rows.length} reusable lines · ${money.format(planned)}</span></div>
           <div class="banner" style="background:var(--yellow-soft);border-color:#ead39c;color:var(--yellow);margin-bottom:1rem"><div><strong>This is your reusable template</strong><span>Edits here affect all future months, not the current month.</span></div></div>
           <div class="muted" style="margin-bottom:.8rem">Last edited ${escapeHtml(formatDateTime(template.lastEdited))}.</div>
-          <div class="toolbar" style="justify-content:flex-start;margin-bottom:.8rem"><button type="button" data-template-action="add">＋ Add Line</button><button type="button" class="secondary" data-template-action="copyCurrent">Save Current Month as Template</button><button type="button" class="secondary" data-template-action="resetSpreadsheet">↺ Reset From Spreadsheet</button></div>
+          <div class="toolbar" style="justify-content:flex-start;margin-bottom:.8rem"><button type="button" data-template-action="add">＋ Add Line</button><button type="button" class="secondary" data-template-action="copyCurrent">Save Current Month as Template</button></div>
           <div class="cards" style="margin-bottom:1rem">
             ${metric("Template total", planned, "This is what new months copy when you choose Base Template.")}
             ${metric("Patricia", byOwner.Patricia || 0, "Template lines assigned to Patricia.")}
             ${metric("Alec", byOwner.Alec || 0, "Template lines assigned to Alec.")}
             ${metric("Shared", byOwner.Shared || 0, "Shared template lines.")}
           </div>`,
-          rows.length ? `<div class="table-wrap"><table><thead><tr><th>Move</th><th>Owner</th><th>Day</th><th>Bill</th><th>Notes</th><th>Paycheck</th><th>Category</th><th>Status</th><th class="money">Amount</th><th></th></tr></thead><tbody>${rows.map((row, index) =>
-            `<tr><td><button class="ghost" type="button" data-template-move="up" data-template-index="${index}">↑</button><button class="ghost" type="button" data-template-move="down" data-template-index="${index}">↓</button></td><td>${ownerPill(row.owner)}</td><td>${escapeHtml(row.dueDay || "")}</td><td><strong>${escapeHtml(row.payee)}</strong></td><td>${row.notes ? escapeHtml(row.notes) : `<span class="muted">No notes</span>`}</td><td>${escapeHtml(templatePaycheckLabel(template, row.paycheckId))}</td><td>${escapeHtml(row.category)}</td><td>${budgetStatusPill(row)}</td><td class="money">${money.format(row.amount)}</td><td class="right"><button class="ghost" type="button" data-edit-template="${row.id}">Edit</button></td></tr>`
+          rows.length ? `<div class="table-wrap"><table><thead><tr><th>Move</th><th>Owner</th><th>Day</th><th>Bill</th><th>Notes</th><th>Paycheck</th><th>Category</th><th>Type</th><th>Status</th><th class="money">Amount</th><th></th></tr></thead><tbody>${rows.map((row, index) =>
+            `<tr><td><button class="ghost" type="button" data-template-move="up" data-template-index="${index}">↑</button><button class="ghost" type="button" data-template-move="down" data-template-index="${index}">↓</button></td><td>${ownerPill(row.owner)}</td><td>${escapeHtml(row.dueDay || "")}</td><td><strong>${escapeHtml(row.payee)}</strong></td><td>${row.notes ? escapeHtml(row.notes) : `<span class="muted">No notes</span>`}</td><td>${escapeHtml(templatePaycheckLabel(template, row.paycheckId))}</td><td>${escapeHtml(row.category)}</td><td><span class="pill blue">${escapeHtml(expenseTypeForLine(row))}</span></td><td>${budgetStatusPill(row)}</td><td class="money">${money.format(row.amount)}</td><td class="right"><button class="ghost" type="button" data-edit-template="${row.id}">Edit</button></td></tr>`
           ).join("")}</tbody></table></div>` : `<div class="empty">No template lines yet.</div>`,
           `</div>`
         ].join("");
@@ -5039,12 +5219,6 @@ function renderProtectionLists(month = currentMonth(), plan = safeNextPaycheckPl
           renderTemplate(); saveState();
         }));
         document.querySelectorAll("[data-template-action='copyCurrent']").forEach(btn => btn.addEventListener("click", saveCurrentMonthAsTemplate));
-        document.querySelectorAll("[data-template-action='resetSpreadsheet']").forEach(btn => btn.addEventListener("click", () => {
-          if (!confirm("Reset the Base Template back to the original spreadsheet lines?")) return;
-          state.baseTemplate = buildBaseTemplateFromMonth({ budgetLines: juneTemplate, allowances: state.baseTemplate.allowances, paychecks: state.baseTemplate.paychecks, contributions: state.baseTemplate.contributions });
-          state.baseTemplate.lastEdited = new Date().toISOString();
-          render();
-        }));
       }
 
       function saveCurrentMonthAsTemplate() {
@@ -5065,9 +5239,9 @@ function renderProtectionLists(month = currentMonth(), plan = safeNextPaycheckPl
         document.querySelector("#budget").innerHTML = [
           `<div class="card"><div class="section-title"><h3>Budget lines</h3><span>${rows.length} lines</span></div>
           <div class="toolbar" style="justify-content:flex-start;margin-bottom:.8rem">
-            <button type="button" data-action="addBudget">＋ Add Line</button>
+            <button type="button" data-action="addBudget">＋ Add Line</button><button type="button" class="secondary kb-mobile-create-month" data-action="createMonth">Create Month</button>
             <button type="button" class="secondary" data-action="clearBudgetFilters">✕ Clear Filters</button>
-            <button type="button" class="secondary" data-action="resetJune">↺ Reset June From Spreadsheet</button>
+            
             <button type="button" class="secondary" data-template-action="copyCurrent">Save Current Month as Template</button>
           </div>
           <div class="form-grid" style="margin-bottom:.8rem">
@@ -5091,6 +5265,7 @@ function renderProtectionLists(month = currentMonth(), plan = safeNextPaycheckPl
             ${budgetSortHeader("Day", "Due day soonest", "Due day latest")}
             ${budgetSortHeader("Payee", "Payee A-Z", "Payee Z-A")}
             ${budgetSortHeader("Category", "Category A-Z", "Category Z-A")}
+            <th>Type</th>
             ${budgetSortHeader("Status", "Status A-Z", "Status Z-A")}
             <th>Notes</th>
             ${budgetSortHeader("Planned", "Planned low-high", "Planned high-low", "money")}
@@ -5099,8 +5274,8 @@ function renderProtectionLists(month = currentMonth(), plan = safeNextPaycheckPl
             <th class="pct">% Income</th><th></th>
           </tr></thead><tbody>`,
           rows.length ? rows.map(row =>
-            `<tr><td class="paid-check"><input type="checkbox" data-toggle-budget-paid="${row.id}" ${row.manualPaid || (row.status === "Paid" && Number(row.remainingAmount || 0) <= 0) ? "checked" : ""} aria-label="Mark ${escapeHtml(row.payee)} paid"></td><td>${ownerPill(row.owner)}</td><td>${escapeHtml(row.dueDay)}</td><td><strong>${escapeHtml(row.payee)}</strong></td><td>${escapeHtml(row.category)}</td><td>${budgetStatusPill(row)}</td><td>${row.notes ? escapeHtml(row.notes) : `<span class="muted">—</span>`}</td><td class="money">${money.format(row.amount)}</td><td class="money">${money.format(row.paidAmount || 0)}</td><td class="money">${monthlyPlanRemainingPill(row)}</td><td class="pct">${Math.round(Number(row.amount || 0) / incomeForPct * 100)}%</td><td class="right"><button class="ghost" type="button" data-edit-budget="${row.id}">Edit</button></td></tr>`
-          ).join("") : `<tr><td colspan="12"><div class="empty">No lines are visible with the current filters.</div></td></tr>`,
+            `<tr><td class="paid-check"><input type="checkbox" data-toggle-budget-paid="${row.id}" ${row.manualPaid || (row.status === "Paid" && Number(row.remainingAmount || 0) <= 0) ? "checked" : ""} aria-label="Mark ${escapeHtml(row.payee)} paid"></td><td>${ownerPill(row.owner)}</td><td>${escapeHtml(row.dueDay)}</td><td><strong>${escapeHtml(row.payee)}</strong></td><td>${escapeHtml(row.category)}</td><td><select data-budget-expense-type="${row.id}" aria-label="Fixed or Flexible for ${escapeHtml(row.payee)}"><option value="Fixed" ${expenseTypeForLine(row) === "Fixed" ? "selected" : ""}>Fixed</option><option value="Flexible" ${expenseTypeForLine(row) === "Flexible" ? "selected" : ""}>Flexible</option></select></td><td>${budgetStatusPill(row)}</td><td>${row.notes ? escapeHtml(row.notes) : `<span class="muted">—</span>`}</td><td class="money">${money.format(row.amount)}</td><td class="money">${money.format(row.paidAmount || 0)}</td><td class="money">${monthlyPlanRemainingPill(row)}</td><td class="pct">${Math.round(Number(row.amount || 0) / incomeForPct * 100)}%</td><td class="right"><button class="ghost" type="button" data-edit-budget="${row.id}">Edit</button></td></tr>`
+          ).join("") : `<tr><td colspan="13"><div class="empty">No lines are visible with the current filters.</div></td></tr>`,
           `</tbody></table></div></div>`
         ].join("");
         bindBudgetActions();
@@ -5266,11 +5441,21 @@ function renderProtectionLists(month = currentMonth(), plan = safeNextPaycheckPl
         }));
         document.querySelector("#addQuarterlyExpense")?.addEventListener("click", () => openQuarterlyExpenseModal());
         document.querySelectorAll("[data-edit-quarterly]").forEach(btn => btn.addEventListener("click", () => openQuarterlyExpenseModal(state.quarterlyExpenses.find(row => row.id === btn.dataset.editQuarterly))));
+      
+        document.querySelectorAll("[data-budget-expense-type]").forEach(selectEl => selectEl.addEventListener("change", event => {
+          const line = currentMonth().budgetLines.find(item => item.id === event.target.dataset.budgetExpenseType);
+          if (!line) return;
+          line.expenseType = event.target.value === "Flexible" ? "Flexible" : "Fixed";
+          saveState();
+          renderBudget();
+        }));
+
       }
 
       function openBudgetModal(line, targetLines = currentMonth().budgetLines, context = "month") {
         const editing = Boolean(line);
-        const value = line || { owner: "Patricia", dueDay: "", payee: "", category: "Utilities", paymentType: "Utilities", amount: 0, asset: "Family", status: "Not Paid", paycheckId: "pc-patricia-10", notes: "", recurring: true };
+        const value = line || { owner: "Patricia", dueDay: "", payee: "", category: "Utilities", paymentType: "Utilities", amount: 0, asset: "Family", status: "Not Paid", paycheckId: "pc-patricia-10", notes: "", recurring: true, expenseType: "Fixed" };
+        const currentExpenseType = expenseTypeForLine(value);
         openModal(editing ? (context === "template" ? "Edit template line" : "Edit budget line") : (context === "template" ? "Add template line" : "Add budget line"), [
           `<form id="budgetForm" class="form-grid">`,
           field("Owner", select("owner", owners, value.owner)),
@@ -5278,6 +5463,7 @@ function renderProtectionLists(month = currentMonth(), plan = safeNextPaycheckPl
           field("Payee / bill", input("payee", value.payee), "wide"),
           field("Amount", input("amount", value.amount, "number", "0.01")),
           field("Category", select("category", categories, value.category)),
+          field("Fixed/Flexible", select("expenseType", ["Fixed","Flexible"], currentExpenseType)),
           field("Status", select("status", statuses, value.status)),
           field("Paycheck bucket", select("paycheckId", context === "template" ? templatePaycheckOptions(state.baseTemplate) : paycheckOptions(), value.paycheckId || defaultPaycheckId(value)), "wide"),
           field("Payment type", input("paymentType", value.paymentType)),
@@ -5289,10 +5475,17 @@ function renderProtectionLists(month = currentMonth(), plan = safeNextPaycheckPl
         document.querySelector("#budgetForm").addEventListener("submit", event => {
           event.preventDefault();
           const data = formData(event.currentTarget);
-          const next = { ...value, ...data, amount: Number(data.amount || 0), id: editing ? value.id : uid(context === "template" ? "tmpl" : "bill"), recurring: true };
+          const next = {
+            ...value,
+            ...data,
+            amount: Number(data.amount || 0),
+            expenseType: data.expenseType === "Flexible" ? "Flexible" : "Fixed",
+            id: editing ? value.id : uid(context === "template" ? "tmpl" : "bill"),
+            recurring: true
+          };
           if (editing) Object.assign(value, next); else targetLines.push(next);
           if (context === "template") state.baseTemplate.lastEdited = new Date().toISOString();
-          closeModal(); render();
+          closeModal(); render(); saveState();
         });
         const deleteBtn = document.querySelector("#deleteBudget");
         if (deleteBtn) deleteBtn.addEventListener("click", () => {
@@ -5300,7 +5493,7 @@ function renderProtectionLists(month = currentMonth(), plan = safeNextPaycheckPl
           const index = targetLines.findIndex(item => item.id === value.id);
           if (index >= 0) targetLines.splice(index, 1);
           if (context === "template") state.baseTemplate.lastEdited = new Date().toISOString();
-          closeModal(); render();
+          closeModal(); render(); saveState();
         });
       }
 
@@ -5322,7 +5515,7 @@ function renderProtectionLists(month = currentMonth(), plan = safeNextPaycheckPl
             <button id="runTxnSearch" type="button">Search</button>
             <button id="clearTxnFilters" class="secondary" type="button">Clear Filters</button>
           </div>
-          <div class="form-grid" style="margin-bottom:.8rem">
+          <details class="kb-advanced-tools"><summary>Advanced bulk tools</summary><div class="form-grid" style="margin-top:.75rem;margin-bottom:.2rem">
             ${field("Bulk bill", select("bulkBillId", billOptions(), ""), "wide")}
             ${field("Bulk category", select("bulkCategory", ["",...categories], ""))}
             ${field("Bulk income type", select("bulkIncomeType", incomeTypes, ""))}
@@ -5332,7 +5525,7 @@ function renderProtectionLists(month = currentMonth(), plan = safeNextPaycheckPl
             <button id="markSelectedPersonal" class="secondary" type="button">Mark Selected Personal</button>
             <button id="selectVisibleTxn" class="secondary" type="button">Select Visible</button>
             <button id="clearSelectedTxn" class="secondary" type="button">Clear Selection</button>
-          </div>`,
+          </div></details>`,
           rows.length ? `<div class="table-wrap"><table><thead><tr><th><input type="checkbox" id="toggleVisibleTxn" aria-label="Select all visible"></th><th>Date</th><th>Description</th><th>Bill</th><th>Category</th><th>Income Type</th><th>Owner</th><th class="money">Amount</th><th>Status</th><th></th></tr></thead><tbody>${rows.map(txn => transactionRow(txn)).join("")}</tbody></table></div>` : `<div class="empty">No transactions match your filters.</div>`,
           `</div>`
         ].join("");
@@ -5530,10 +5723,20 @@ function renderProtectionLists(month = currentMonth(), plan = safeNextPaycheckPl
           existing.add(key);
           txn.category = "Side Hustles";
           txn.incomeType = "Side Hustle Income";
-          txn.owner ||= "Patricia";
+          txn.owner = normalizedSideHustleOwner(txn.owner || "Patricia");
           txn.asset ||= "Family";
           txn.reconciled = true;
-          month.sideGigs.push({ id: uid("gig"), date: toDateInputValue(txn.date) || txn.date || "", source: "PayPal", gross: Math.abs(Number(txn.amount || 0)), taxRate: PAYPAL_SIDE_HUSTLE_TAX_RATE, target: "Debt", notes: "Imported from CSV: " + (txn.description || "PayPal"), transactionKey: key });
+          month.sideGigs.push({
+            id: uid("gig"),
+            date: toDateInputValue(txn.date) || txn.date || "",
+            owner: normalizedSideHustleOwner(txn.owner),
+            source: "PayPal",
+            gross: Math.abs(Number(txn.amount || 0)),
+            taxRate: PAYPAL_SIDE_HUSTLE_TAX_RATE,
+            target: "Debt",
+            notes: "Imported from CSV: " + (txn.description || "PayPal"),
+            transactionKey: key
+          });
           added++;
         });
         return added;
@@ -6123,14 +6326,29 @@ function renderProtectionLists(month = currentMonth(), plan = safeNextPaycheckPl
         const paypalSetAside = paypalSideGigSetAside(month);
         const paypalNet = paypalSideGigNet(month);
         const paypalYtd = paypalSideHustleYtdTotals();
+        const monthPlan = currentMonthPlannedPaidLeft(month);
+        const actualIncomeReceived = dashboardActualIncomeReceived(month);
+        const vaultMoney = dashboardVaultMoneyTotal(month);
+        const sideByOwner = sideHustleGrossByOwner(month);
 
         document.querySelector("#income").innerHTML = [
+          `<div class="section-title" style="margin:.25rem 0 .15rem">
+            <h3>Current Month Snapshot</h3>
+            <span>Moved from Dashboard</span>
+          </div>
+          <div class="cards kb-simple-dashboard-cards">
+            ${metric("Actual income received", actualIncomeReceived, dashboardActualIncomeLabel(month), "green")}
+            ${metric("Vault / reserve money", vaultMoney, dashboardVaultMoneyLabel(month), vaultMoney > 0 ? "yellow" : "green")}
+            ${metric("Already paid", monthPlan.paid, dashboardAlreadyPaidLabel(monthPlan), "green")}
+            ${personalMoneyActualTiles(month)}
+          </div>`,
+
           `<div class="cards">
             ${metric("Planned job income", plannedJob, "Reliable salary/paycheck money.")}
             ${metric("Planned other income", plannedOther, "Vault, savings, quarterly, reimbursements, or one-time planned money.")}
             ${metric("Actual job income", actualJobTotal, actualJobRows.length + " statement deposit" + (actualJobRows.length === 1 ? "" : "s") + " classified as Job Income.", "green")}
             ${metric("Actual other income", actualOtherTotal, actualOtherRows.length + " deposit" + (actualOtherRows.length === 1 ? "" : "s") + " from vaults or other non-job / non-side-hustle money.", "green")}
-            ${metric("Side hustle gross", paypalGross, "PayPal is always side hustle. Set aside this month: " + money.format(paypalSetAside) + " · Set aside overall: " + money.format(paypalYtd.setAside || 0) + " · Net: " + money.format(paypalNet))}
+            ${metric("Side hustle gross", paypalGross, "PayPal side hustle gross. Patricia: " + money.format(sideByOwner.Patricia || 0) + " · Alec: " + money.format(sideByOwner.Alec || 0))}
           </div>`,
 
           `<div class="card">
@@ -6168,20 +6386,18 @@ function renderProtectionLists(month = currentMonth(), plan = safeNextPaycheckPl
             </tbody></table></div></div>
           </div>`,
 
-          `<div class="card"><div class="section-title"><h3>Side gig income</h3><span>PayPal is always side hustle</span></div>
+          `<div class="card"><div class="section-title"><h3>Side hustle income</h3><span>Gross only by person</span></div>
             <div class="cards" style="margin-bottom:.8rem">
-              ${metric("Gross this month", paypalGross, "Side hustle deposits this month.")}
-              ${metric("Set aside this month", paypalSetAside, `${PAYPAL_SIDE_HUSTLE_TAX_RATE}% recommended set aside.`, "yellow")}
-              ${metric("Set aside overall", paypalYtd.setAside || 0, `${paypalYtd.year} through ${currentMonth().label}.`, "yellow")}
-              ${metric("Net after set aside", paypalNet, "Gross minus monthly set aside.", "green")}
+              ${metric("Gross this month", paypalGross, "All side hustle deposits this month.")}
+              ${metric("Patricia gross", sideByOwner.Patricia || 0, "Side hustle gross assigned to Patricia.", "green")}
+              ${metric("Alec gross", sideByOwner.Alec || 0, "Side hustle gross assigned to Alec.", "green")}
+              ${metric("Set aside estimate", paypalSetAside, `${PAYPAL_SIDE_HUSTLE_TAX_RATE}% of gross, shown for planning only.`, "yellow")}
             </div>
             <div class="toolbar" style="justify-content:flex-start;margin-bottom:.8rem"><button id="addGig" type="button">Add Side Gig</button></div>
-            <div class="table-wrap"><table><thead><tr><th>Date</th><th>Source</th><th class="money">Gross</th><th class="money">Set aside</th><th class="money">After set aside</th><th></th></tr></thead><tbody>
+            <div class="table-wrap"><table><thead><tr><th>Date</th><th>Owner</th><th>Source</th><th class="money">Gross</th><th>Notes</th><th></th></tr></thead><tbody>
             ${month.sideGigs.map(row => {
-              const tax = isPaypalSideGig(row) ? Number(row.gross||0) * PAYPAL_SIDE_HUSTLE_TAX_RATE / 100 : 0;
-              const net = Number(row.gross||0) - tax;
-              return `<tr><td>${escapeHtml(row.date)}</td><td><strong>${escapeHtml(row.source)}</strong></td><td class="money">${money.format(row.gross)}</td><td class="money">${money.format(tax)}</td><td class="money" style="color:var(--green)">${money.format(net)}</td><td class="right"><button class="ghost" data-edit-gig="${row.id}" type="button">Edit</button></td></tr>`;
-            }).join("")}
+              return `<tr><td>${escapeHtml(row.date)}</td><td><select data-side-gig-owner="${row.id}" aria-label="Side hustle owner"><option value="Patricia" ${sideGigOwner(row, month) === "Patricia" ? "selected" : ""}>Patricia</option><option value="Alec" ${sideGigOwner(row, month) === "Alec" ? "selected" : ""}>Alec</option></select></td><td><strong>${escapeHtml(row.source)}</strong></td><td class="money">${money.format(row.gross)}</td><td>${row.notes ? escapeHtml(row.notes) : `<span class="muted">—</span>`}</td><td class="right"><button class="ghost" data-edit-gig="${row.id}" type="button">Edit</button></td></tr>`;
+            }).join("") || `<tr><td colspan="6"><div class="empty">No side hustle rows yet.</div></td></tr>`}
             </tbody></table></div></div>`,
 
           renderPayPalSideHustleYearSection(paypalYtd)
@@ -6203,6 +6419,13 @@ function renderProtectionLists(month = currentMonth(), plan = safeNextPaycheckPl
         document.querySelectorAll("[data-edit-contribution]").forEach(btn => btn.addEventListener("click", () => openContributionModal(month.contributions.find(row => row.id === btn.dataset.editContribution))));
         document.querySelector("#addGig").addEventListener("click", () => openGigModal());
         document.querySelectorAll("[data-edit-gig]").forEach(btn => btn.addEventListener("click", () => openGigModal(month.sideGigs.find(row => row.id === btn.dataset.editGig))));
+        document.querySelectorAll("[data-side-gig-owner]").forEach(selectEl => selectEl.addEventListener("change", event => {
+          const row = month.sideGigs.find(item => item.id === event.target.dataset.sideGigOwner);
+          if (!row) return;
+          row.owner = normalizedSideHustleOwner(event.target.value);
+          saveState();
+          renderIncome();
+        }));
       }
 
             function renderPayPalSideHustleYearSection(ytd) {
@@ -6307,19 +6530,62 @@ function renderProtectionLists(month = currentMonth(), plan = safeNextPaycheckPl
 
       function openGigModal(row) {
         const editing = Boolean(row);
-        const value = row || { date: "", source: "PayPal", gross: 0, taxRate: PAYPAL_SIDE_HUSTLE_TAX_RATE, target: "Taxes", notes: "" };
-        openModal(editing ? "Edit side gig" : "Add side gig", `<form id="gigForm" class="form-grid">${field("Date", input("date", value.date, "date"))}${field("Source", input("source", value.source))}${field("Gross", input("gross", value.gross, "number", "0.01"))}${field("Tax %", input("taxRate", isPaypalSideGig(value) ? PAYPAL_SIDE_HUSTLE_TAX_RATE : value.taxRate, "number", "1"))}${field("Target", select("target", ["Taxes","Debt","Savings","Bills","Personal","Kids","Buffer"], value.target))}${field("Notes", input("notes", value.notes), "wide")}<div class="full toolbar"><button type="submit">Save</button></div></form>`);
+        const value = row || { date: "", owner: "Patricia", source: "PayPal", gross: 0, taxRate: PAYPAL_SIDE_HUSTLE_TAX_RATE, target: "Taxes", notes: "" };
+        openModal(editing ? "Edit side gig" : "Add side gig", `<form id="gigForm" class="form-grid">${field("Date", input("date", value.date, "date"))}${field("Owner", select("owner", ["Patricia","Alec"], sideGigOwner(value)))}${field("Source", input("source", value.source))}${field("Gross", input("gross", value.gross, "number", "0.01"))}${field("Tax %", input("taxRate", isPaypalSideGig(value) ? PAYPAL_SIDE_HUSTLE_TAX_RATE : value.taxRate, "number", "1"))}${field("Target", select("target", ["Taxes","Debt","Savings","Bills","Personal","Kids","Buffer"], value.target))}${field("Notes", input("notes", value.notes), "wide")}<div class="full toolbar"><button type="submit">Save</button></div></form>`);
         document.querySelector("#gigForm").addEventListener("submit", event => {
           event.preventDefault();
           const data = formData(event.currentTarget);
-          const next = { ...value, ...data, gross: Number(data.gross||0), taxRate: /paypal|pay pal|pp\*/i.test(String(data.source || "")) ? PAYPAL_SIDE_HUSTLE_TAX_RATE : Number(data.taxRate||0), id: editing ? value.id : uid("gig") };
+          const next = { ...value, ...data, owner: normalizedSideHustleOwner(data.owner), gross: Number(data.gross||0), taxRate: /paypal|pay pal|pp\*/i.test(String(data.source || "")) ? PAYPAL_SIDE_HUSTLE_TAX_RATE : Number(data.taxRate||0), id: editing ? value.id : uid("gig") };
           if (editing) Object.assign(value, next); else currentMonth().sideGigs.push(next);
-          closeModal(); render();
+          closeModal(); render(); saveState();
         });
       }
 
       // ── COMPARE ──────────────────────────────────────────────────────────────
-      function renderCompare() {
+      
+      function plannedByCategory(month, category) {
+        return sum(activeBudgetLines(allBudgetLines(month)).filter(line => line.category === category || line.paymentType === category), line => Number(line.amount || 0));
+      }
+
+      function comparisonCategoryNames() {
+        const names = new Set();
+        Object.values(state.months || {}).forEach(month => {
+          activeBudgetLines(allBudgetLines(month)).forEach(line => {
+            if (line.category && !["Income","Side Hustles","Side Gig"].includes(line.category)) names.add(line.category);
+          });
+          (month.transactions || []).forEach(txn => {
+            if (txn.reconciled && Number(txn.amount || 0) < 0 && txn.category && txn.category !== "Uncategorized") names.add(txn.category);
+          });
+        });
+        ["Groceries","Fuel","Utilities","HOA","Mortgage","Credit Cards","Entertainment","Personal"].forEach(name => names.add(name));
+        return Array.from(names).sort();
+      }
+
+      function categoryComparisonTable(rows) {
+        const latest = rows[rows.length - 1];
+        const prior = rows[rows.length - 2];
+        if (!latest) return `<div class="empty">No month data yet.</div>`;
+        const month = state.months[latest.key];
+        const priorMonth = prior ? state.months[prior.key] : null;
+        const cats = comparisonCategoryNames();
+        const body = cats.map(cat => {
+          const planned = plannedByCategory(month, cat);
+          const actual = actualByCategory(month, cat);
+          const priorActual = priorMonth ? actualByCategory(priorMonth, cat) : 0;
+          if (!planned && !actual && !priorActual) return "";
+          return `<tr><td><strong>${escapeHtml(cat)}</strong></td><td class="money">${money.format(planned)}</td><td class="money">${money.format(actual)}</td><td class="money">${prior ? money.format(priorActual) : "—"}</td><td class="money">${prior ? money.format(actual - priorActual) : "—"}</td></tr>`;
+        }).join("");
+
+        const specialRows = [
+          { name: "Side Hustle Gross", planned: 0, actual: paypalSideGigGross(month), prior: priorMonth ? paypalSideGigGross(priorMonth) : 0 },
+          { name: "Personal — Alec", planned: Number(personalBudgetByOwner(month).Alec || 0), actual: personalSpentForOwner(month, "Alec"), prior: priorMonth ? personalSpentForOwner(priorMonth, "Alec") : 0 },
+          { name: "Personal — Patricia", planned: Number(personalBudgetByOwner(month).Patricia || 0), actual: personalSpentForOwner(month, "Patricia"), prior: priorMonth ? personalSpentForOwner(priorMonth, "Patricia") : 0 }
+        ].map(row => `<tr><td><strong>${escapeHtml(row.name)}</strong></td><td class="money">${money.format(row.planned)}</td><td class="money">${money.format(row.actual)}</td><td class="money">${prior ? money.format(row.prior) : "—"}</td><td class="money">${prior ? money.format(row.actual - row.prior) : "—"}</td></tr>`).join("");
+
+        return `<div class="table-wrap"><table><thead><tr><th>Category</th><th class="money">Monthly plan</th><th class="money">${escapeHtml(latest.label)} actual</th><th class="money">${prior ? escapeHtml(prior.label) : "Prior"} actual</th><th class="money">Change</th></tr></thead><tbody>${body}${specialRows}</tbody></table></div>`;
+      }
+
+function renderCompare() {
         const rows = monthComparisonRows();
         const latest = rows[rows.length-1];
         const prior = rows[rows.length-2];
@@ -6327,7 +6593,6 @@ function renderProtectionLists(month = currentMonth(), plan = safeNextPaycheckPl
         const bestMonth = rows.reduce((best, row) => !best || row.breathingRoom > best.breathingRoom ? row : best, null);
 
         document.querySelector("#compare").innerHTML = [
-          rows.length < 2 ? `<div class="banner"><div><strong>Create another month to compare</strong><span>Once you create July, this screen will start showing trends.</span></div><button type="button" class="secondary" data-create-month>Create Month</button></div>` : "",
           `<div class="cards">
             ${countMetric("Months tracked", rows.length, "Each saved month becomes part of this view.")}
             ${metric("Latest breathing room", latest ? latest.breathingRoom : 0, latest ? latest.label : "No month yet")}
@@ -6341,13 +6606,17 @@ function renderProtectionLists(month = currentMonth(), plan = safeNextPaycheckPl
             <div style="position:relative;width:100%;height:220px"><canvas id="compareChart" role="img" aria-label="Line chart of monthly breathing room and planned spending trends">Monthly breathing room and spending trends.</canvas></div>
           </div>` : "",
 
-          `<div class="card"><div class="section-title"><h3>Month-by-month comparison</h3></div>
+          `<div class="card"><div class="section-title"><h3>Month-by-month comparison</h3><span>Includes side hustle gross and personal spending</span></div>
           ${rows.length ? comparisonTable(rows) : `<div class="empty">No months yet.</div>`}
           </div>`,
 
+          `<div class="card"><div class="section-title"><h3>Category comparison</h3><span>Latest month vs prior month</span></div>
+            ${categoryComparisonTable(rows)}
+          </div>`,
+
           `<div class="split">
-            <div class="card"><div class="section-title"><h3>Category trends</h3><span>Latest month</span></div>
-              ${latest ? miniBars({ Groceries: latest.groceries, Utilities: latest.utilities, Cars: latest.cars, Houses: latest.houses, Debt: latest.debtSpending, Personal: latest.personalSpending }, Math.max(1, latest.actualSpending)) : `<div class="empty">No data yet.</div>`}
+            <div class="card"><div class="section-title"><h3>Latest month categories</h3><span>${latest ? escapeHtml(latest.label) : ""}</span></div>
+              ${latest ? miniBars({ Groceries: latest.groceries, Utilities: latest.utilities, Cars: latest.cars, Houses: latest.houses, Debt: latest.debtSpending, Personal: latest.personalSpending, SideHustleGross: latest.sideGigs }, Math.max(1, latest.actualSpending + latest.sideGigs)) : `<div class="empty">No data yet.</div>`}
             </div>
             <div class="card"><div class="section-title"><h3>What to watch</h3></div>${compareFlags(rows)}</div>
           </div>`
@@ -6373,8 +6642,6 @@ function renderProtectionLists(month = currentMonth(), plan = safeNextPaycheckPl
             `<span><span class="legend-dot" style="background:#e34948"></span>Actual spending</span>`
           ].join("");
         }
-
-        document.querySelectorAll("[data-create-month]").forEach(btn => btn.addEventListener("click", openCreateMonthModal));
       }
 
       function monthComparisonRows() {
@@ -6388,7 +6655,7 @@ function renderProtectionLists(month = currentMonth(), plan = safeNextPaycheckPl
             groceries: actualByCategory(month, "Groceries"), utilities: actualByCategory(month, "Utilities"),
             cars: actualByAsset(month, ["Car 1","Car 2"]), houses: actualByAsset(month, ["House 1","House 2"]),
             debtSpending: actualByAsset(month, ["Debt"]) + actualByCategory(month, "Debt") + actualByCategory(month, "Credit Cards"),
-            personalSpending: actualPersonalSpending(month), daughters: contributionReceived(month), sideGigs: sideGigNet(month),
+            personalSpending: actualPersonalSpending(month), personalAlec: personalSpentForOwner(month, "Alec"), personalPatricia: personalSpentForOwner(month, "Patricia"), daughters: contributionReceived(month), sideGigs: paypalSideGigGross(month),
             unreconciled: unreconciledCount(month)
           };
         });
@@ -6709,7 +6976,7 @@ function renderProtectionLists(month = currentMonth(), plan = safeNextPaycheckPl
         const label = new Date(next+"-02T00:00:00").toLocaleDateString("en-US", { month: "long", year: "numeric" });
         state.months[next] = {
           label,
-          budgetLines: (source.budgetLines||[]).map(line => ({ ...line, id: uid("bill"), status: String(line.payee||"").toLowerCase().includes("pennymac") ? "Committed" : "Not Paid", manualPaid: false, paidAmount: 0, remainingAmount: Number(line.amount||0), notes: line.notes||"", paycheckId: line.paycheckId||defaultPaycheckId(line) })),
+          budgetLines: (source.budgetLines||[]).map(line => ({ ...line, id: uid("bill"), expenseType: expenseTypeForLine(line), status: String(line.payee||"").toLowerCase().includes("pennymac") ? "Committed" : "Not Paid", manualPaid: false, paidAmount: 0, remainingAmount: Number(line.amount||0), notes: line.notes||"", paycheckId: line.paycheckId||defaultPaycheckId(line) })),
           transactions: [],
           allowances: (source.allowances||[]).map(row => ({ ...row, id: uid("allow") })),
           paychecks: (source.paychecks||defaultPaychecks()).map(row => ({ ...row, id: row.id.startsWith("pc-") ? row.id : uid("pc") })),

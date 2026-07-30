@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Kingdom Builder</title>
-  <!-- v110 single total source -->
+  <!-- v112 show overspent lines -->
   <!-- v84 safe next paycheck -->
   <!-- v82 expected income actuals -->
   <!-- v81 fix csv amount sort -->
@@ -2187,6 +2187,16 @@
       /* v108: unified table, breakdown, and card totals */
 
       /* v110: single total source for ignored-row math */
+
+      /* v111: paycheck matched by owner/date Job Income even if amount differs */
+
+      .pill.red {
+        background: rgba(190, 55, 55, .14);
+        color: #9f2d2d;
+        border-color: rgba(190, 55, 55, .22);
+      }
+      /* v112: monthly plan shows overspent lines instead of hiding them as zero remaining */
+
 </style>
   
   <link rel="manifest" href="/manifest.webmanifest">
@@ -3492,33 +3502,51 @@
         return diff <= 2 || diff <= Math.max(5, left * 0.03);
       }
 
-      function actualJobDepositsForExpectedIncome(month = currentMonth()) {
+      
+      function isActualJobIncomeForPaycheck(txn) {
+        return isIncomeTxn(txn)
+          && transactionIncomeType(txn) === "Job Income"
+          && Number(txn.amount || 0) > 0
+          && txn.reconciled !== false;
+      }
+
+function actualJobDepositsForExpectedIncome(month = currentMonth()) {
         return actualJobIncomeRows(month)
-          .map(txn => ({ txn, date: transactionDateObject(txn), amount: Number(txn.amount || 0), owner: txn.owner || "" }))
-          .filter(row => row.date && Number(row.amount || 0) > 0)
-          .sort((a, b) => a.date - b.date);
+          .filter(isActualJobIncomeForPaycheck)
+          .map(txn => ({ ...txn, _dateObject: transactionDateObject(txn) }))
+          .filter(txn => txn._dateObject);
       }
 
       function paycheckOccurrenceWasAlreadyReceived(occurrence, actualRows, usedActualIndexes) {
-        const scheduled = occurrence.date;
-        const scheduledTime = scheduled.getTime();
-        const oneDay = 24 * 60 * 60 * 1000;
+        const occurrenceDate = occurrence.date instanceof Date ? occurrence.date : new Date(occurrence.date);
+        if (!occurrenceDate || Number.isNaN(occurrenceDate.getTime())) return false;
 
-        const matchIndex = actualRows.findIndex((row, index) => {
-          if (usedActualIndexes.has(index)) return false;
-          if (!sameOwnerForPaycheck(row.owner, occurrence.owner)) return false;
-          if (!closePaycheckAmount(row.amount, occurrence.amount)) return false;
+        for (let index = 0; index < actualRows.length; index += 1) {
+          if (usedActualIndexes.has(index)) continue;
+          const actual = actualRows[index];
+          const actualDate = actual._dateObject || transactionDateObject(actual);
+          if (!actualDate || Number.isNaN(actualDate.getTime())) continue;
+          if (!sameOwnerForPaycheck(occurrence, actual)) continue;
+          if (!isActualJobIncomeForPaycheck(actual)) continue;
 
-          // Covers early deposits without hardcoding a date:
-          // if the paycheck posted up to 7 days before the scheduled bucket date,
-          // don't keep showing that scheduled bucket as expected income.
-          const daysBeforeOrOnSchedule = (scheduledTime - row.date.getTime()) / oneDay;
-          return daysBeforeOrOnSchedule >= 0 && daysBeforeOrOnSchedule <= 7;
-        });
+          const diffDays = Math.round((occurrenceDate - actualDate) / (1000 * 60 * 60 * 24));
 
-        if (matchIndex === -1) return false;
-        usedActualIndexes.add(matchIndex);
-        return true;
+          // A real paycheck can vary. If the same owner's Job Income posted near the scheduled paycheck,
+          // treat that scheduled paycheck as received even when the amount is not close.
+          // This prevents Alec's actual $1,905.49 paycheck from leaving the expected $1,692 still "coming in".
+          if (diffDays >= -1 && diffDays <= 7) {
+            usedActualIndexes.add(index);
+            return true;
+          }
+
+          // Keep the older amount-close fallback for unusual date spacing.
+          if (diffDays >= -3 && diffDays <= 10 && closePaycheckAmount(occurrence.amount, actual.amount)) {
+            usedActualIndexes.add(index);
+            return true;
+          }
+        }
+
+        return false;
       }
 
       function expectedPaychecksLeft(month = currentMonth()) {
@@ -3575,6 +3603,28 @@
         if (Number.isFinite(explicit)) return Math.max(0, explicit);
         return Math.max(0, Number(line.amount || 0) - Number(line.paidAmount || 0));
       }
+
+
+      function overSpentForLine(line) {
+        const planned = Number(line?.amount || 0);
+        const paid = Number(line?.paidAmount || 0);
+        return Math.max(0, paid - planned);
+      }
+
+      function lineIsOverspent(line) {
+        return overSpentForLine(line) > 0.005;
+      }
+
+      function remainingOrOverspentBadge(line) {
+        const over = overSpentForLine(line);
+        if (over > 0.005) {
+          return `<span class="pill red">Over ${money.format(over)}</span>`;
+        }
+        const remaining = remainingForLine(line);
+        return `${remainingOrOverspentBadge(line)}`;
+      }
+
+
 
       function unpaidActiveBudgetRows(month = currentMonth()) {
         return activeBudgetLines(allBudgetLines(month)).filter(line => remainingForLine(line) > 0.005);
@@ -4503,7 +4553,7 @@ function renderProtectionLists(month = currentMonth(), plan = safeNextPaycheckPl
               <input id="todayCheckingBalanceInput" type="number" step="0.01" value="${escapeHtml(state.jointAccountBalance ?? "")}" placeholder="0.00" style="margin-top:.7rem;width:100%">
             </div>
 
-            ${metric("Cash coming in", plan.cashComingIn, `${escapeHtml(plan.paycheck.owner || "Income")} ${escapeHtml(shortMonthDay(plan.paycheck.date))}: ${money.format(plan.paycheckAmount)}. Janis is not included here.`, "green")}
+            ${metric("Cash coming in", plan.cashComingIn, `${escapeHtml(plan.paycheck.owner || "Income")} ${escapeHtml(shortMonthDay(plan.paycheck.date))}: ${money.format(plan.paycheckAmount)}. Janis is not included here. Actual received paychecks are removed automatically.`, "green")}
             ${metric("Money to protect", plan.amountToKeepSafe, "This Month Not Fully Paid + Hold for Early Next Paycheck.", "yellow")}
             ${metric(plan.leftAfterProtectedNeeds >= 0 ? "Safe after protected needs" : "Still short", plan.leftAfterProtectedNeeds, statusText, plan.leftAfterProtectedNeeds < 0 ? "red" : "green")}
             ${metric("Cannot touch", plan.cannotTouch, `Mortgage vault ${money.format(plan.mortgageVault)}${plan.futureReserve > 0 ? ` · future/quarterly reserve ${money.format(plan.futureReserve)}` : ""}. This is protected money, not spending money.`, "yellow")}

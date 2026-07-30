@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Kingdom Builder</title>
-  <!-- v115 month end polish -->
+  <!-- v117 paycheck protection window -->
   <!-- v84 safe next paycheck -->
   <!-- v82 expected income actuals -->
   <!-- v81 fix csv amount sort -->
@@ -2226,7 +2226,7 @@
       /* v114: monthly plan remaining cell shows overage instead of zero */
 
 
-      /* v115 month-end polish: cleaner dark mode and mobile readability */
+      /* v117 paycheck protection window: cleaner dark mode and mobile readability */
       @media (prefers-color-scheme: dark) {
         :root {
           --bg: #14120f;
@@ -3012,6 +3012,107 @@
 
       function currentMonth() { return state.months[state.activeMonth]; }
       function sum(items, getter) { return items.reduce((total, item) => total + Number(getter(item) || 0), 0); }
+
+
+      function roundMoney(value) {
+        const amount = Number(value || 0);
+        if (!Number.isFinite(amount)) return 0;
+        return Math.round((amount + Number.EPSILON) * 100) / 100;
+      }
+
+      function localDateOnly(date = new Date()) {
+        const d = date instanceof Date ? date : new Date(date);
+        return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+      }
+
+      function addDays(date, days) {
+        const d = localDateOnly(date);
+        d.setDate(d.getDate() + Number(days || 0));
+        return d;
+      }
+
+      function monthKeyForDate(date) {
+        const d = date instanceof Date ? date : new Date(date);
+        if (!d || Number.isNaN(d.getTime())) return state.activeMonth;
+        return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0");
+      }
+
+      function activeMonthDateFromKey(key = state.activeMonth) {
+        const [year, month] = String(key || "").split("-").map(Number);
+        return { year, month };
+      }
+
+      function daysInMonthKey(key = state.activeMonth) {
+        const { year, month } = activeMonthDateFromKey(key);
+        return year && month ? new Date(year, month, 0).getDate() : 31;
+      }
+
+      function monthDateFromKey(key, day = 1) {
+        const { year, month } = activeMonthDateFromKey(key);
+        return year && month ? new Date(year, month - 1, day) : null;
+      }
+
+      function compareLocalDates(a, b) {
+        return localDateOnly(a).getTime() - localDateOnly(b).getTime();
+      }
+
+      function isDateBetweenInclusive(date, start, end) {
+        const d = localDateOnly(date).getTime();
+        return d >= localDateOnly(start).getTime() && d <= localDateOnly(end).getTime();
+      }
+
+      function protectionWindowDays(start, end) {
+        const diff = Math.round((localDateOnly(end) - localDateOnly(start)) / 86400000);
+        return Math.max(1, diff + 1);
+      }
+
+      function monthDataForKey(key) {
+        return state.months && state.months[key] ? state.months[key] : null;
+      }
+
+      function virtualMonthForKey(key) {
+        const base = monthDataForKey(key) || currentMonth() || {};
+        const templateLines = (state.baseTemplate && Array.isArray(state.baseTemplate.budgetLines)) ? state.baseTemplate.budgetLines : (base.budgetLines || []);
+        const templateAllowances = (state.baseTemplate && Array.isArray(state.baseTemplate.allowances)) ? state.baseTemplate.allowances : (base.allowances || []);
+        const templatePaychecks = (state.baseTemplate && Array.isArray(state.baseTemplate.paychecks)) ? state.baseTemplate.paychecks : (base.paychecks || defaultPaychecks());
+        return {
+          ...base,
+          label: key,
+          budgetLines: (templateLines || []).map(line => ({
+            ...line,
+            id: line.id || uid("virtual-bill"),
+            paidAmount: 0,
+            remainingAmount: Number(line.amount || 0),
+            manualPaid: false,
+            status: String(line.payee || "").toLowerCase().includes("pennymac") ? "Committed" : "Not Paid",
+            expenseType: expenseTypeForLine(line)
+          })),
+          allowances: (templateAllowances || []).map(row => ({ ...row })),
+          paychecks: (templatePaychecks || defaultPaychecks()).map(row => ({ ...row })),
+          transactions: [],
+          sideGigs: [],
+          contributions: []
+        };
+      }
+
+      function protectionMonthForKey(key) {
+        return monthDataForKey(key) || virtualMonthForKey(key);
+      }
+
+      function monthKeysBetweenDates(start, end) {
+        const keys = [];
+        let cursor = monthDateFromKey(monthKeyForDate(start), 1);
+        const lastKey = monthKeyForDate(end);
+        while (cursor && keys.length < 6) {
+          const key = monthKeyForDate(cursor);
+          keys.push(key);
+          if (key === lastKey) break;
+          cursor.setMonth(cursor.getMonth() + 1);
+        }
+        return keys;
+      }
+
+
       function isPlaceholderBudgetLine(line) { return Number(line?.amount || 0) <= 0 && !String(line?.dueDay || "").trim(); }
       function activeBudgetLines(lines) { return (lines || []).filter(line => !isPlaceholderBudgetLine(line)); }
       function allBudgetLines(month = currentMonth()) { return month.budgetLines || []; }
@@ -3606,7 +3707,26 @@
         return out;
       }
 
+      
+      function biweeklyThursdayPaydaysForMonthKey(key) {
+        const { year, month } = activeMonthDateFromKey(key);
+        if (!year || !month) return [];
+        const anchor = new Date(2026, 6, 2);
+        const daysInMonth = daysInMonthKey(key);
+        const out = [];
+        for (let day = 1; day <= daysInMonth; day += 1) {
+          const d = new Date(year, month - 1, day);
+          const diffDays = Math.round((d - anchor) / 86400000);
+          if (diffDays % 14 === 0) out.push(d);
+        }
+        return out;
+      }
+
       function paycheckOccurrencesForRow(row) {
+        return paycheckOccurrencesForRowInMonth(row, state.activeMonth);
+      }
+
+function paycheckOccurrencesForRow(row) {
         const { year, month } = activeMonthDateParts();
         if (!year || !month || Number(row.amount || 0) <= 0) return [];
         const text = [row.owner, row.label, row.expectedDay, row.frequency, row.notes].join(" ").toLowerCase();
@@ -3658,8 +3778,12 @@
       }
 
       function sameOwnerForPaycheck(a, b) {
-        const left = String(a || "").trim().toLowerCase();
-        const right = String(b || "").trim().toLowerCase();
+        const ownerOf = value => {
+          if (value && typeof value === "object") return String(value.owner || value.Owner || value.person || value.assignedTo || "").trim().toLowerCase();
+          return String(value || "").trim().toLowerCase();
+        };
+        const left = ownerOf(a);
+        const right = ownerOf(b);
         if (!left || !right || left === "shared" || right === "shared" || left === "unassigned" || right === "unassigned") return true;
         return left === right;
       }
@@ -3757,8 +3881,224 @@ function actualJobDepositsForExpectedIncome(month = currentMonth()) {
 
 
       /* v84 Safe After Next Paycheck helpers */
-      function firstUpcomingPaycheck(month = currentMonth()) {
-        return expectedPaychecksLeft(month).slice().sort((a, b) => a.date - b.date)[0] || null;
+      
+      function actualJobDepositsForMonthKey(key) {
+        const month = monthDataForKey(key);
+        return month ? actualJobDepositsForExpectedIncome(month) : [];
+      }
+
+      function expectedPaychecksForMonthKey(key) {
+        const month = protectionMonthForKey(key);
+        const actualRows = actualJobDepositsForMonthKey(key);
+        const usedActualIndexes = new Set();
+        const seen = new Set();
+        return (month.paychecks || defaultPaychecks())
+          .flatMap(row => paycheckOccurrencesForRowInMonth(row, key))
+          .sort((a, b) => a.date - b.date)
+          .filter(item => {
+            const unique = [
+              String(item.owner || "").trim().toLowerCase(),
+              dateOnlyKey(item.date),
+              Number(item.amount || 0).toFixed(2)
+            ].join("|");
+            if (seen.has(unique)) return false;
+            seen.add(unique);
+            return true;
+          })
+          .filter(item => !paycheckOccurrenceWasAlreadyReceived(item, actualRows, usedActualIndexes));
+      }
+
+      function expectedPaychecksAcrossProtectionMonths(startDate = new Date(), monthsAhead = 2) {
+        const start = localDateOnly(startDate);
+        const keys = [];
+        const activeStart = monthDateFromKey(state.activeMonth, 1) || start;
+        const cursor = new Date(Math.min(start.getTime(), activeStart.getTime()));
+        cursor.setDate(1);
+        for (let i = 0; i <= monthsAhead + 1; i += 1) {
+          const key = monthKeyForDate(cursor);
+          if (!keys.includes(key)) keys.push(key);
+          cursor.setMonth(cursor.getMonth() + 1);
+        }
+        return keys
+          .flatMap(key => expectedPaychecksForMonthKey(key))
+          .filter(item => compareLocalDates(item.date, start) >= 0)
+          .sort((a, b) => a.date - b.date);
+      }
+
+      function nextUpcomingPaycheckAfterToday(startDate = new Date()) {
+        return expectedPaychecksAcrossProtectionMonths(startDate, 3)[0] || null;
+      }
+
+      function protectionWindowInfo(paycheck = nextUpcomingPaycheckAfterToday()) {
+        const start = localDateOnly(new Date());
+        const end = paycheck ? addDays(paycheck.date, -1) : addDays(start, 9);
+        const days = protectionWindowDays(start, end);
+        return {
+          start,
+          end,
+          days,
+          paycheck,
+          startKey: monthKeyForDate(start),
+          endKey: monthKeyForDate(end),
+          label: `${escapeHtml(shortMonthDay(start))} – ${escapeHtml(shortMonthDay(end))}`
+        };
+      }
+
+      function lineDueDateInMonth(line, key) {
+        const day = dueDayNumber(line?.dueDay);
+        if (!day) return null;
+        const max = daysInMonthKey(key);
+        if (day < 1 || day > max) return null;
+        return monthDateFromKey(key, day);
+      }
+
+      function protectionWindowBillRows(month = currentMonth(), plan = safeNextPaycheckBasePlan(month)) {
+        const window = plan.window || protectionWindowInfo(plan.paycheck);
+        return monthKeysBetweenDates(window.start, window.end)
+          .flatMap(key => {
+            const windowMonth = protectionMonthForKey(key);
+            return activeBudgetLines(allBudgetLines(windowMonth))
+              .filter(line => !isMortgageFundingLine(line))
+              .filter(line => {
+                const dueDate = lineDueDateInMonth(line, key);
+                if (!dueDate) return false;
+                return isDateBetweenInclusive(dueDate, window.start, window.end);
+              })
+              .map(line => {
+                const dueDate = lineDueDateInMonth(line, key);
+                const fallback = monthDataForKey(key) ? remainingForLine(line) : Number(line.amount || 0);
+                return { line, key, dueDate, fallback: Math.max(0, roundMoney(fallback)) };
+              })
+              .filter(row => row.fallback > 0.005);
+          });
+      }
+
+      function currentRolloverProtectionRows(month = currentMonth(), plan = safeNextPaycheckBasePlan(month)) {
+        const rows = [];
+        const today = localDateOnly(new Date());
+        const activeKey = state.activeMonth;
+        const currentKey = monthKeyForDate(today);
+
+        // If active month is the real current month, only "now" means due today or already overdue.
+        activeBudgetLines(allBudgetLines(month))
+          .filter(line => !isMortgageFundingLine(line))
+          .filter(line => {
+            const dueDate = lineDueDateInMonth(line, activeKey);
+            if (!dueDate) return false;
+            return compareLocalDates(dueDate, today) <= 0;
+          })
+          .forEach(line => {
+            const fallback = remainingForLine(line);
+            if (fallback <= 0.005) return;
+            const key = scopedProtectionKey(line, "now");
+            const protectAmount = protectionAmountForKey(key, fallback, month);
+            rows.push({
+              name: billLineName(line),
+              dueDate: dueDisplayForLine(line),
+              amountLeft: fallback,
+              amount: protectAmount,
+              protectAmount,
+              defaultAmount: fallback,
+              controlKey: key,
+              ignored: isProtectionKeyIgnored(key, month),
+              overrideValue: protectionAmountOverrideForKey(key, month),
+              expenseType: expenseTypeForLine(line),
+              showExpenseType: true
+            });
+          });
+
+        // If a prior month exists and still has unpaid lines, show them explicitly as rollover.
+        const priorKey = previousMonthKey(activeKey);
+        const priorMonth = monthDataForKey(priorKey);
+        if (priorMonth) {
+          activeBudgetLines(allBudgetLines(priorMonth))
+            .filter(line => !isMortgageFundingLine(line))
+            .filter(line => remainingForLine(line) > 0.005)
+            .forEach(line => {
+              const fallback = remainingForLine(line);
+              const key = `rollover:${priorKey}:${protectionLineKey(line)}`;
+              const protectAmount = protectionAmountForKey(key, fallback, month);
+              rows.push({
+                name: `Rollover — ${billLineName(line)}`,
+                dueDate: priorKey,
+                amountLeft: fallback,
+                amount: protectAmount,
+                protectAmount,
+                defaultAmount: fallback,
+                controlKey: key,
+                ignored: isProtectionKeyIgnored(key, month),
+                overrideValue: protectionAmountOverrideForKey(key, month),
+                expenseType: expenseTypeForLine(line),
+                showExpenseType: true
+              });
+            });
+        }
+
+        return rows;
+      }
+
+      function windowFlexibleEstimateRows(month = currentMonth(), plan = safeNextPaycheckBasePlan(month)) {
+        const window = plan.window || protectionWindowInfo(plan.paycheck);
+        const key = window.startKey || state.activeMonth;
+        const windowMonth = protectionMonthForKey(key);
+        const days = window.days || 1;
+        const monthDays = daysInMonthKey(key);
+        const rows = [];
+
+        activeBudgetLines(allBudgetLines(windowMonth))
+          .filter(line => expenseTypeForLine(line) === "Flexible")
+          .filter(line => !isMortgageFundingLine(line))
+          .filter(line => !lineDueDateInMonth(line, key))
+          .forEach(line => {
+            const base = Number(line.amount || 0);
+            const fallback = roundMoney(base * days / monthDays);
+            if (fallback <= 0.005) return;
+            const controlLine = { ...line, id: `window-flex-${key}-${protectionLineKey(line)}` };
+            const controlKey = scopedProtectionKey(controlLine, "window");
+            const protectAmount = protectionAmountForKey(controlKey, fallback, month);
+            rows.push({
+              name: `${billLineName(line)} — ${days}-day estimate`,
+              dueDate: window.label || "Window",
+              amountLeft: fallback,
+              amount: protectAmount,
+              protectAmount,
+              defaultAmount: fallback,
+              controlKey,
+              ignored: isProtectionKeyIgnored(controlKey, month),
+              overrideValue: protectionAmountOverrideForKey(controlKey, month),
+              expenseType: expenseTypeForLine(line),
+              showExpenseType: true
+            });
+          });
+
+        const personalBudgets = personalBudgetByOwner(windowMonth);
+        ["Alec", "Patricia"].forEach(owner => {
+          const base = Number(personalBudgets[owner] || 0);
+          if (base <= 0) return;
+          const fallback = roundMoney(base * days / monthDays);
+          const personalLine = { id: `window-personal-${key}-${owner}`, payee: `Personal Money — ${owner}`, category: "Personal", expenseType: "Flexible" };
+          const controlKey = scopedProtectionKey(personalLine, "window");
+          const protectAmount = protectionAmountForKey(controlKey, fallback, month);
+          rows.push({
+            name: `Personal Money — ${escapeHtml(owner)} — ${days}-day estimate`,
+            dueDate: window.label || "Window",
+            amountLeft: fallback,
+            amount: protectAmount,
+            protectAmount,
+            defaultAmount: fallback,
+            controlKey,
+            ignored: isProtectionKeyIgnored(controlKey, month),
+            overrideValue: protectionAmountOverrideForKey(controlKey, month),
+            expenseType: "Flexible",
+            showExpenseType: false
+          });
+        });
+
+        return rows;
+      }
+
+function firstUpcomingPaycheck(month = currentMonth()) {
+        return nextUpcomingPaycheckAfterToday();
       }
 
       function dueDayNumber(value) {
@@ -3769,9 +4109,10 @@ function actualJobDepositsForExpectedIncome(month = currentMonth()) {
 
       function remainingForLine(line) {
         if (!line) return 0;
+        const calculated = roundMoney(Number(line.amount || 0) - Number(line.paidAmount || 0));
+        if (Number.isFinite(calculated)) return Math.max(0, calculated);
         const explicit = Number(line.remainingAmount);
-        if (Number.isFinite(explicit)) return Math.max(0, explicit);
-        return Math.max(0, Number(line.amount || 0) - Number(line.paidAmount || 0));
+        return Number.isFinite(explicit) ? Math.max(0, roundMoney(explicit)) : 0;
       }
 
 
@@ -3931,16 +4272,17 @@ function actualJobDepositsForExpectedIncome(month = currentMonth()) {
 
       function safeNextPaycheckBasePlan(month = currentMonth()) {
         const paycheck = firstUpcomingPaycheck(month);
-        const checking = Number(state.jointAccountBalance || 0);
-        const paycheckAmount = Number(paycheck?.amount || 0);
+        const window = protectionWindowInfo(paycheck);
+        const checking = roundMoney(Number(state.jointAccountBalance || 0));
+        const paycheckAmount = roundMoney(Number(paycheck?.amount || 0));
         const janisExpected = janisExpectedMortgagePortion(month);
 
         const cashComingIn = paycheckAmount;
 
-        const billsBeforePay = datedBillsDueThroughPaycheckTotal(month, paycheck);
-        const currentLiving = currentLivingNeedLeft(month);
-        const earlyFixed = earlyNextMonthFixedBillsTotal(month);
-        const earlyLiving = proratedEarlyNextMonthLivingTotal(month, 10);
+        const billsBeforePay = sum(protectionWindowBillRows(month, { paycheck, window }), row => Number(row.fallback || 0));
+        const currentLiving = 0;
+        const earlyFixed = 0;
+        const earlyLiving = sum(windowFlexibleEstimateRows(month, { paycheck, window }), row => Number(row.defaultAmount || row.amountLeft || 0));
 
         const mortgageNeed = mortgageNeedForNextMonth(month);
         const mortgageVault = smartNextMonthMortgageReserveTotal(month);
@@ -3949,6 +4291,11 @@ function actualJobDepositsForExpectedIncome(month = currentMonth()) {
 
         return {
           paycheck,
+          window,
+          windowStart: window.start,
+          windowEnd: window.end,
+          windowDays: window.days,
+          windowLabel: window.label,
           checking,
           paycheckAmount,
           janisExpected,
@@ -3962,7 +4309,7 @@ function actualJobDepositsForExpectedIncome(month = currentMonth()) {
           mortgageVault,
           mortgageCovered,
           mortgageGapAfterVault,
-          cannotTouch: mortgageVault + Math.max(0, futureReserveTotal(month)),
+          cannotTouch: roundMoney(mortgageVault + Math.max(0, futureReserveTotal(month))),
           futureReserve: Math.max(0, futureReserveTotal(month))
         };
       }
@@ -4000,10 +4347,11 @@ function actualJobDepositsForExpectedIncome(month = currentMonth()) {
 
       function currentMonthPlannedPaidLeft(month = currentMonth()) {
         const rows = dashboardBudgetLines(month, "Everyone");
-        const planned = sum(rows, row => Number(row.amount || 0));
-        const paid = sum(rows, row => Number(row.paidAmount || 0));
-        const left = Math.max(0, planned - paid);
-        return { rows, planned, paid, left };
+        const planned = roundMoney(sum(rows, row => Number(row.amount || 0)));
+        const paid = roundMoney(sum(rows, row => Number(row.paidAmount || 0)));
+        const left = roundMoney(sum(rows, row => remainingForLine(row)));
+        const overpaid = roundMoney(sum(rows, row => Math.max(0, Number(row.paidAmount || 0) - Number(row.amount || 0))));
+        return { rows, planned, paid, left, overpaid };
       }
 
       function notFullyPaidMonthlyRows(month = currentMonth()) {
@@ -4523,48 +4871,7 @@ function renderProtectionControls(row) {
 
 
 function currentMonthProtectedRows(month = currentMonth(), plan = safeNextPaycheckBasePlan(month)) {
-        const rows = [];
-
-        notFullyPaidMonthlyRows(month).forEach(line => {
-          const key = scopedProtectionKey(line, "current");
-          const fallback = remainingForLine(line);
-          const protectAmount = protectionAmountForKey(key, fallback, month);
-          rows.push({
-            name: billLineName(line),
-            dueDate: dueDisplayForLine(line),
-            amountLeft: fallback,
-            amount: protectAmount,
-            protectAmount,
-            defaultAmount: fallback,
-            controlKey: key,
-            ignored: isProtectionKeyIgnored(key, month),
-            overrideValue: protectionAmountOverrideForKey(key, month),
-            expenseType: expenseTypeForLine(line),
-            showExpenseType: true
-          });
-        });
-
-        personalRemainingRowsByOwner(month).forEach(personal => {
-          if (personal.remaining <= 0) return;
-          const personalLine = { id: `personal-money-current-${personal.owner}`, payee: `Personal Money — ${personal.owner}`, category: "Personal", expenseType: "Flexible" };
-          const key = scopedProtectionKey(personalLine, "current");
-          const protectAmount = protectionAmountForKey(key, personal.remaining, month);
-          rows.push({
-            name: `Personal Money — ${escapeHtml(personal.owner)}`,
-            dueDate: "—",
-            amountLeft: personal.remaining,
-            amount: protectAmount,
-            protectAmount,
-            defaultAmount: personal.remaining,
-            controlKey: key,
-            ignored: isProtectionKeyIgnored(key, month),
-            overrideValue: protectionAmountOverrideForKey(key, month),
-            expenseType: "Flexible",
-            showExpenseType: false
-          });
-        });
-
-        return rows.filter(row => Number(row.amountLeft ?? row.amount ?? 0) > 0.005);
+        return currentRolloverProtectionRows(month, plan);
       }
 
       
@@ -4580,15 +4887,16 @@ function currentMonthProtectedRows(month = currentMonth(), plan = safeNextPayche
 
 function earlyNextMonthProtectedRows(month = currentMonth(), plan = safeNextPaycheckBasePlan(month)) {
         const rows = [];
-        const days = daysInNextMonthFromActive();
+        const window = plan.window || protectionWindowInfo(plan.paycheck);
 
-        earlyNextMonthFixedBills(month).forEach(line => {
-          const key = scopedProtectionKey(line, "next");
-          const fallback = Number(line.amount || 0);
+        protectionWindowBillRows(month, plan).forEach(item => {
+          const line = item.line;
+          const key = scopedProtectionKey({ ...line, id: `window-bill-${item.key}-${protectionLineKey(line)}` }, "window");
+          const fallback = item.fallback;
           const protectAmount = protectionAmountForKey(key, fallback, month);
           rows.push({
             name: billLineName(line),
-            dueDate: dueDisplayForLine(line),
+            dueDate: `${escapeHtml(shortMonthDay(item.dueDate))}`,
             amountLeft: fallback,
             amount: protectAmount,
             protectAmount,
@@ -4601,74 +4909,10 @@ function earlyNextMonthProtectedRows(month = currentMonth(), plan = safeNextPayc
           });
         });
 
-        // Achieva belongs here as Flexible. It is not mortgage funding and not fixed.
-        achievaProtectionRows(month).forEach(line => {
-          const key = scopedProtectionKey(line, "next-achieva");
-          const fallback = Number(line.amount || 0);
-          const protectAmount = protectionAmountForKey(key, fallback, month);
-          rows.push({
-            name: billLineName(line),
-            dueDate: dueDisplayForLine(line),
-            amountLeft: fallback,
-            amount: protectAmount,
-            protectAmount,
-            defaultAmount: fallback,
-            controlKey: key,
-            ignored: isProtectionKeyIgnored(key, month),
-            overrideValue: protectionAmountOverrideForKey(key, month),
-            expenseType: "Flexible",
-            showExpenseType: false
-          });
-        });
+        windowFlexibleEstimateRows(month, plan).forEach(row => rows.push(row));
+        manualProtectionRows(month).forEach(row => rows.push(row));
 
-        activeBudgetLines(allBudgetLines(month))
-          .filter(line => expenseTypeForLine(line) === "Flexible")
-          .filter(line => !isMortgageFundingLine(line))
-          .filter(line => !isAchievaLine(line))
-          .forEach(line => {
-            const key = scopedProtectionKey(line, "next");
-            const base = Number(line.amount || 0);
-            const fallback = base * 10 / days;
-            const protectAmount = protectionAmountForKey(key, fallback, month);
-            if (fallback > 0) rows.push({
-              name: `${billLineName(line)} — 10-day estimate`,
-              dueDate: "—",
-              amountLeft: fallback,
-              amount: protectAmount,
-              protectAmount,
-              defaultAmount: fallback,
-              controlKey: key,
-              ignored: isProtectionKeyIgnored(key, month),
-              overrideValue: protectionAmountOverrideForKey(key, month),
-              expenseType: expenseTypeForLine(line),
-              showExpenseType: true
-            });
-          });
-
-        const personalBudgets = personalBudgetByOwner(month);
-        ["Alec", "Patricia"].forEach(owner => {
-          const base = Number(personalBudgets[owner] || 0);
-          if (base <= 0) return;
-          const fallback = base * 10 / days;
-          const personalLine = { id: `personal-money-next-window-${owner}`, payee: `Personal Money — ${owner} — 10-day estimate`, category: "Personal", expenseType: "Flexible" };
-          const key = scopedProtectionKey(personalLine, "next");
-          const protectAmount = protectionAmountForKey(key, fallback, month);
-          rows.push({
-            name: `Personal Money — ${escapeHtml(owner)} — 10-day estimate`,
-            dueDate: "—",
-            amountLeft: fallback,
-            amount: protectAmount,
-            protectAmount,
-            defaultAmount: fallback,
-            controlKey: key,
-            ignored: isProtectionKeyIgnored(key, month),
-            overrideValue: protectionAmountOverrideForKey(key, month),
-            expenseType: "Flexible",
-            showExpenseType: false
-          });
-        });
-
-        return rows.concat(manualProtectionRows(month)).filter(row => Number(row.amountLeft ?? row.amount ?? 0) > 0.005);
+        return rows.filter(row => Number(row.amountLeft ?? row.amount ?? 0) > 0.005 || row.ignored);
       }
 
       
@@ -4684,6 +4928,7 @@ function renderProtectionLists(month = currentMonth(), plan = safeNextPaycheckPl
           const listTotal = currentTotal + nextTotal;
           const difference = listTotal - Number(plan.amountToKeepSafe || 0);
           const matches = Math.abs(difference) < 0.01;
+          const windowLabel = plan.windowLabel || (plan.window ? plan.window.label : "window");
 
           return `
             <div class="section-title" style="margin:.25rem 0 .15rem">
@@ -4697,8 +4942,8 @@ function renderProtectionLists(month = currentMonth(), plan = safeNextPaycheckPl
               <button type="button" class="secondary" id="addManualProtectionLineBtn">+ Add protection line</button>
             </div>
             <div class="kb-list-stack">
-              ${twoColumnMoneyList("This Month Not Fully Paid", currentRows, "Everything in the monthly plan is fully paid.")}
-              ${twoColumnMoneyList("Hold for Early Next Paycheck", nextRows, "No early protection lines.")}
+              ${twoColumnMoneyList("Still Needed Now / Rollover", currentRows, "Nothing pending from the current/prior month.")}
+              ${twoColumnMoneyList(`Needed Before Next Paycheck (${windowLabel})`, nextRows, "No protection lines before the next paycheck.")}
             </div>
             <div class="card kb-reconcile-card" style="padding:1rem;margin-top:.4rem">
               <div class="kb-money-total" style="display:grid;grid-template-columns:minmax(0,1fr) 9rem;gap:1rem;align-items:center;font-weight:900;">
@@ -4718,18 +4963,19 @@ function renderProtectionLists(month = currentMonth(), plan = safeNextPaycheckPl
 
       function renderSafeNextPaycheckPlan(plan) {
         const hasPaycheck = Boolean(plan.paycheck);
+        const windowLabel = plan.windowLabel || (plan.window ? plan.window.label : "protection window");
         const incomingHint = hasPaycheck
-          ? `${escapeHtml(plan.paycheck.owner || "Income")} ${escapeHtml(shortMonthDay(plan.paycheck.date))}: ${money.format(plan.paycheckAmount)}. Janis is not included here. Actual received paychecks are removed automatically.`
-          : "No future paycheck left in this month. Cash coming in is $0.";
+          ? `${escapeHtml(plan.paycheck.owner || "Income")} ${escapeHtml(shortMonthDay(plan.paycheck.date))}: ${money.format(plan.paycheckAmount)}. The protection window ends the day before this paycheck. Janis is not spendable cash.`
+          : `No future paycheck found. Showing a ${Number(plan.windowDays || 10)}-day protection window with $0 incoming.`;
 
         const statusText = plan.leftAfterProtectedNeeds >= 0
-          ? `Left after protecting what is needed from now through the next paycheck window.`
-          : `Still missing after counting checking and remaining protected needs.`;
+          ? `Cash available now + next paycheck coming in - protected needs for ${windowLabel}.`
+          : `Still missing after counting checking, next paycheck, and protected needs for ${windowLabel}.`;
 
         return `
           <div class="section-title" style="margin:.25rem 0 .15rem">
-            <h3>Cash Protection Plan</h3>
-            <span>${hasPaycheck ? "No buffer included. Janis is not spendable cash." : "No future paycheck found. Showing protection plan with $0 incoming."}</span>
+            <h3>Cash Protection Until Next Paycheck</h3>
+            <span>Window: ${windowLabel}${hasPaycheck ? ` · next paycheck ${escapeHtml(shortMonthDay(plan.paycheck.date))}` : ""}</span>
           </div>
 
           <div class="cards kb-simple-dashboard-cards">
@@ -4740,8 +4986,8 @@ function renderProtectionLists(month = currentMonth(), plan = safeNextPaycheckPl
               <input id="todayCheckingBalanceInput" type="number" step="0.01" value="${escapeHtml(state.jointAccountBalance ?? "")}" placeholder="0.00" style="margin-top:.7rem;width:100%">
             </div>
 
-            ${metric("Cash coming in", plan.cashComingIn, incomingHint, plan.cashComingIn > 0 ? "green" : "")}
-            ${metric("Money to protect", plan.amountToKeepSafe, "This Month Not Fully Paid + Hold for Early Next Paycheck.", "yellow")}
+            ${metric("Next paycheck coming", plan.cashComingIn, incomingHint, plan.cashComingIn > 0 ? "green" : "")}
+            ${metric("Money to protect", plan.amountToKeepSafe, `Needed from today through ${escapeHtml(shortMonthDay(plan.windowEnd || new Date()))}.`, "yellow")}
             ${metric(plan.leftAfterProtectedNeeds >= 0 ? "Safe after protected needs" : "Still short", plan.leftAfterProtectedNeeds, statusText, plan.leftAfterProtectedNeeds < 0 ? "red" : "green")}
             ${metric("Cannot touch", plan.cannotTouch, `Mortgage vault ${money.format(plan.mortgageVault)}${plan.futureReserve > 0 ? ` · future/quarterly reserve ${money.format(plan.futureReserve)}` : ""}. This is protected money, not spending money.`, "yellow")}
           </div>`;
@@ -4765,7 +5011,7 @@ function renderProtectionLists(month = currentMonth(), plan = safeNextPaycheckPl
           <div class="cards kb-simple-dashboard-cards">
             ${metric("Planned", monthPlan.planned, "Total planned bills for this budget month, not including income details.")}
             ${metric("Paid", monthPlan.paid, "Bills already matched or marked paid for this month.", "green")}
-            ${metric("Still due", monthPlan.left, "This is the one monthly bills-left number.", monthPlan.left > 0 ? "yellow" : "green")}
+            ${metric("Still due", monthPlan.left, monthPlan.overpaid > 0 ? `Line-by-line remaining. Overpaid bills add ${money.format(monthPlan.overpaid)} but do not reduce other bills.` : "Line-by-line remaining for this month.", monthPlan.left > 0 ? "yellow" : "green")}
           </div>
 
           ${renderSafeNextPaycheckPlan(safePaycheckPlan)}
@@ -5343,10 +5589,10 @@ function renderProtectionLists(month = currentMonth(), plan = safeNextPaycheckPl
       function budgetRunningTotals(rows) {
         const activeRows = activeBudgetLines(rows);
         return {
-          planned: sum(activeRows, row => row.amount),
-          matched: sum(activeRows, row => row.paidAmount || 0),
-          remaining: sum(activeRows, row => row.remainingAmount || 0),
-          committed: sum(activeRows.filter(row => ["Scheduled","Committed","Auto-pay"].includes(row.status) && Number(row.paidAmount || 0) <= 0), row => row.amount)
+          planned: roundMoney(sum(activeRows, row => row.amount)),
+          matched: roundMoney(sum(activeRows, row => row.paidAmount || 0)),
+          remaining: roundMoney(sum(activeRows, row => remainingForLine(row))),
+          committed: roundMoney(sum(activeRows.filter(row => ["Scheduled","Committed","Auto-pay"].includes(row.status) && Number(row.paidAmount || 0) <= 0), row => row.amount))
         };
       }
 

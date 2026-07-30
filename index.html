@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Kingdom Builder</title>
-  <!-- v121 rollback careful dashboard -->
+  <!-- v122 clean careful dashboard -->
   <!-- v84 safe next paycheck -->
   <!-- v82 expected income actuals -->
   <!-- v81 fix csv amount sort -->
@@ -2226,7 +2226,7 @@
       /* v114: monthly plan remaining cell shows overage instead of zero */
 
 
-      /* v121 rollback careful dashboard: cleaner dark mode and mobile readability */
+      /* v122 clean careful dashboard: cleaner dark mode and mobile readability */
       @media (prefers-color-scheme: dark) {
         :root {
           --bg: #14120f;
@@ -4731,12 +4731,11 @@ function renderProtectionLists(month = currentMonth(), plan = safeNextPaycheckPl
       function renderSafeNextPaycheckPlan(plan) {
         const hasPaycheck = Boolean(plan.paycheck);
         const safeBeforePay = roundMoney(Number(plan.safeToSpendBeforePaycheck ?? (plan.checking - plan.amountToKeepSafe)));
-        const afterPayForecast = roundMoney(Number(plan.afterPaycheckForecast ?? plan.leftAfterProtectedNeeds ?? 0));
         const payName = hasPaycheck ? escapeHtml(plan.paycheck.owner || "Income") : "No paycheck found";
         const payDate = hasPaycheck ? escapeHtml(shortMonthDay(plan.paycheck.date)) : "—";
         const incomingHint = hasPaycheck
-          ? `${payName} ${payDate}: ${money.format(plan.paycheckAmount)}. This is future money, not safe-to-spend until it posts. Janis is not included here.`
-          : "No future paycheck left in this month. Forecast uses $0 coming in.";
+          ? `${payName} ${payDate}: ${money.format(plan.paycheckAmount)}. Future money — do not treat it as available until it posts.`
+          : "No future paycheck left in this month. Use the safe-before-paycheck number.";
 
         const safeHint = safeBeforePay >= 0
           ? `Be careful: this is the max safe spending before ${payDate}.`
@@ -4756,11 +4755,9 @@ function renderProtectionLists(month = currentMonth(), plan = safeNextPaycheckPl
               <input id="todayCheckingBalanceInput" type="number" step="0.01" value="${escapeHtml(state.jointAccountBalance ?? "")}" placeholder="0.00" style="margin-top:.7rem;width:100%">
             </div>
 
-            ${metric("Next paycheck", plan.cashComingIn, incomingHint, plan.cashComingIn > 0 ? "green" : "")}
-            ${metric("Must protect before paycheck", plan.amountToKeepSafe, "This Month Not Fully Paid + Hold for Early Next Paycheck.", "yellow")}
+            ${metric("Must protect before paycheck", plan.amountToKeepSafe, "Bills and protected needs that should not be touched before payday.", "yellow")}
             ${metric(safeBeforePay >= 0 ? "Safe to spend before paycheck" : "Short before paycheck", safeBeforePay, safeHint, safeBeforePay < 0 ? "red" : "green")}
-            ${metric("After paycheck forecast", afterPayForecast, "Cash available now + next paycheck - protected needs. Not today's safe spending.", afterPayForecast < 0 ? "red" : "green")}
-            ${metric("Cannot touch", plan.cannotTouch, `Mortgage vault ${money.format(plan.mortgageVault)}${plan.futureReserve > 0 ? ` · future/quarterly reserve ${money.format(plan.futureReserve)}` : ""}. This is protected money, not spending money.`, "yellow")}
+            ${metric("Next paycheck", plan.cashComingIn, incomingHint, plan.cashComingIn > 0 ? "green" : "")}
           </div>
 
           <div class="banner" style="margin-top:-.25rem;margin-bottom:1rem">

@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Kingdom Builder</title>
-  <!-- v112 show overspent lines -->
+  <!-- v114 monthly overage visible -->
   <!-- v84 safe next paycheck -->
   <!-- v82 expected income actuals -->
   <!-- v81 fix csv amount sort -->
@@ -2197,6 +2197,17 @@
       }
       /* v112: monthly plan shows overspent lines instead of hiding them as zero remaining */
 
+
+      /* v113: show protection plan even after last paycheck */
+
+      .pill.red {
+        background: rgba(190, 55, 55, .14);
+        color: #9f2d2d;
+        border-color: rgba(190, 55, 55, .22);
+        font-weight: 900;
+      }
+      /* v114: monthly plan remaining cell shows overage instead of zero */
+
 </style>
   
   <link rel="manifest" href="/manifest.webmanifest">
@@ -3611,6 +3622,17 @@ function actualJobDepositsForExpectedIncome(month = currentMonth()) {
         return Math.max(0, paid - planned);
       }
 
+
+      function monthlyPlanRemainingPill(line) {
+        const over = overSpentForLine(line);
+        if (over > 0.005) {
+          return `<span class="pill red">Over ${money.format(over)}</span>`;
+        }
+        return remainingPill(line?.remainingAmount ?? line?.amount ?? 0);
+      }
+
+
+
       function lineIsOverspent(line) {
         return overSpentForLine(line) > 0.005;
       }
@@ -4453,40 +4475,7 @@ function earlyNextMonthProtectedRows(month = currentMonth(), plan = safeNextPayc
       }
 
       
-      function mortgageFundingTable(title, rows, plan) {
-        const needRows = rows.filter(row => Number(row.amount || 0) > 0 && row.expenseType === "Mortgage");
-        const fundingRows = rows.filter(row => Number(row.amount || 0) < 0);
-        return `
-          <div class="card kb-protection-card">
-            <div class="section-title">
-              <h3>${escapeHtml(title)}</h3>
-              <span>Gap from us: ${money.format(plan.mortgageGapAfterVault)}</span>
-            </div>
-            <div class="kb-protection-table">
-              <div class="kb-protection-header">
-                <div>Mortgage item</div>
-                <div>Due</div>
-                <div>Type</div>
-                <div>Amount</div>
-                <div>Funding</div>
-                <div>Gap</div>
-              </div>
-              ${rows.map(row => `
-                <div class="kb-protection-row ${row.amount < 0 ? "is-funding-row" : ""}">
-                  <div class="kb-cell kb-bill-name">${row.name}</div>
-                  <div class="kb-cell kb-due">${escapeHtml(row.dueDate || "—")}</div>
-                  <div class="kb-cell kb-type">${escapeHtml(row.expenseType || "—")}</div>
-                  <div class="kb-cell kb-money-num">${row.amount > 0 ? money.format(row.amount) : "—"}</div>
-                  <div class="kb-cell kb-money-num">${row.amount < 0 ? money.format(Math.abs(row.amount)) : "—"}</div>
-                  <div class="kb-cell kb-money-num">${row.name === "Mortgage gap from us" ? money.format(row.amount) : "—"}</div>
-                </div>`).join("")}
-              <div class="kb-protection-total">
-                <div>Mortgage need ${money.format(plan.mortgageNeed)} − funding ${money.format(plan.mortgageCovered)}</div>
-                <div>${money.format(plan.mortgageGapAfterVault)}</div>
-              </div>
-            </div>
-          </div>`;
-      }
+      
 
 function renderProtectionLists(month = currentMonth(), plan = safeNextPaycheckPlan(month)) {
         return safeRenderDashboardBlock("Money to Protect Breakdown", () => {
@@ -4531,18 +4520,19 @@ function renderProtectionLists(month = currentMonth(), plan = safeNextPaycheckPl
 
 
       function renderSafeNextPaycheckPlan(plan) {
-        if (!plan.paycheck) {
-          return `<div class="card"><div class="section-title"><h3>Cash Protection Plan</h3><span>No future paycheck found</span></div><div class="empty">Add a future paycheck bucket to calculate this number.</div></div>`;
-        }
+        const hasPaycheck = Boolean(plan.paycheck);
+        const incomingHint = hasPaycheck
+          ? `${escapeHtml(plan.paycheck.owner || "Income")} ${escapeHtml(shortMonthDay(plan.paycheck.date))}: ${money.format(plan.paycheckAmount)}. Janis is not included here. Actual received paychecks are removed automatically.`
+          : "No future paycheck left in this month. Cash coming in is $0.";
 
         const statusText = plan.leftAfterProtectedNeeds >= 0
           ? `Left after protecting what is needed from now through the next paycheck window.`
-          : `Still missing after counting checking and the next paycheck.`;
+          : `Still missing after counting checking and remaining protected needs.`;
 
         return `
           <div class="section-title" style="margin:.25rem 0 .15rem">
             <h3>Cash Protection Plan</h3>
-            <span>No buffer included. Janis is not spendable cash.</span>
+            <span>${hasPaycheck ? "No buffer included. Janis is not spendable cash." : "No future paycheck found. Showing protection plan with $0 incoming."}</span>
           </div>
 
           <div class="cards kb-simple-dashboard-cards">
@@ -4553,7 +4543,7 @@ function renderProtectionLists(month = currentMonth(), plan = safeNextPaycheckPl
               <input id="todayCheckingBalanceInput" type="number" step="0.01" value="${escapeHtml(state.jointAccountBalance ?? "")}" placeholder="0.00" style="margin-top:.7rem;width:100%">
             </div>
 
-            ${metric("Cash coming in", plan.cashComingIn, `${escapeHtml(plan.paycheck.owner || "Income")} ${escapeHtml(shortMonthDay(plan.paycheck.date))}: ${money.format(plan.paycheckAmount)}. Janis is not included here. Actual received paychecks are removed automatically.`, "green")}
+            ${metric("Cash coming in", plan.cashComingIn, incomingHint, plan.cashComingIn > 0 ? "green" : "")}
             ${metric("Money to protect", plan.amountToKeepSafe, "This Month Not Fully Paid + Hold for Early Next Paycheck.", "yellow")}
             ${metric(plan.leftAfterProtectedNeeds >= 0 ? "Safe after protected needs" : "Still short", plan.leftAfterProtectedNeeds, statusText, plan.leftAfterProtectedNeeds < 0 ? "red" : "green")}
             ${metric("Cannot touch", plan.cannotTouch, `Mortgage vault ${money.format(plan.mortgageVault)}${plan.futureReserve > 0 ? ` · future/quarterly reserve ${money.format(plan.futureReserve)}` : ""}. This is protected money, not spending money.`, "yellow")}
@@ -5109,7 +5099,7 @@ function renderProtectionLists(month = currentMonth(), plan = safeNextPaycheckPl
             <th class="pct">% Income</th><th></th>
           </tr></thead><tbody>`,
           rows.length ? rows.map(row =>
-            `<tr><td class="paid-check"><input type="checkbox" data-toggle-budget-paid="${row.id}" ${row.manualPaid || (row.status === "Paid" && Number(row.remainingAmount || 0) <= 0) ? "checked" : ""} aria-label="Mark ${escapeHtml(row.payee)} paid"></td><td>${ownerPill(row.owner)}</td><td>${escapeHtml(row.dueDay)}</td><td><strong>${escapeHtml(row.payee)}</strong></td><td>${escapeHtml(row.category)}</td><td>${budgetStatusPill(row)}</td><td>${row.notes ? escapeHtml(row.notes) : `<span class="muted">—</span>`}</td><td class="money">${money.format(row.amount)}</td><td class="money">${money.format(row.paidAmount || 0)}</td><td class="money">${remainingPill(row.remainingAmount ?? row.amount ?? 0)}</td><td class="pct">${Math.round(Number(row.amount || 0) / incomeForPct * 100)}%</td><td class="right"><button class="ghost" type="button" data-edit-budget="${row.id}">Edit</button></td></tr>`
+            `<tr><td class="paid-check"><input type="checkbox" data-toggle-budget-paid="${row.id}" ${row.manualPaid || (row.status === "Paid" && Number(row.remainingAmount || 0) <= 0) ? "checked" : ""} aria-label="Mark ${escapeHtml(row.payee)} paid"></td><td>${ownerPill(row.owner)}</td><td>${escapeHtml(row.dueDay)}</td><td><strong>${escapeHtml(row.payee)}</strong></td><td>${escapeHtml(row.category)}</td><td>${budgetStatusPill(row)}</td><td>${row.notes ? escapeHtml(row.notes) : `<span class="muted">—</span>`}</td><td class="money">${money.format(row.amount)}</td><td class="money">${money.format(row.paidAmount || 0)}</td><td class="money">${monthlyPlanRemainingPill(row)}</td><td class="pct">${Math.round(Number(row.amount || 0) / incomeForPct * 100)}%</td><td class="right"><button class="ghost" type="button" data-edit-budget="${row.id}">Edit</button></td></tr>`
           ).join("") : `<tr><td colspan="12"><div class="empty">No lines are visible with the current filters.</div></td></tr>`,
           `</tbody></table></div></div>`
         ].join("");

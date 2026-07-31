@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Kingdom Builder</title>
-  <!-- v122 clean careful dashboard -->
+  <!-- v124 closeout planned vs actual -->
   <!-- v84 safe next paycheck -->
   <!-- v82 expected income actuals -->
   <!-- v81 fix csv amount sort -->
@@ -2226,7 +2226,7 @@
       /* v114: monthly plan remaining cell shows overage instead of zero */
 
 
-      /* v122 clean careful dashboard: cleaner dark mode and mobile readability */
+      /* v124 closeout planned vs actual: cleaner dark mode and mobile readability */
       @media (prefers-color-scheme: dark) {
         :root {
           --bg: #14120f;
@@ -2520,7 +2520,7 @@
       const assets = ["House 1", "House 2", "Car 1", "Car 2", "Family", "Debt", "Giving", "Kids", "Personal"];
       const categories = ["Personal", "Credit Cards", "Medical", "Entertainment", "Fuel", "Groceries", "Insurance", "HOA", "Mortgage", "Patinada", "Utilities", "Income", "Side Hustles", "Side Gig", "Contribution", "Debt", "Savings", "Next Month Mortgage Reserve / Vault", "Bill Still Due This Month Reserve / Vault", "This Month Bill Reserve / Vault", "Transfer / Vault Movement", "Quarterly Reserve / Vault Set-Aside", "Paid from Vault / Already Reserved", "Uncategorized"];
       const incomeTypes = ["", "Job Income", "Side Hustle Income", "Other Income"];
-      const statuses = ["Not Paid", "Scheduled", "Committed", "Funded", "Paid", "Partial", "Auto-pay", "Review", "Skipped"];
+      const statuses = ["Not Paid", "Scheduled", "Committed", "Funded", "Paid", "Partial", "Auto-pay", "Review", "Skipped", "Closed", "Rolled Over"];
       const navItems = [
         ["dashboard", "Dashboard"],
         ["template", "Base Template"],
@@ -6715,46 +6715,818 @@ function renderCompare() {
       }
 
       // ── CLOSEOUT ─────────────────────────────────────────────────────────────
+
+      function closeoutLineKey(line) {
+        return String(line?.id || protectionLineKey(line) || billLineName(line));
+      }
+
+      function closeoutActionLabels() {
+        return [
+          { value: "close-unused", label: "Close as unused / not needed" },
+          { value: "rollover", label: "Roll over to next month" },
+          { value: "paid-manual", label: "Paid manually at close" },
+          { value: "skip", label: "Skip / not owed" },
+          { value: "leave-open", label: "Leave open" }
+        ];
+      }
+
+      function closeoutActionLabel(value) {
+        const found = closeoutActionLabels().find(item => item.value === value);
+        return found ? found.label : "Close as unused / not needed";
+      }
+
+      function closeoutActionSelect(key, value) {
+        return `<select data-closeout-action="${escapeHtml(key)}">${closeoutActionLabels().map(option => `<option value="${option.value}" ${option.value === value ? "selected" : ""}>${escapeHtml(option.label)}</option>`).join("")}</select>`;
+      }
+
+      function ensureCloseoutState(month = currentMonth()) {
+        month.closeout = month.closeout && typeof month.closeout === "object" ? month.closeout : {};
+        month.closeout.lineActions = month.closeout.lineActions && typeof month.closeout.lineActions === "object" ? month.closeout.lineActions : {};
+        month.closeout.notes ||= "";
+        ["billsChecked", "transactionsChecked", "allowanceChecked", "incomeChecked"].forEach(key => {
+          month.closeout[key] = Boolean(month.closeout[key]);
+        });
+        closeoutOpenLines(month).forEach(line => {
+          const key = closeoutLineKey(line);
+          const remaining = remainingForLine(line);
+          if (!month.closeout.lineActions[key]) {
+            month.closeout.lineActions[key] = {
+              action: "close-unused",
+              amount: remaining,
+              notes: ""
+            };
+          } else {
+            const action = month.closeout.lineActions[key];
+            action.action ||= "close-unused";
+            if (action.amount === undefined || action.amount === null || action.amount === "") action.amount = remaining;
+            action.notes ||= "";
+          }
+        });
+        return month.closeout;
+      }
+
+      function closeoutOpenLines(month = currentMonth()) {
+        return activeBudgetLines(allBudgetLines(month))
+          .filter(line => !isMortgageFundingLine(line))
+          .filter(line => remainingForLine(line) > 0.005)
+          .sort((a, b) => dueDayNumber(a.dueDay) - dueDayNumber(b.dueDay) || String(a.payee || "").localeCompare(String(b.payee || "")));
+      }
+
+      function closeoutAllRows(month = currentMonth()) {
+        return activeBudgetLines(allBudgetLines(month)).map(line => {
+          const planned = Number(line.amount || 0);
+          const paid = Number(line.paidAmount || 0);
+          const remaining = remainingForLine(line);
+          const overpaid = Math.max(0, paid - planned);
+          return {
+            id: line.id,
+            line,
+            key: closeoutLineKey(line),
+            payee: line.payee || line.name || "Bill",
+            owner: line.owner || "Shared",
+            category: line.category || line.paymentType || "Uncategorized",
+            dueDay: dueDisplayForLine(line),
+            planned: roundMoney(planned),
+            paid: roundMoney(paid),
+            remaining: roundMoney(remaining),
+            overpaid: roundMoney(overpaid),
+            status: line.status || "Not Paid"
+          };
+        });
+      }
+
+      function sumCloseoutRows(rows, getter) {
+        return roundMoney(sum(rows || [], getter));
+      }
+
+      function groupCloseoutTotals(rows, groupGetter) {
+        const out = {};
+        (rows || []).forEach(row => {
+          const key = String(groupGetter(row) || "Uncategorized");
+          out[key] ||= { planned: 0, paid: 0, remaining: 0, overpaid: 0, rollover: 0, closedUnused: 0, paidManual: 0, skipped: 0, leaveOpen: 0 };
+          out[key].planned = roundMoney(out[key].planned + Number(row.planned || 0));
+          out[key].paid = roundMoney(out[key].paid + Number(row.paid || 0));
+          out[key].remaining = roundMoney(out[key].remaining + Number(row.remaining || 0));
+          out[key].overpaid = roundMoney(out[key].overpaid + Number(row.overpaid || 0));
+          if (row.action === "rollover") out[key].rollover = roundMoney(out[key].rollover + Number(row.actionAmount || row.remaining || 0));
+          if (row.action === "close-unused") out[key].closedUnused = roundMoney(out[key].closedUnused + Number(row.actionAmount || row.remaining || 0));
+          if (row.action === "paid-manual") out[key].paidManual = roundMoney(out[key].paidManual + Number(row.actionAmount || row.remaining || 0));
+          if (row.action === "skip") out[key].skipped = roundMoney(out[key].skipped + Number(row.actionAmount || row.remaining || 0));
+          if (row.action === "leave-open") out[key].leaveOpen = roundMoney(out[key].leaveOpen + Number(row.actionAmount || row.remaining || 0));
+        });
+        return out;
+      }
+
+      function closeoutReportRows(month = currentMonth()) {
+        const closeout = ensureCloseoutState(month);
+        return closeoutAllRows(month).map(row => {
+          const action = closeout.lineActions[row.key] || {};
+          const amount = Number(action.amount ?? row.remaining ?? 0);
+          return {
+            ...row,
+            action: row.remaining > 0.005 ? (action.action || "close-unused") : "already-closed",
+            actionLabel: row.remaining > 0.005 ? closeoutActionLabel(action.action || "close-unused") : "Already closed",
+            actionAmount: row.remaining > 0.005 ? roundMoney(Number.isFinite(amount) ? Math.max(0, amount) : row.remaining) : 0,
+            actionNotes: action.notes || ""
+          };
+        });
+      }
+
+
+      function rawMoney(value) {
+        const amount = Number(value);
+        return Number.isFinite(amount) ? amount : 0;
+      }
+
+      function varianceAmount(actual, planned) {
+        return rawMoney(actual) - rawMoney(planned);
+      }
+
+      function varianceNeedsReview(actual, planned, threshold = 1) {
+        return Math.abs(varianceAmount(actual, planned)) > threshold;
+      }
+
+      function closeoutVarianceFlag(name, section, actual, planned, notes = "") {
+        if (!varianceNeedsReview(actual, planned)) return null;
+        return {
+          section,
+          name,
+          planned: rawMoney(planned),
+          actual: rawMoney(actual),
+          variance: varianceAmount(actual, planned),
+          notes
+        };
+      }
+
+      function linkedBillTransactionActual(month, billId) {
+        if (!billId) return 0;
+        return Math.abs(sum((month.transactions || []).filter(txn =>
+          txn.reconciled &&
+          txn.billId === billId &&
+          Number(txn.amount || 0) < 0
+        ), txn => Number(txn.amount || 0)));
+      }
+
+      function actualForBudgetLine(month, line) {
+        const paidAmount = rawMoney(line.paidAmount);
+        const linkedActual = linkedBillTransactionActual(month, line.id);
+        if (linkedActual > 0 && Math.abs(linkedActual - paidAmount) > 0.01) {
+          return { actual: linkedActual, source: "linked reconciled transactions" };
+        }
+        return { actual: paidAmount, source: "paidAmount" };
+      }
+
+      function plannedActualBillRows(month = currentMonth()) {
+        return activeBudgetLines(allBudgetLines(month)).map(line => {
+          const planned = rawMoney(line.amount);
+          const actualInfo = actualForBudgetLine(month, line);
+          const actual = rawMoney(actualInfo.actual);
+          const variance = varianceAmount(actual, planned);
+          const status = line.status || "Not Paid";
+          const statusFlag = ["Paid", "Committed", "Auto-pay", "Funded"].includes(status) && Math.abs(variance) > 0.01;
+          const reviewFlag = varianceNeedsReview(actual, planned);
+          return {
+            section: "Bills",
+            id: line.id,
+            name: billLineName(line),
+            owner: line.owner || "Shared",
+            category: line.category || line.paymentType || "Uncategorized",
+            planned,
+            actual,
+            variance,
+            notes: [
+              `Status: ${status}`,
+              `Actual source: ${actualInfo.source}`,
+              statusFlag ? "FLAG: status says paid/committed but actual does not match planned" : "",
+              reviewFlag ? "Review: planned and actual differ by more than $1" : ""
+            ].filter(Boolean).join(" · "),
+            status,
+            statusFlag,
+            reviewFlag
+          };
+        });
+      }
+
+      function transactionMatchesIncomeOwner(txn, owner) {
+        const txOwner = String(txn.owner || "").trim().toLowerCase();
+        const expected = String(owner || "").trim().toLowerCase();
+        if (!expected || expected === "shared") return true;
+        return txOwner === expected;
+      }
+
+      function incomeTransactionRows(month, typeMatcher) {
+        return (month.transactions || []).filter(txn =>
+          txn.reconciled &&
+          Number(txn.amount || 0) > 0 &&
+          typeMatcher(txn)
+        );
+      }
+
+      function plannedPaycheckByOwner(month = currentMonth()) {
+        return (month.paychecks || []).reduce((acc, row) => {
+          const owner = row.owner || "Unassigned";
+          acc[owner] = (acc[owner] || 0) + rawMoney(row.amount);
+          return acc;
+        }, {});
+      }
+
+      function actualJobIncomeByOwner(month = currentMonth()) {
+        return actualJobIncomeRows(month).reduce((acc, txn) => {
+          const owner = txn.owner || "Unassigned";
+          acc[owner] = (acc[owner] || 0) + rawMoney(txn.amount);
+          return acc;
+        }, {});
+      }
+
+      function plannedActualIncomeRows(month = currentMonth()) {
+        const rows = [];
+        const plannedByOwner = plannedPaycheckByOwner(month);
+        const actualByOwner = actualJobIncomeByOwner(month);
+        Array.from(new Set([...Object.keys(plannedByOwner), ...Object.keys(actualByOwner)])).sort().forEach(owner => {
+          const planned = rawMoney(plannedByOwner[owner]);
+          const actual = rawMoney(actualByOwner[owner]);
+          rows.push({
+            section: "Income",
+            name: `Job income — ${owner}`,
+            owner,
+            category: "Job Income",
+            planned,
+            actual,
+            variance: varianceAmount(actual, planned),
+            notes: varianceNeedsReview(actual, planned) ? "Review: job income planned and actual differ by more than $1." : "Expected paychecks vs reconciled job income.",
+            reviewFlag: varianceNeedsReview(actual, planned)
+          });
+        });
+
+        reliableJobIncomeRows().forEach(row => {
+          // Only include non-paycheck reliable lines if they are not already represented by paycheck buckets.
+          const label = `${row.owner || "Shared"}|${row.type || "Income"}`;
+          if (/job|paycheck|salary/i.test(String(row.type || row.incomeType || ""))) return;
+          const planned = rawMoney(row.monthly);
+          const actual = sum(incomeTransactionRows(month, txn =>
+            transactionMatchesIncomeOwner(txn, row.owner) &&
+            !isSideHustleTransaction(txn) &&
+            !isActualJobIncomeForPaycheck(txn)
+          ), txn => rawMoney(txn.amount));
+          rows.push({
+            section: "Income",
+            name: row.type || label,
+            owner: row.owner || "Shared",
+            category: row.type || "Income",
+            planned,
+            actual,
+            variance: varianceAmount(actual, planned),
+            notes: row.notes || "Reliable planned income source.",
+            reviewFlag: varianceNeedsReview(actual, planned)
+          });
+        });
+
+        otherPlannedIncomeRows().forEach(row => {
+          const planned = rawMoney(row.monthly);
+          const actual = sum(incomeTransactionRows(month, txn =>
+            transactionMatchesIncomeOwner(txn, row.owner) &&
+            !isSideHustleTransaction(txn) &&
+            !isActualJobIncomeForPaycheck(txn)
+          ), txn => rawMoney(txn.amount));
+          rows.push({
+            section: "Income",
+            name: row.type || "Other planned income",
+            owner: row.owner || "Shared",
+            category: row.type || "Other Income",
+            planned,
+            actual,
+            variance: varianceAmount(actual, planned),
+            notes: row.notes || "Planned non-job income compared to reconciled non-job deposits.",
+            reviewFlag: varianceNeedsReview(actual, planned)
+          });
+        });
+
+        actualOtherIncomeRows(month).forEach(txn => {
+          const name = txn.description || txn.merchant || "Other income deposit";
+          rows.push({
+            section: "Income",
+            name: `Actual deposit — ${name}`,
+            owner: txn.owner || "Shared",
+            category: txn.incomeType || txn.category || "Other Income",
+            planned: 0,
+            actual: rawMoney(txn.amount),
+            variance: rawMoney(txn.amount),
+            notes: "Side income / other deposit. Planned left as $0 unless modeled separately.",
+            reviewFlag: Math.abs(rawMoney(txn.amount)) > 1
+          });
+        });
+
+        return rows;
+      }
+
+      function plannedActualSideHustleRows(month = currentMonth()) {
+        const groups = {};
+        (paypalSideGigRows(month) || []).forEach(gig => {
+          const owner = sideGigOwner(gig, month) || gig.owner || "Unassigned";
+          const source = gig.source || "Side Hustle";
+          const key = `${owner}|${source}`;
+          groups[key] ||= { owner, source, gross: 0, net: 0, count: 0 };
+          const gross = rawMoney(gig.gross);
+          const taxRate = rawMoney(gig.taxRate);
+          const net = gross - (gross * taxRate / 100);
+          groups[key].gross += gross;
+          groups[key].net += net;
+          groups[key].count += 1;
+        });
+        return Object.values(groups).sort((a,b) => `${a.owner} ${a.source}`.localeCompare(`${b.owner} ${b.source}`)).map(group => ({
+          section: "Side Hustles",
+          name: `${group.owner} — ${group.source}`,
+          owner: group.owner,
+          category: "Side Hustles",
+          planned: null,
+          actual: group.gross,
+          actualNet: group.net,
+          variance: null,
+          notes: `Bonus income, not budgeted. Gross ${money.format(group.gross)} · net after tax setting ${money.format(group.net)} · ${group.count} entr${group.count === 1 ? "y" : "ies"}.`,
+          reviewFlag: false
+        }));
+      }
+
+      function plannedActualPersonalRows(month = currentMonth()) {
+        const budgets = personalBudgetByOwner(month);
+        const owners = Array.from(new Set([...Object.keys(budgets), "Alec", "Patricia"])).filter(Boolean).sort();
+        return owners.map(owner => {
+          const planned = rawMoney(budgets[owner]);
+          const actual = rawMoney(personalSpentForOwner(month, owner));
+          return {
+            section: "Personal / Allowance",
+            name: `Personal money — ${owner}`,
+            owner,
+            category: "Personal",
+            planned,
+            actual,
+            variance: varianceAmount(actual, planned),
+            notes: varianceAmount(actual, planned) > 1 ? "Review: overspent personal allowance." : "Monthly allowance vs reconciled Personal transactions.",
+            reviewFlag: varianceNeedsReview(actual, planned)
+          };
+        });
+      }
+
+      function plannedActualContributionRows(month = currentMonth()) {
+        return (month.contributions || []).map(row => {
+          const planned = rawMoney(row.expected);
+          const actual = rawMoney(row.received);
+          return {
+            section: "Contributions",
+            name: row.person || "Contribution",
+            owner: row.person || "Contribution",
+            category: "Contributions",
+            planned,
+            actual,
+            variance: varianceAmount(actual, planned),
+            notes: `Status: ${row.status || "Pending"}${row.notes ? " · " + row.notes : ""}. Pending is never counted as received.`,
+            status: row.status || "Pending",
+            reviewFlag: varianceNeedsReview(actual, planned)
+          };
+        });
+      }
+
+      function plannedActualRowsBySection(month = currentMonth()) {
+        return {
+          bills: plannedActualBillRows(month),
+          income: plannedActualIncomeRows(month),
+          sideHustles: plannedActualSideHustleRows(month),
+          personal: plannedActualPersonalRows(month),
+          contributions: plannedActualContributionRows(month)
+        };
+      }
+
+      function plannedActualFlatRows(sections) {
+        return [
+          ...(sections.bills || []),
+          ...(sections.income || []),
+          ...(sections.sideHustles || []),
+          ...(sections.personal || []),
+          ...(sections.contributions || [])
+        ];
+      }
+
+      function plannedActualSectionTotals(rows) {
+        const plannedRows = (rows || []).filter(row => row.planned !== null && row.planned !== undefined);
+        return {
+          planned: sum(plannedRows, row => rawMoney(row.planned)),
+          actual: sum(rows || [], row => rawMoney(row.actual)),
+          variance: sum(plannedRows, row => varianceAmount(row.actual, row.planned))
+        };
+      }
+
+      function plannedActualReportTotals(sections) {
+        const billActual = sum(sections.bills || [], row => rawMoney(row.actual));
+        const personalActual = sum(sections.personal || [], row => rawMoney(row.actual));
+        const contributionActual = sum(sections.contributions || [], row => rawMoney(row.actual));
+        const incomeActual = sum(sections.income || [], row => rawMoney(row.actual));
+        const sideGross = sum(sections.sideHustles || [], row => rawMoney(row.actual));
+        const sideNet = sum(sections.sideHustles || [], row => rawMoney(row.actualNet));
+        const actualSpending = billActual + personalActual;
+        const actualIncomeAll = incomeActual + sideGross + contributionActual;
+        return {
+          plannedBills: sum(sections.bills || [], row => rawMoney(row.planned)),
+          actualBills: billActual,
+          plannedIncome: sum(sections.income || [], row => rawMoney(row.planned)),
+          actualIncome: incomeActual,
+          sideHustleGross: sideGross,
+          sideHustleNet: sideNet,
+          plannedPersonal: sum(sections.personal || [], row => rawMoney(row.planned)),
+          actualPersonal: personalActual,
+          plannedContributions: sum(sections.contributions || [], row => rawMoney(row.planned)),
+          actualContributions: contributionActual,
+          totalActualIncome: actualIncomeAll,
+          totalActualSpending: actualSpending,
+          netCashPosition: actualIncomeAll - actualSpending
+        };
+      }
+
+      function plannedActualReviewFlags(sections) {
+        const flags = [];
+        plannedActualFlatRows(sections).forEach(row => {
+          if (row.reviewFlag) {
+            flags.push({
+              section: row.section,
+              name: row.name,
+              planned: row.planned,
+              actual: row.actual,
+              variance: row.variance,
+              notes: row.notes || ""
+            });
+          }
+          if (row.statusFlag) {
+            flags.push({
+              section: row.section,
+              name: row.name,
+              planned: row.planned,
+              actual: row.actual,
+              variance: row.variance,
+              notes: "Status is Paid/Committed/Funded/Auto-pay but actual does not equal planned."
+            });
+          }
+        });
+        return flags;
+      }
+
+      function renderPlannedActualTable(title, rows, options = {}) {
+        if (!rows || !rows.length) return `<div class="empty">No ${escapeHtml(title.toLowerCase())} rows.</div>`;
+        return `<div class="table-wrap"><table><thead><tr><th>Name</th><th class="money">Planned</th><th class="money">Actual</th><th class="money">Variance</th><th>Notes</th></tr></thead><tbody>
+          ${rows.map(row => {
+            const plannedText = row.planned === null || row.planned === undefined ? "N/A" : money.format(row.planned);
+            const actualText = money.format(row.actual || 0);
+            const varianceText = row.variance === null || row.variance === undefined ? "N/A" : money.format(row.variance);
+            const flag = row.reviewFlag || row.statusFlag ? `<span class="pill red">Review</span> ` : "";
+            return `<tr>
+              <td><strong>${escapeHtml(row.name)}</strong><div class="muted small">${escapeHtml(row.owner || "")}${row.category ? " · " + escapeHtml(row.category) : ""}</div></td>
+              <td class="money">${plannedText}</td>
+              <td class="money">${actualText}</td>
+              <td class="money">${varianceText}</td>
+              <td>${flag}${escapeHtml(row.notes || "")}</td>
+            </tr>`;
+          }).join("")}
+        </tbody></table></div>`;
+      }
+
+      function renderPlannedActualCloseoutSection(report) {
+        const pa = report.plannedActual || {};
+        const sections = pa.sections || {};
+        const totals = pa.totals || {};
+        const flags = pa.reviewFlags || [];
+        return `
+          <div class="card">
+            <div class="section-title"><h3>Planned vs Actual Closeout</h3><span>Name · Planned · Actual · Variance · Notes</span></div>
+            <div class="cards kb-simple-dashboard-cards">
+              ${metric("Actual income", totals.totalActualIncome || 0, `Includes job/other income, side hustle gross, and received contributions.`, "green")}
+              ${metric("Actual spending", totals.totalActualSpending || 0, "Bills actual + personal actual.", "yellow")}
+              ${metric("Net cash position", totals.netCashPosition || 0, "Total actual income minus total actual spending.", (totals.netCashPosition || 0) < 0 ? "red" : "green")}
+              ${metric("Review flags", flags.length, "Lines where planned and actual differ by more than $1, plus paid/committed mismatches.", flags.length ? "red" : "green")}
+            </div>
+            ${flags.length ? `<div class="banner" style="background:var(--red-soft);border-color:#e7b8ae;color:var(--red);margin-top:.6rem"><div><strong>${flags.length} line${flags.length === 1 ? "" : "s"} need review before locking</strong><span>${flags.slice(0,5).map(flag => `${escapeHtml(flag.section)}: ${escapeHtml(flag.name)} (${money.format(flag.variance || 0)})`).join(" · ")}${flags.length > 5 ? " · ..." : ""}</span></div></div>` : `<div class="banner" style="background:var(--green-soft);border-color:#b8d6c3;color:var(--green);margin-top:.6rem"><div><strong>No planned-vs-actual review flags over $1</strong><span>Paid status did not substitute for actual dollars.</span></div></div>`}
+          </div>
+          <div class="card"><div class="section-title"><h3>Bills</h3></div>${renderPlannedActualTable("Bills", sections.bills || [])}</div>
+          <div class="card"><div class="section-title"><h3>Income</h3></div>${renderPlannedActualTable("Income", sections.income || [])}</div>
+          <div class="card"><div class="section-title"><h3>Side hustles</h3></div>${renderPlannedActualTable("Side Hustles", sections.sideHustles || [])}</div>
+          <div class="card"><div class="section-title"><h3>Personal / Allowance</h3></div>${renderPlannedActualTable("Personal", sections.personal || [])}</div>
+          <div class="card"><div class="section-title"><h3>Contributions</h3></div>${renderPlannedActualTable("Contributions", sections.contributions || [])}</div>
+        `;
+      }
+
+
+      function buildCloseoutReport(month = currentMonth()) {
+        const rows = closeoutReportRows(month);
+        const openRows = rows.filter(row => row.remaining > 0.005);
+        const actionRows = rows.filter(row => row.remaining > 0.005 && row.action !== "already-closed");
+        const actualJob = actualJobIncomeTotal(month);
+        const actualOther = actualOtherIncomeTotal(month);
+        const actualSide = actualSideHustleIncomeTotal(month);
+        const sideGross = paypalSideGigGross(month);
+        const personalAlec = personalSpentForOwner(month, "Alec");
+        const personalPatricia = personalSpentForOwner(month, "Patricia");
+        const plannedActualSections = plannedActualRowsBySection(month);
+        const plannedActualTotals = plannedActualReportTotals(plannedActualSections);
+        const plannedActualFlags = plannedActualReviewFlags(plannedActualSections);
+
+        const report = {
+          id: `closeout-${state.activeMonth || Date.now()}`,
+          monthKey: state.activeMonth,
+          monthLabel: month.label,
+          status: "Draft",
+          generatedAt: new Date().toISOString(),
+          notes: month.closeout?.notes || "",
+          checklist: {
+            billsChecked: Boolean(month.closeout?.billsChecked),
+            transactionsChecked: Boolean(month.closeout?.transactionsChecked),
+            allowanceChecked: Boolean(month.closeout?.allowanceChecked),
+            incomeChecked: Boolean(month.closeout?.incomeChecked)
+          },
+          totals: {
+            planned: sumCloseoutRows(rows, row => row.planned),
+            paid: sumCloseoutRows(rows, row => row.paid),
+            remainingAtReview: sumCloseoutRows(rows, row => row.remaining),
+            overpaid: sumCloseoutRows(rows, row => row.overpaid),
+            rolledOver: sumCloseoutRows(actionRows.filter(row => row.action === "rollover"), row => row.actionAmount),
+            closedUnused: sumCloseoutRows(actionRows.filter(row => row.action === "close-unused"), row => row.actionAmount),
+            paidManuallyAtClose: sumCloseoutRows(actionRows.filter(row => row.action === "paid-manual"), row => row.actionAmount),
+            skippedNotOwed: sumCloseoutRows(actionRows.filter(row => row.action === "skip"), row => row.actionAmount),
+            leftOpen: sumCloseoutRows(actionRows.filter(row => row.action === "leave-open"), row => row.actionAmount),
+            openLineCount: openRows.length,
+            unreconciledTransactions: unreconciledCount(month)
+          },
+          income: {
+            actualIncomeReceived: rawMoney(actualJob + actualSide + actualOther),
+            job: rawMoney(actualJob),
+            sideHustle: rawMoney(actualSide),
+            sideHustleGross: rawMoney(sideGross),
+            other: rawMoney(actualOther),
+            daughtersReceived: rawMoney(contributionReceived(month))
+          },
+          personal: {
+            Alec: rawMoney(personalAlec),
+            Patricia: rawMoney(personalPatricia)
+          },
+          plannedActual: {
+            sections: plannedActualSections,
+            totals: plannedActualTotals,
+            reviewFlags: plannedActualFlags
+          },
+          byCategory: groupCloseoutTotals(rows, row => row.category),
+          byOwner: groupCloseoutTotals(rows, row => row.owner),
+          lines: rows.map(row => ({
+            id: row.id,
+            payee: row.payee,
+            owner: row.owner,
+            category: row.category,
+            dueDay: row.dueDay,
+            planned: row.planned,
+            paid: row.paid,
+            remaining: row.remaining,
+            overpaid: row.overpaid,
+            status: row.status,
+            action: row.action,
+            actionLabel: row.actionLabel,
+            actionAmount: row.actionAmount,
+            actionNotes: row.actionNotes
+          }))
+        };
+        return report;
+      }
+
+      function applyCloseoutReportActions(month, report) {
+        const byId = {};
+        activeBudgetLines(allBudgetLines(month)).forEach(line => { byId[line.id] = line; });
+        (report.lines || []).forEach(row => {
+          if (!row.remaining || row.remaining <= 0.005 || row.action === "already-closed") return;
+          const line = byId[row.id];
+          if (!line) return;
+          line.closeoutAction = row.action;
+          line.closeoutActionLabel = row.actionLabel;
+          line.closeoutOriginalRemaining = row.remaining;
+          line.closeoutActionAmount = row.actionAmount;
+          if (row.action === "paid-manual") {
+            line.manualPaid = true;
+            line.paidAmount = roundMoney(Math.max(Number(line.paidAmount || 0), Number(line.amount || 0)));
+            line.remainingAmount = 0;
+            line.status = "Paid";
+            line.notes = [line.notes, `Closed manually in ${month.label}.`].filter(Boolean).join(" ");
+          } else if (row.action === "rollover") {
+            line.remainingAmount = 0;
+            line.status = "Rolled Over";
+            line.notes = [line.notes, `Rolled over ${money.format(row.actionAmount || row.remaining)} from ${month.label}.`].filter(Boolean).join(" ");
+          } else if (row.action === "skip" || row.action === "close-unused") {
+            line.remainingAmount = 0;
+            line.status = row.action === "skip" ? "Skipped" : "Closed";
+            line.notes = [line.notes, row.action === "skip" ? `Skipped/not owed in ${month.label}.` : `Closed unused in ${month.label}.`].filter(Boolean).join(" ");
+          }
+        });
+      }
+
+      function finalizeCloseoutReport(month = currentMonth()) {
+        ensureCloseoutState(month);
+        const report = buildCloseoutReport(month);
+        report.status = "Closed";
+        report.closedAt = new Date().toISOString();
+        applyCloseoutReportActions(month, report);
+        // Rebuild after applying actions so final remaining reflects the closed state, but keep action detail.
+        const finalReport = buildCloseoutReport(month);
+        finalReport.status = "Closed";
+        finalReport.closedAt = report.closedAt;
+        finalReport.lines = report.lines;
+        finalReport.totals = {
+          ...report.totals,
+          finalRemainingAfterClose: sumCloseoutRows(closeoutAllRows(month), row => row.remaining)
+        };
+        month.closeoutReport = finalReport;
+        month.closed = true;
+        month.closedAt = finalReport.closedAt;
+        saveState();
+        return finalReport;
+      }
+
+      function closeoutReportTable(title, groups) {
+        const entries = Object.entries(groups || {}).sort((a,b) => a[0].localeCompare(b[0]));
+        if (!entries.length) return `<div class="empty">No ${escapeHtml(title.toLowerCase())} totals yet.</div>`;
+        return `<div class="table-wrap"><table><thead><tr><th>${escapeHtml(title)}</th><th class="money">Planned</th><th class="money">Paid</th><th class="money">Remaining</th><th class="money">Overpaid</th><th class="money">Rollover</th><th class="money">Closed unused</th></tr></thead><tbody>${entries.map(([name, row]) => `<tr><td><strong>${escapeHtml(name)}</strong></td><td class="money">${money.format(row.planned || 0)}</td><td class="money">${money.format(row.paid || 0)}</td><td class="money">${money.format(row.remaining || 0)}</td><td class="money">${money.format(row.overpaid || 0)}</td><td class="money">${money.format(row.rollover || 0)}</td><td class="money">${money.format(row.closedUnused || 0)}</td></tr>`).join("")}</tbody></table></div>`;
+      }
+
+      function renderCloseoutSummaryCards(report) {
+        return `<div class="cards kb-simple-dashboard-cards">
+          ${metric("Planned bills", report.totals.planned, "Original planned budget for this month.")}
+          ${metric("Paid", report.totals.paid, "Paid/matched/manual amount before close.", "green")}
+          ${metric("Remaining reviewed", report.totals.remainingAtReview, "Line-by-line remaining before close actions.", report.totals.remainingAtReview > 0 ? "yellow" : "green")}
+          ${metric("Rolled over", report.totals.rolledOver, "Amount selected to move into next month.", report.totals.rolledOver > 0 ? "yellow" : "")}
+          ${metric("Closed unused/skipped", report.totals.closedUnused + report.totals.skippedNotOwed, "Remaining amount closed without counting as paid.")}
+          ${metric("Overpaid", report.totals.overpaid, "Paid above planned on individual lines.")}
+          ${metric("Actual income", report.income.actualIncomeReceived, `Job ${money.format(report.income.job)} · Side ${money.format(report.income.sideHustle)} · Other ${money.format(report.income.other)}`, "green")}
+          ${metric("Personal spending", report.personal.Alec + report.personal.Patricia, `Alec ${money.format(report.personal.Alec)} · Patricia ${money.format(report.personal.Patricia)}`, "yellow")}
+        </div>`;
+      }
+
+      function exportCloseoutReport(report = buildCloseoutReport(currentMonth())) {
+        const blob = new Blob([JSON.stringify(report, null, 2)], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `${String(report.monthLabel || report.monthKey || "month").replace(/\s+/g, "-").toLowerCase()}-closeout-report.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+      }
+
+      function applyCloseoutRolloversToMonth(sourceMonth, targetMonth) {
+        const report = sourceMonth?.closeoutReport;
+        if (!report || !Array.isArray(report.lines)) return 0;
+        let added = 0;
+        report.lines
+          .filter(row => row.action === "rollover" && Number(row.actionAmount || row.remaining || 0) > 0)
+          .forEach(row => {
+            targetMonth.budgetLines.push({
+              id: uid("bill"),
+              owner: row.owner || "Shared",
+              dueDay: "1",
+              payee: `Rollover from ${sourceMonth.label}: ${row.payee}`,
+              category: row.category || "Rollover",
+              paymentType: row.category || "Rollover",
+              amount: roundMoney(Number(row.actionAmount || row.remaining || 0)),
+              paidAmount: 0,
+              remainingAmount: roundMoney(Number(row.actionAmount || row.remaining || 0)),
+              status: "Not Paid",
+              manualPaid: false,
+              recurring: false,
+              expenseType: "Fixed",
+              notes: `Created from ${sourceMonth.label} closeout. Original remaining ${money.format(row.remaining || 0)}.`
+            });
+            added += 1;
+          });
+        return added;
+      }
+
+
       function renderCloseout() {
         const month = currentMonth();
+        const closeout = ensureCloseoutState(month);
         const checks = [
-          ["billsChecked", "All planned bills are marked paid, partial, skipped, or review"],
+          ["billsChecked", "All planned bills are reviewed and assigned a close action"],
           ["transactionsChecked", "All CSV transactions are reconciled and have a home"],
           ["allowanceChecked", "Personal money is checked for Patricia and Alec"],
           ["incomeChecked", "Daughters' contributions and side gig income are recorded"]
         ];
         const complete = closeoutComplete(month);
+        const draftReport = buildCloseoutReport(month);
+        const savedReport = month.closeoutReport || null;
+        const openRows = closeoutOpenLines(month);
+
         document.querySelector("#closeout").innerHTML = [
-          `<div class="card"><div class="section-title"><h3>Close ${escapeHtml(month.label)}</h3></div>
-          ${complete ? `<div class="banner" style="background:var(--green-soft);border-color:#b8d6c3;color:var(--green)"><div><strong>Closeout complete</strong><span>You can create the next month from this screen.</span></div></div>` : `<div class="banner" style="background:var(--yellow-soft);border-color:#ead39c;color:var(--yellow)"><div><strong>Closeout is not complete yet</strong><span>Check all items before creating the next month.</span></div></div>`}
-          <div class="mini-list">
-          ${checks.map(([key, label]) => `<label style="display:flex;align-items:center;gap:.65rem;color:var(--ink);font-size:.95rem"><input type="checkbox" data-closeout="${key}"${month.closeout[key] ? " checked" : ""} style="width:auto"> ${label}</label>`).join("")}
-          </div>
-          <label style="margin-top:1rem">Month notes<textarea id="closeoutNotes">${escapeHtml(month.closeout.notes||"")}</textarea></label>
-          <div class="toolbar" style="justify-content:flex-start;margin-top:1rem">
-            <button id="saveCloseout" type="button">Save Closeout</button>
-            <button id="copyNextFromCloseout" class="secondary" type="button"${complete ? "" : " disabled"}>Create Month</button>
-          </div></div>`
+          `<div class="card">
+            <div class="section-title"><h3>Close ${escapeHtml(month.label)}</h3><span>${savedReport ? `Closed ${escapeHtml(new Date(savedReport.closedAt || savedReport.generatedAt).toLocaleString())}` : "Real closeout report"}</span></div>
+            ${savedReport ? `<div class="banner" style="background:var(--green-soft);border-color:#b8d6c3;color:var(--green)"><div><strong>${escapeHtml(month.label)} closeout report saved</strong><span>July is stored as a historical report. You can still export or update it if needed.</span></div></div>` : complete ? `<div class="banner" style="background:var(--green-soft);border-color:#b8d6c3;color:var(--green)"><div><strong>Ready to save closeout report</strong><span>Review the totals and click Save Final Closeout Report.</span></div></div>` : `<div class="banner" style="background:var(--yellow-soft);border-color:#ead39c;color:var(--yellow)"><div><strong>Closeout is not complete yet</strong><span>Review open lines, check all items, then save the report.</span></div></div>`}
+
+            <div class="mini-list">
+              ${checks.map(([key, label]) => `<label style="display:flex;align-items:center;gap:.65rem;color:var(--ink);font-size:.95rem"><input type="checkbox" data-closeout="${key}"${closeout[key] ? " checked" : ""} style="width:auto"> ${label}</label>`).join("")}
+            </div>
+
+            <label style="margin-top:1rem">Month notes<textarea id="closeoutNotes">${escapeHtml(closeout.notes||"")}</textarea></label>
+
+            <div class="toolbar" style="justify-content:flex-start;margin-top:1rem;flex-wrap:wrap">
+              <button id="saveCloseoutDraft" type="button">Save Draft</button>
+              <button id="saveFinalCloseout" class="secondary" type="button"${complete ? "" : " disabled"}>Save Final Closeout Report</button>
+              <button id="exportCloseoutReport" class="secondary" type="button">Export Report</button>
+              <button id="copyNextFromCloseout" class="secondary" type="button"${savedReport ? "" : " disabled"}>Create Next Month From Closeout</button>
+            </div>
+          </div>`,
+
+          `<div class="card">
+            <div class="section-title"><h3>Final totals preview</h3><span>${escapeHtml(month.label)}</span></div>
+            ${renderCloseoutSummaryCards(savedReport || draftReport)}
+          </div>`,
+
+          `<div class="card">
+            <div class="section-title"><h3>Open lines to close</h3><span>${openRows.length ? openRows.length + " line" + (openRows.length === 1 ? "" : "s") + " need a close action" : "No remaining lines"}</span></div>
+            ${openRows.length ? `<div class="table-wrap"><table><thead><tr><th>Bill</th><th>Owner</th><th>Category</th><th>Due</th><th class="money">Planned</th><th class="money">Paid</th><th class="money">Remaining</th><th>Close action</th></tr></thead><tbody>
+              ${openRows.map(line => {
+                const key = closeoutLineKey(line);
+                const action = closeout.lineActions[key] || { action: "close-unused", amount: remainingForLine(line) };
+                return `<tr>
+                  <td><strong>${billLineName(line)}</strong><div class="muted small">${escapeHtml(line.status || "Not Paid")}</div></td>
+                  <td>${ownerPill(line.owner || "Shared")}</td>
+                  <td>${escapeHtml(line.category || line.paymentType || "Uncategorized")}</td>
+                  <td>${escapeHtml(dueDisplayForLine(line))}</td>
+                  <td class="money">${money.format(Number(line.amount || 0))}</td>
+                  <td class="money">${money.format(Number(line.paidAmount || 0))}</td>
+                  <td class="money">${money.format(remainingForLine(line))}</td>
+                  <td>${closeoutActionSelect(key, action.action || "close-unused")}</td>
+                </tr>`;
+              }).join("")}
+            </tbody></table></div>` : `<div class="empty">Everything is paid, closed, skipped, or already has no remaining amount.</div>`}
+            <p class="muted small" style="margin-top:.8rem">Default is “Close as unused / not needed.” Use “Roll over” only for something August really needs to carry.</p>
+          </div>`,
+
+          `<div class="split">
+            <div class="card"><div class="section-title"><h3>By category</h3></div>${closeoutReportTable("Category", (savedReport || draftReport).byCategory)}</div>
+            <div class="card"><div class="section-title"><h3>By owner</h3></div>${closeoutReportTable("Owner", (savedReport || draftReport).byOwner)}</div>
+          </div>`,
+
+          renderPlannedActualCloseoutSection(savedReport || draftReport),
+
+          savedReport ? `<div class="card"><div class="section-title"><h3>Saved report detail</h3><span>Historical record</span></div>
+            <div class="table-wrap"><table><thead><tr><th>Bill</th><th>Action</th><th class="money">Planned</th><th class="money">Paid</th><th class="money">Remaining reviewed</th><th class="money">Action amount</th></tr></thead><tbody>
+              ${(savedReport.lines || []).map(row => `<tr><td><strong>${escapeHtml(row.payee)}</strong><div class="muted small">${escapeHtml(row.category)} · ${escapeHtml(row.owner)}</div></td><td>${escapeHtml(row.actionLabel || row.action)}</td><td class="money">${money.format(row.planned || 0)}</td><td class="money">${money.format(row.paid || 0)}</td><td class="money">${money.format(row.remaining || 0)}</td><td class="money">${money.format(row.actionAmount || 0)}</td></tr>`).join("")}
+            </tbody></table></div></div>` : ""
         ].join("");
-        document.querySelector("#saveCloseout").addEventListener("click", () => {
-          document.querySelectorAll("[data-closeout]").forEach(box => { month.closeout[box.dataset.closeout] = box.checked; });
-          month.closeout.notes = document.querySelector("#closeoutNotes").value;
+
+        const saveDraft = () => {
+          document.querySelectorAll("[data-closeout]").forEach(box => { closeout[box.dataset.closeout] = box.checked; });
+          closeout.notes = document.querySelector("#closeoutNotes").value;
+          saveState();
+        };
+
+        document.querySelector("#saveCloseoutDraft").addEventListener("click", () => {
+          saveDraft();
+          renderCloseout();
+        });
+
+        document.querySelectorAll("[data-closeout]").forEach(box => box.addEventListener("change", () => {
+          closeout[box.dataset.closeout] = box.checked;
+          closeout.notes = document.querySelector("#closeoutNotes").value;
+          saveState();
+          renderCloseout();
+        }));
+
+        document.querySelectorAll("[data-closeout-action]").forEach(selectEl => selectEl.addEventListener("change", event => {
+          const key = event.target.dataset.closeoutAction;
+          closeout.lineActions[key] = closeout.lineActions[key] && typeof closeout.lineActions[key] === "object" ? closeout.lineActions[key] : {};
+          closeout.lineActions[key].action = event.target.value;
+          saveState();
+          renderCloseout();
+        }));
+
+        document.querySelector("#saveFinalCloseout").addEventListener("click", () => {
+          saveDraft();
+          if (!closeoutComplete(month)) return alert("Check all closeout items first.");
+          const flags = buildCloseoutReport(month).plannedActual?.reviewFlags || [];
+          const flagText = flags.length ? `\n\n${flags.length} planned-vs-actual review flag${flags.length === 1 ? "" : "s"} will be saved in the report. Review them before locking if needed.` : "";
+          if (!confirm("Save the final closeout report and close remaining July lines using the selected actions?" + flagText)) return;
+          finalizeCloseoutReport(month);
           render();
         });
-        document.querySelectorAll("[data-closeout]").forEach(box => box.addEventListener("change", () => {
-          month.closeout[box.dataset.closeout] = box.checked;
-          month.closeout.notes = document.querySelector("#closeoutNotes").value;
-          renderCloseout(); saveState();
-        }));
+
+        document.querySelector("#exportCloseoutReport").addEventListener("click", () => {
+          saveDraft();
+          exportCloseoutReport(month.closeoutReport || buildCloseoutReport(month));
+        });
+
         document.querySelector("#copyNextFromCloseout").addEventListener("click", () => {
-          if (!closeoutComplete(month)) return alert("Finish all closeout checklist items first.");
-          openCreateMonthModal();
+          if (!month.closeoutReport) return alert("Save the final closeout report first.");
+          createMonthFromSource(nextMonthKey(state.activeMonth), state.activeMonth);
         });
       }
 
       function closeoutComplete(month) {
-        const c = month.closeout || {};
-        return Boolean(c.billsChecked && c.transactionsChecked && c.allowanceChecked && c.incomeChecked);
+        const c = ensureCloseoutState(month);
+        const checklistComplete = Boolean(c.billsChecked && c.transactionsChecked && c.allowanceChecked && c.incomeChecked);
+        const unresolved = closeoutOpenLines(month).some(line => {
+          const action = c.lineActions[closeoutLineKey(line)]?.action || "close-unused";
+          return action === "leave-open";
+        });
+        return checklistComplete && !unresolved;
       }
 
 
@@ -7016,6 +7788,7 @@ function renderCompare() {
           sideGigs: [], importMessage: "",
           closeout: { billsChecked: false, transactionsChecked: false, allowanceChecked: false, incomeChecked: false, notes: "" }
         };
+        if (sourceKey !== "__baseTemplate") applyCloseoutRolloversToMonth(source, state.months[next]);
         state.activeMonth = next; state.activeView = "budget";
         closeModal(); render();
       }

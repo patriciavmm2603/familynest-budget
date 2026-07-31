@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Kingdom Builder</title>
-  <!-- v126 ignore csv lines -->
+  <!-- v128 ignored lines stay visible -->
   <!-- v84 safe next paycheck -->
   <!-- v82 expected income actuals -->
   <!-- v81 fix csv amount sort -->
@@ -2226,7 +2226,7 @@
       /* v114: monthly plan remaining cell shows overage instead of zero */
 
 
-      /* v126 ignore csv lines: cleaner dark mode and mobile readability */
+      /* v128 ignored lines stay visible: cleaner dark mode and mobile readability */
       @media (prefers-color-scheme: dark) {
         :root {
           --bg: #14120f;
@@ -2334,6 +2334,19 @@
         .kb-mobile-create-month {
           display: inline-flex;
         }
+      }
+
+
+      .kb-ignored-txn td:not(:last-child) {
+        text-decoration: line-through;
+        opacity: .6;
+      }
+      .kb-ignored-txn td:last-child {
+        opacity: 1;
+        text-decoration: none;
+      }
+      .kb-ignored-txn .pill {
+        text-decoration: none;
       }
 
 </style>
@@ -5553,7 +5566,7 @@ function renderProtectionLists(month = currentMonth(), plan = safeNextPaycheckPl
           `<div class="card"><div class="section-title"><h3>Upload bank CSV</h3><span>Works with statement CSVs and SoFi CSVs</span></div>
           ${month.importMessage ? `<div class="banner" style="background:var(--blue-soft);border-color:var(--blue);color:var(--blue)"><div><strong>Last import</strong><span>${escapeHtml(month.importMessage)}</span></div></div>` : ""}
           <div class="form-grid"><label class="wide">CSV file<input id="csvFile" type="file" accept=".csv,text/csv"></label><button id="addTxnBtn" type="button">Add Transaction</button></div></div>`,
-          `<div class="card"><div class="section-title"><h3>Review queue</h3><span>${unreconciledCount(month)} need review · ${ignoredTransactions(month).length} ignored · ${rows.length} showing · <span id="selectedTxnCount">${selectedRows.length}</span> selected</span></div>
+          `<div class="card"><div class="section-title"><h3>Review queue</h3><span>${unreconciledCount(month)} need review · ${ignoredTransactions(month).length} ignored/struck out · ${rows.length} showing · <span id="selectedTxnCount">${selectedRows.length}</span> selected</span></div>
           <div class="form-grid" style="margin-bottom:.8rem">
             ${field("Search transactions", input("transactionSearch", state.transactionSearch || ""), "wide")}
             ${field("Quick filter", select("transactionFilter", ["All","Needs Review","Matched","Unmatched","Income","Spending","Ignored"], state.transactionFilter || "All"))}
@@ -5653,11 +5666,7 @@ function renderProtectionLists(month = currentMonth(), plan = safeNextPaycheckPl
         const categoryFilter = state.transactionCategoryFilter || "All";
         return (month.transactions || []).filter(txn => {
           const ignored = isIgnoredTransaction(txn);
-          if (filter === "Ignored") {
-            if (!ignored) return false;
-          } else if (ignored) {
-            return false;
-          }
+          if (filter === "Ignored" && !ignored) return false;
           const bill = txn.billId ? month.budgetLines.find(line => line.id === txn.billId) : null;
           const needs = transactionNeedsReview(txn);
           const amount = Number(txn.amount || 0);
@@ -5665,10 +5674,10 @@ function renderProtectionLists(month = currentMonth(), plan = safeNextPaycheckPl
           if (query && !haystack.includes(query)) return false;
           if (categoryFilter !== "All" && (txn.category || "Uncategorized") !== categoryFilter) return false;
           if (filter === "Needs Review") return needs;
-          if (filter === "Matched") return Boolean(txn.billId);
-          if (filter === "Unmatched") return !txn.billId;
-          if (filter === "Income") return Number(txn.amount || 0) > 0;
-          if (filter === "Spending") return Number(txn.amount || 0) < 0;
+          if (filter === "Matched") return !ignored && Boolean(txn.billId);
+          if (filter === "Unmatched") return !ignored && !txn.billId;
+          if (filter === "Income") return !ignored && Number(txn.amount || 0) > 0;
+          if (filter === "Spending") return !ignored && Number(txn.amount || 0) < 0;
           return true;
         });
       }
@@ -5754,7 +5763,7 @@ function renderProtectionLists(month = currentMonth(), plan = safeNextPaycheckPl
           ? `<button class="secondary" type="button" data-restore-txn="${txn.id}">Restore</button>`
           : `<button class="secondary" type="button" data-ignore-txn="${txn.id}">Ignore</button>`;
         const rowStyle = ignored ? "opacity:.62;background:color-mix(in srgb,var(--neutral) 12%,transparent)" : needs ? "background:color-mix(in srgb,var(--yellow-soft) 40%,transparent)" : "";
-        return `<tr style="${rowStyle}">
+        return `<tr class="${ignored ? "kb-ignored-txn" : ""}" style="${rowStyle}">
           <td><input type="checkbox" data-select-txn="${txn.id}" aria-label="Select transaction"${checked}></td>
           <td>${escapeHtml(txn.date)}</td>
           <td><strong>${escapeHtml(txn.description)}</strong><div class="muted">${escapeHtml(txn.account || "")}</div>${ignored ? `<div class="muted small">Ignored: ${escapeHtml(txn.ignoreReason || "Excluded from this month's budget/review")}</div>` : ""}${personalSplitText}</td>
@@ -7051,6 +7060,8 @@ function renderCompare() {
           item?.owner,
           item?.notes,
           item?.label,
+          item?.frequency,
+          item?.expectedDay,
           item?.account
         ].join(" ").toLowerCase();
       }
@@ -7091,11 +7102,28 @@ function renderCompare() {
         const text = closeoutIncomeText(row);
         const amount = rawMoney(row.amount);
         if (amount <= 0) return 0;
-        if (/shared|flexible/.test(String(row.owner || "").toLowerCase()) || /shared|flexible/.test(text)) return 0;
+        const ownerText = String(row.owner || "").trim().toLowerCase();
+        if (ownerText === "shared" || /shared|flexible/.test(text)) return 0;
+
+        const frequencyText = String(row.frequency || "").trim().toLowerCase();
+        const expectedDayText = String(row.expectedDay || "").trim().toLowerCase();
+
+        // Alec's configured paycheck is biweekly / every other Thursday.
+        // In July 2026 that should be counted as two planned paychecks: 1,692 x 2 = 3,384.
+        if (/biweekly|every other|every\s*other\s*thursday/.test(text + " " + frequencyText + " " + expectedDayText)) return 2;
+
+        // Patricia is modeled as two separate paycheck rows, one for the 10th and one for the 24th,
+        // so each explicit row counts once. If a future single row says twice-monthly with no explicit day, count twice.
         const hasExplicitDay = firstDayNumber(row.expectedDay || row.label || row.notes);
-        if (/biweekly|every other|every\s*other\s*thursday/.test(text)) return 2;
         if (/twice|semi|semi-monthly|semi monthly|10.*24|24.*10/.test(text) && !hasExplicitDay) return 2;
+
         return 1;
+      }
+
+
+      function closeoutExpectedAlecPlannedCheck(month = currentMonth()) {
+        const planned = closeoutPlannedPaycheckByOwner(month);
+        return planned.Alec || 0;
       }
 
       function closeoutPlannedPaycheckByOwner(month = currentMonth()) {

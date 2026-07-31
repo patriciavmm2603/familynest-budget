@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Kingdom Builder</title>
-  <!-- v124 closeout planned vs actual -->
+  <!-- v126 ignore csv lines -->
   <!-- v84 safe next paycheck -->
   <!-- v82 expected income actuals -->
   <!-- v81 fix csv amount sort -->
@@ -2226,7 +2226,7 @@
       /* v114: monthly plan remaining cell shows overage instead of zero */
 
 
-      /* v124 closeout planned vs actual: cleaner dark mode and mobile readability */
+      /* v126 ignore csv lines: cleaner dark mode and mobile readability */
       @media (prefers-color-scheme: dark) {
         :root {
           --bg: #14120f;
@@ -3061,8 +3061,12 @@
       function regularIncomeTotal() { return sum(regularIncomeRows(), row => row.monthly); }
       function incomeTotal(monthKey = state.activeMonth) { return regularIncomeTotal() + quarterlyIncomeTotal(monthKey); }
       function plannedTotal(month = currentMonth()) { return sum(activeBudgetLines(allBudgetLines(month)), row => row.amount); }
-      function actualSpending(month = currentMonth()) { return Math.abs(sum(month.transactions.filter(t => t.reconciled && Number(t.amount) < 0), t => t.amount)); }
-      function actualIncome(month = currentMonth()) { return sum(month.transactions.filter(t => t.reconciled && Number(t.amount) > 0), t => t.amount); }
+      function actualSpending(month = currentMonth()) {
+        return Math.abs(sum(activeTransactions(month).filter(t => t.reconciled && Number(t.amount) < 0), t => t.amount));
+      }
+      function actualIncome(month = currentMonth()) {
+        return sum(activeTransactions(month).filter(t => t.reconciled && Number(t.amount) > 0), t => t.amount);
+      }
       function sideGigGross(month = currentMonth()) { return sum(month.sideGigs || [], gig => gig.gross); }
       function sideGigNet(month = currentMonth()) { return sum(month.sideGigs || [], gig => Number(gig.gross || 0) * (1 - Number(gig.taxRate || 0) / 100)); }
       function isPaypalSideGig(gig) {
@@ -3115,12 +3119,13 @@
       }
       function isActualStatementIncome(txn) {
         return Boolean(txn && txn.reconciled)
+          && !isIgnoredTransaction(txn)
           && Number(txn.amount || 0) > 0
           && String(txn.category || "").trim() === "Income"
           && transactionIncomeType(txn) !== "Side Hustle Income";
       }
       function actualStatementIncomeRows(month = currentMonth()) {
-        return (month.transactions || []).filter(isActualStatementIncome);
+        return activeTransactions(month).filter(isActualStatementIncome);
       }
       function actualStatementIncomeTotal(month = currentMonth()) {
         return sum(actualStatementIncomeRows(month), txn => Number(txn.amount || 0));
@@ -3156,7 +3161,9 @@
         </tbody></table></div>`;
       }
       function contributionReceived(month = currentMonth()) { return sum(month.contributions || [], row => row.received); }
-      function unreconciledCount(month = currentMonth()) { return month.transactions.filter(t => !t.reconciled || !t.category || !t.owner || t.category === "Uncategorized").length; }
+      function unreconciledCount(month = currentMonth()) {
+        return activeTransactions(month).filter(t => !t.reconciled || !t.category || !t.owner || t.category === "Uncategorized").length;
+      }
       function monthOptions() { return Object.keys(state.months).sort(); }
       function escapeHtml(value) { return String(value ?? "").replace(/[&<>"']/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" }[ch])); }
 
@@ -3361,7 +3368,7 @@
           || (category === "this month bill reserve / vault" && !/(mortgage|pennymac)/.test(text));
       }
       function currentMonthBillReserveRows(month = currentMonth()) {
-        return (month.transactions || []).filter(isCurrentMonthBillReserveTxn);
+        return activeTransactions(month).filter(isCurrentMonthBillReserveTxn);
       }
 
       function currentMonthBillReserveTotal(month = currentMonth()) {
@@ -3422,7 +3429,7 @@
       }
 
       function mortgageReserveRows(month = currentMonth()) {
-        return (month.transactions || []).filter(isMortgageReserveTxn);
+        return activeTransactions(month).filter(isMortgageReserveTxn);
       }
 
       function mortgageReserveTotal(month = currentMonth()) {
@@ -3473,14 +3480,13 @@
       }
 
       function nonMortgageCurrentReserveRows(month = currentMonth()) {
-        return (month.transactions || []).filter(txn => {
+        return activeTransactions(month).filter(txn => {
           if (!txn || !txn.reconciled || Number(txn.amount || 0) >= 0) return false;
-          const category = String(txn.category || "").trim().toLowerCase();
-          const text = reserveText(txn);
-
-          // Explicit same-month reserve only, and never mortgage/PennyMac.
-          return category === "bill still due this month reserve / vault"
-            && !/(mortgage|pennymac|next month|next-month)/.test(text);
+          const category = String(txn.category || "").toLowerCase();
+          const notes = String(txn.notes || "").toLowerCase();
+          const desc = String(txn.description || "").toLowerCase();
+          if (isMortgageReserveTxn(txn)) return false;
+          return /reserve|vault|quarter|quarterly|future/.test(category + " " + notes + " " + desc);
         });
       }
 
@@ -3522,24 +3528,27 @@
       }
 
       function futureReserveRows(month = currentMonth()) {
-        return (month.transactions || []).filter(isFutureReserveTxn);
+        return activeTransactions(month).filter(isFutureReserveTxn);
       }
 
       function futureReserveTotal(month = currentMonth()) {
         return Math.abs(sum(futureReserveRows(month), txn => Number(txn.amount || 0)));
       }
       function isIncomeTxn(txn) {
-        return Boolean(txn && txn.reconciled) && Number(txn.amount || 0) > 0 && !isVaultMovementTxn(txn);
+        return Boolean(txn && txn.reconciled)
+          && !isIgnoredTransaction(txn)
+          && Number(txn.amount || 0) > 0
+          && !isVaultMovementTxn(txn);
       }
 
       function actualJobIncomeRows(month = currentMonth()) {
-        return (month.transactions || []).filter(txn => isIncomeTxn(txn) && transactionIncomeType(txn) === "Job Income");
+        return activeTransactions(month).filter(txn => isIncomeTxn(txn) && transactionIncomeType(txn) === "Job Income");
       }
       function actualSideHustleIncomeRows(month = currentMonth()) {
-        return (month.transactions || []).filter(txn => isIncomeTxn(txn) && transactionIncomeType(txn) === "Side Hustle Income");
+        return activeTransactions(month).filter(txn => isIncomeTxn(txn) && transactionIncomeType(txn) === "Side Hustle Income");
       }
       function actualOtherIncomeRows(month = currentMonth()) {
-        return (month.transactions || []).filter(txn => isIncomeTxn(txn) && transactionIncomeType(txn) === "Other Income");
+        return activeTransactions(month).filter(txn => isIncomeTxn(txn) && transactionIncomeType(txn) === "Other Income");
       }
       function actualJobIncomeTotal(month = currentMonth()) { return sum(actualJobIncomeRows(month), txn => Number(txn.amount || 0)); }
       function actualSideHustleIncomeTotal(month = currentMonth()) { return sum(actualSideHustleIncomeRows(month), txn => Number(txn.amount || 0)); }
@@ -3927,7 +3936,7 @@ function actualJobDepositsForExpectedIncome(month = currentMonth()) {
       }
 
       function janisExpectedMortgagePortion(month = currentMonth()) {
-        const janisRows = (month.transactions || [])
+        const janisRows = activeTransactions(month)
           .filter(txn => Boolean(txn.reconciled) && Number(txn.amount || 0) > 0 && /janis/i.test(String(txn.description || "") + " " + String(txn.notes || "")))
           .sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")));
         return Number(janisRows[0]?.amount || 0);
@@ -4124,7 +4133,7 @@ function actualJobDepositsForExpectedIncome(month = currentMonth()) {
       }
 
       function actualPersonalSpendingByOwner(month = currentMonth()) {
-        const rows = (month.transactions || []).filter(isPersonalTransaction);
+        const rows = activeTransactions(month).filter(isPersonalTransaction);
         return rows.reduce((acc, txn) => {
           const rawOwner = txn.owner || txn.person || txn.assignedTo || "Unassigned";
           const owner = String(rawOwner || "Unassigned").trim() || "Unassigned";
@@ -5544,10 +5553,10 @@ function renderProtectionLists(month = currentMonth(), plan = safeNextPaycheckPl
           `<div class="card"><div class="section-title"><h3>Upload bank CSV</h3><span>Works with statement CSVs and SoFi CSVs</span></div>
           ${month.importMessage ? `<div class="banner" style="background:var(--blue-soft);border-color:var(--blue);color:var(--blue)"><div><strong>Last import</strong><span>${escapeHtml(month.importMessage)}</span></div></div>` : ""}
           <div class="form-grid"><label class="wide">CSV file<input id="csvFile" type="file" accept=".csv,text/csv"></label><button id="addTxnBtn" type="button">Add Transaction</button></div></div>`,
-          `<div class="card"><div class="section-title"><h3>Review queue</h3><span>${unreconciledCount(month)} need review · ${rows.length} showing · <span id="selectedTxnCount">${selectedRows.length}</span> selected</span></div>
+          `<div class="card"><div class="section-title"><h3>Review queue</h3><span>${unreconciledCount(month)} need review · ${ignoredTransactions(month).length} ignored · ${rows.length} showing · <span id="selectedTxnCount">${selectedRows.length}</span> selected</span></div>
           <div class="form-grid" style="margin-bottom:.8rem">
             ${field("Search transactions", input("transactionSearch", state.transactionSearch || ""), "wide")}
-            ${field("Quick filter", select("transactionFilter", ["All","Needs Review","Matched","Unmatched","Income","Spending"], state.transactionFilter || "All"))}
+            ${field("Quick filter", select("transactionFilter", ["All","Needs Review","Matched","Unmatched","Income","Spending","Ignored"], state.transactionFilter || "All"))}
             ${field("Category", select("transactionCategoryFilter", ["All",...categories], state.transactionCategoryFilter || "All"))}
             ${field("Sort by", select("transactionSort", ["Date newest","Date oldest","Amount highest","Amount lowest","Description A-Z","Needs review first"], state.transactionSort || "Date newest"))}
             <button id="runTxnSearch" type="button">Search</button>
@@ -5561,6 +5570,8 @@ function renderProtectionLists(month = currentMonth(), plan = safeNextPaycheckPl
             <button id="applyBulkSelectedTxn" type="button">Apply To Selected</button>
             <button id="applyBulkTxn" type="button">Apply To Visible</button>
             <button id="markSelectedPersonal" class="secondary" type="button">Mark Selected Personal</button>
+            <button id="ignoreSelectedTxn" class="secondary" type="button">Ignore Selected</button>
+            <button id="restoreSelectedTxn" class="secondary" type="button">Restore Selected</button>
             <button id="selectVisibleTxn" class="secondary" type="button">Select Visible</button>
             <button id="clearSelectedTxn" class="secondary" type="button">Clear Selection</button>
           </div></details>`,
@@ -5580,7 +5591,9 @@ function renderProtectionLists(month = currentMonth(), plan = safeNextPaycheckPl
         document.querySelector("#clearTxnFilters").addEventListener("click", () => { state.transactionSearch = ""; state.transactionFilter = "All"; state.transactionCategoryFilter = "All"; state.transactionSort = "Date newest"; state.selectedTransactionIds = []; renderTransactions(); saveState(); });
         document.querySelector("#applyBulkTxn").addEventListener("click", () => { const visible = filteredTransactions(month); if (!visible.length) return alert("No visible transactions."); if (!confirm("Update " + visible.length + " visible transactions?")) return; applyBulkTransactionUpdate(month, visible); });
         document.querySelector("#applyBulkSelectedTxn").addEventListener("click", () => { const selected = selectedTransactions(month); if (!selected.length) return alert("Select one or more transactions first."); if (!confirm("Update " + selected.length + " selected transactions?")) return; applyBulkTransactionUpdate(month, selected); });
-        document.querySelector("#markSelectedPersonal").addEventListener("click", () => { const selected = selectedTransactions(month); if (!selected.length) return alert("Select transactions first."); if (!confirm("Mark " + selected.length + " selected as Personal?")) return; markTransactionsPersonal(month, selected); });
+        document.querySelector("#markSelectedPersonal").addEventListener("click", () => { const selected = selectedTransactions(month).filter(txn => !isIgnoredTransaction(txn)); if (!selected.length) return alert("Select active transactions first."); if (!confirm("Mark " + selected.length + " selected as Personal?")) return; markTransactionsPersonal(month, selected); });
+        document.querySelector("#ignoreSelectedTxn").addEventListener("click", () => { const selected = selectedTransactions(month).filter(txn => !isIgnoredTransaction(txn)); if (!selected.length) return alert("Select active transactions first."); const reason = prompt("Why ignore these lines?", "Statement overlap / already handled in another month") || "Ignored / excluded from this month"; if (!confirm("Ignore " + selected.length + " selected transactions? They will stay saved but stop counting in review/totals.")) return; ignoreTransactions(month, selected, reason); renderTransactions(); });
+        document.querySelector("#restoreSelectedTxn").addEventListener("click", () => { const selected = selectedTransactions(month).filter(isIgnoredTransaction); if (!selected.length) return alert("Select ignored transactions first."); if (!confirm("Restore " + selected.length + " ignored transactions?")) return; restoreIgnoredTransactions(selected); renderTransactions(); });
         document.querySelector("#selectVisibleTxn").addEventListener("click", () => { const ids = new Set(state.selectedTransactionIds || []); rows.forEach(txn => ids.add(txn.id)); state.selectedTransactionIds = [...ids]; renderTransactions(); saveState(); });
         document.querySelector("#clearSelectedTxn").addEventListener("click", () => { state.selectedTransactionIds = []; renderTransactions(); saveState(); });
         const toggleVisible = document.querySelector("#toggleVisibleTxn");
@@ -5598,6 +5611,8 @@ function renderProtectionLists(month = currentMonth(), plan = safeNextPaycheckPl
           saveState();
         }));
         document.querySelectorAll("[data-edit-txn]").forEach(btn => btn.addEventListener("click", () => openTransactionModal(month.transactions.find(txn => txn.id === btn.dataset.editTxn))));
+        document.querySelectorAll("[data-ignore-txn]").forEach(btn => btn.addEventListener("click", () => { const txn = month.transactions.find(item => item.id === btn.dataset.ignoreTxn); if (!txn) return; const reason = prompt("Why ignore this line?", "Statement overlap / already handled in another month") || "Ignored / excluded from this month"; ignoreTransaction(month, txn, reason); renderTransactions(); saveState(); }));
+        document.querySelectorAll("[data-restore-txn]").forEach(btn => btn.addEventListener("click", () => { const txn = month.transactions.find(item => item.id === btn.dataset.restoreTxn); if (!txn) return; restoreIgnoredTransaction(txn); renderTransactions(); saveState(); }));
         document.querySelectorAll("[data-split-personal]").forEach(btn => btn.addEventListener("click", () => openPersonalSplitModal(month.transactions.find(txn => txn.id === btn.dataset.splitPersonal))));
       }
 
@@ -5609,7 +5624,7 @@ function renderProtectionLists(month = currentMonth(), plan = safeNextPaycheckPl
         const category = document.querySelector("[name='bulkCategory']").value;
         const incomeType = document.querySelector("[name='bulkIncomeType']")?.value || "";
         const owner = document.querySelector("[name='bulkOwner']").value;
-        transactions.forEach(txn => {
+        transactions.filter(txn => !isIgnoredTransaction(txn)).forEach(txn => {
           if (bill) { txn.billId = bill.id; txn.category = bill.category || txn.category; txn.owner = bill.owner || txn.owner; txn.asset = bill.asset || txn.asset; }
           if (category) txn.category = category;
           if (incomeType && Number(txn.amount || 0) > 0) { txn.incomeType = normalizeIncomeType(incomeType); txn.category = "Income"; }
@@ -5623,7 +5638,7 @@ function renderProtectionLists(month = currentMonth(), plan = safeNextPaycheckPl
 
       function markTransactionsPersonal(month, transactions) {
         const owner = document.querySelector("[name='bulkOwner']").value;
-        transactions.forEach(txn => {
+        transactions.filter(txn => !isIgnoredTransaction(txn)).forEach(txn => {
           txn.category = "Personal";
           txn.billId = "";
           if (owner) txn.owner = owner;
@@ -5636,11 +5651,17 @@ function renderProtectionLists(month = currentMonth(), plan = safeNextPaycheckPl
         const query = String(state.transactionSearch || "").toLowerCase().trim();
         const filter = state.transactionFilter || "All";
         const categoryFilter = state.transactionCategoryFilter || "All";
-        return month.transactions.filter(txn => {
+        return (month.transactions || []).filter(txn => {
+          const ignored = isIgnoredTransaction(txn);
+          if (filter === "Ignored") {
+            if (!ignored) return false;
+          } else if (ignored) {
+            return false;
+          }
           const bill = txn.billId ? month.budgetLines.find(line => line.id === txn.billId) : null;
           const needs = transactionNeedsReview(txn);
           const amount = Number(txn.amount || 0);
-          const haystack = [txn.date,txn.description,txn.account,txn.category,txn.owner,txn.asset,amount,Math.abs(amount),bill?.payee].join(" ").toLowerCase();
+          const haystack = [txn.date,txn.description,txn.account,txn.category,txn.owner,txn.asset,amount,Math.abs(amount),bill?.payee,txn.ignoreReason].join(" ").toLowerCase();
           if (query && !haystack.includes(query)) return false;
           if (categoryFilter !== "All" && (txn.category || "Uncategorized") !== categoryFilter) return false;
           if (filter === "Needs Review") return needs;
@@ -5652,7 +5673,62 @@ function renderProtectionLists(month = currentMonth(), plan = safeNextPaycheckPl
         });
       }
 
-      function transactionNeedsReview(txn) { return !txn.reconciled || !txn.category || !txn.owner || txn.category === "Uncategorized"; }
+
+      function isIgnoredTransaction(txn) {
+        return Boolean(txn && txn.ignored);
+      }
+
+      function activeTransactions(month = currentMonth()) {
+        return (month.transactions || []).filter(txn => !isIgnoredTransaction(txn));
+      }
+
+      function ignoredTransactions(month = currentMonth()) {
+        return (month.transactions || []).filter(isIgnoredTransaction);
+      }
+
+      function ignoreTransaction(month, txn, reason = "") {
+        if (!txn) return;
+        txn.ignored = true;
+        txn.ignoredAt = new Date().toISOString();
+        txn.ignoreReason = reason || txn.ignoreReason || "Ignored / excluded from this month";
+        txn.reconciled = true;
+        txn.billId = "";
+        removeSideGigForTransaction(month, txn);
+        applyBillPaymentStatuses(month);
+      }
+
+      function restoreIgnoredTransaction(txn) {
+        if (!txn) return;
+        txn.ignored = false;
+        txn.ignoredAt = "";
+        txn.ignoreReason = "";
+        txn.reconciled = Boolean(txn.billId || (txn.category && txn.owner && txn.category !== "Uncategorized"));
+      }
+
+      function removeSideGigForTransaction(month, txn) {
+        if (!month || !txn || !Array.isArray(month.sideGigs)) return;
+        const key = sideGigTransactionKey(txn);
+        if (!key) return;
+        month.sideGigs = month.sideGigs.filter(gig => gig.transactionKey !== key);
+      }
+
+      function ignoreTransactions(month, transactions, reason = "") {
+        (transactions || []).forEach(txn => ignoreTransaction(month, txn, reason));
+        state.selectedTransactionIds = [];
+        saveState();
+      }
+
+      function restoreIgnoredTransactions(transactions) {
+        (transactions || []).forEach(restoreIgnoredTransaction);
+        state.selectedTransactionIds = [];
+        saveState();
+      }
+
+
+      function transactionNeedsReview(txn) {
+        if (isIgnoredTransaction(txn)) return false;
+        return !txn.reconciled || !txn.category || !txn.owner || txn.category === "Uncategorized";
+      }
 
       function sortTransactions(rows) {
         const sort = state.transactionSort || "Date newest";
@@ -5666,24 +5742,29 @@ function renderProtectionLists(month = currentMonth(), plan = safeNextPaycheckPl
       }
 
       function transactionRow(txn) {
+        const ignored = isIgnoredTransaction(txn);
         const needs = transactionNeedsReview(txn);
         const bill = txn.billId ? currentMonth().budgetLines.find(line => line.id === txn.billId) : null;
         const checked = (state.selectedTransactionIds || []).includes(txn.id) ? " checked" : "";
         const personalSplitText = hasPersonalSplit(txn) ? `<div class="split-badge">Split: ${personalSplitLabel(txn)}</div>` : "";
-        const splitButton = isPersonalTransaction(txn)
+        const splitButton = !ignored && isPersonalTransaction(txn)
           ? `<button class="secondary" type="button" data-split-personal="${txn.id}">${hasPersonalSplit(txn) ? "Edit Split" : "Split Personal"}</button>`
           : "";
-        return `<tr style="${needs ? "background:color-mix(in srgb,var(--yellow-soft) 40%,transparent)" : ""}">
+        const ignoreButton = ignored
+          ? `<button class="secondary" type="button" data-restore-txn="${txn.id}">Restore</button>`
+          : `<button class="secondary" type="button" data-ignore-txn="${txn.id}">Ignore</button>`;
+        const rowStyle = ignored ? "opacity:.62;background:color-mix(in srgb,var(--neutral) 12%,transparent)" : needs ? "background:color-mix(in srgb,var(--yellow-soft) 40%,transparent)" : "";
+        return `<tr style="${rowStyle}">
           <td><input type="checkbox" data-select-txn="${txn.id}" aria-label="Select transaction"${checked}></td>
           <td>${escapeHtml(txn.date)}</td>
-          <td><strong>${escapeHtml(txn.description)}</strong><div class="muted">${escapeHtml(txn.account || "")}</div>${personalSplitText}</td>
-          <td>${bill ? escapeHtml(bill.payee) : `<span class="muted">Unmatched</span>`}</td>
+          <td><strong>${escapeHtml(txn.description)}</strong><div class="muted">${escapeHtml(txn.account || "")}</div>${ignored ? `<div class="muted small">Ignored: ${escapeHtml(txn.ignoreReason || "Excluded from this month's budget/review")}</div>` : ""}${personalSplitText}</td>
+          <td>${ignored ? `<span class="muted">Ignored</span>` : bill ? escapeHtml(bill.payee) : `<span class="muted">Unmatched</span>`}</td>
           <td>${escapeHtml(txn.category || "Uncategorized")}</td>
           <td>${Number(txn.amount || 0) > 0 ? `<span class="pill ${transactionIncomeType(txn) === "Side Hustle Income" ? "yellow" : transactionIncomeType(txn) === "Other Income" ? "blue" : "green"}">${escapeHtml(transactionIncomeType(txn) || "Job Income")}</span>` : `<span class="muted">—</span>`}</td>
           <td>${hasPersonalSplit(txn) ? `<span class="pill green">Split</span>` : escapeHtml(txn.owner || "-")}</td>
           <td class="money" style="color:${Number(txn.amount)>=0?"var(--green)":"var(--red)"}">${money.format(txn.amount)}</td>
-          <td>${needs ? `<span class="pill red">Needs review</span>` : `<span class="pill green">Reconciled</span>`}</td>
-          <td class="right"><div class="toolbar" style="justify-content:flex-end;gap:.35rem"><button class="ghost" type="button" data-edit-txn="${txn.id}">Review</button>${splitButton}</div></td>
+          <td>${ignored ? `<span class="pill blue">Ignored</span>` : needs ? `<span class="pill red">Needs review</span>` : `<span class="pill green">Reconciled</span>`}</td>
+          <td class="right"><div class="toolbar" style="justify-content:flex-end;gap:.35rem"><button class="ghost" type="button" data-edit-txn="${txn.id}">Review</button>${ignoreButton}${splitButton}</div></td>
         </tr>`;
       }
 
@@ -5752,9 +5833,14 @@ function renderProtectionLists(month = currentMonth(), plan = safeNextPaycheckPl
 
       function syncSideGigsFromTransactions(month, transactions) {
         month.sideGigs ||= [];
+        const txns = transactions || [];
+        txns.forEach(txn => {
+          if (isIgnoredTransaction(txn) || !isSideHustleTransaction(txn)) removeSideGigForTransaction(month, txn);
+        });
         const existing = new Set(month.sideGigs.map(gig => gig.transactionKey).filter(Boolean));
         let added = 0;
-        (transactions || []).forEach(txn => {
+        txns.forEach(txn => {
+          if (isIgnoredTransaction(txn)) return;
           if (!isSideHustleTransaction(txn)) return;
           const key = sideGigTransactionKey(txn);
           if (existing.has(key)) return;
@@ -5908,6 +5994,8 @@ function renderProtectionLists(month = currentMonth(), plan = safeNextPaycheckPl
           Number(value.amount || 0) > 0 ? field("Income Type", select("incomeType", incomeTypes, normalizeIncomeType(value.incomeType) || guessIncomeType(value))) : "",
           field("Owner", select("owner", ["",...owners], value.owner)),
           field("Account", input("account", value.account)),
+          `<label class="full" style="display:flex;align-items:center;gap:.65rem;margin:.4rem 0"><input name="ignored" type="checkbox" value="yes"${value.ignored ? " checked" : ""} style="width:auto"> Ignore / exclude this line from this month\'s budget, review, and totals</label>`,
+          field("Ignore reason", input("ignoreReason", value.ignoreReason || ""), "wide"),
           `<div class="full toolbar" style="justify-content:flex-start"><button type="button" class="secondary" id="autoTxnCategory">Auto-categorize</button><button type="button" class="secondary" id="createBillFromTxn">Create bill from this</button></div>`,
           field("Notes", textarea("notes", value.notes), "full"),
           `<div class="full toolbar" style="justify-content:space-between">`,
@@ -5919,12 +6007,15 @@ function renderProtectionLists(month = currentMonth(), plan = safeNextPaycheckPl
           const data = formData(event.currentTarget);
           data.date = toDateInputValue(data.date);
           if (data.billId) { const bill = currentMonth().budgetLines.find(line => line.id === data.billId); if (bill) { data.category = bill.category || data.category; data.owner = bill.owner || data.owner; data.asset = bill.asset || data.asset; } }
-          const next = { ...value, ...data, amount: Number(data.amount || 0), id: editing ? value.id : uid("txn") };
+          const ignored = Boolean(document.querySelector("[name=\'ignored\']")?.checked);
+          const next = { ...value, ...data, amount: Number(data.amount || 0), id: editing ? value.id : uid("txn"), ignored, ignoreReason: data.ignoreReason || value.ignoreReason || "" };
           if (next.amount > 0) { next.category = next.category === "Uncategorized" ? "Income" : next.category; next.incomeType = normalizeIncomeType(next.incomeType) || guessIncomeType(next); }
           else { delete next.incomeType; }
-          next.reconciled = Boolean(next.billId || (next.category && next.owner && next.category !== "Uncategorized"));
+          if (next.ignored) { next.reconciled = true; next.billId = ""; next.ignoreReason ||= "Ignored / excluded from this month"; }
+          else next.reconciled = Boolean(next.billId || (next.category && next.owner && next.category !== "Uncategorized"));
           if (next.category !== "Personal" || next.billId || Number(next.amount || 0) >= 0) delete next.personalSplit;
           if (editing) Object.assign(value, next); else currentMonth().transactions.push(next);
+          if (next.ignored) removeSideGigForTransaction(currentMonth(), next);
           syncSideGigsFromTransactions(currentMonth(), [editing ? value : next]);
           applyBillPaymentStatuses(currentMonth()); closeModal(); render();
         });
@@ -6005,7 +6096,7 @@ function renderProtectionLists(month = currentMonth(), plan = safeNextPaycheckPl
       function renderAllowance() {
         const month = currentMonth();
         const search = String(state.personalSearch || "").trim().toLowerCase();
-        const allPersonalRows = month.transactions.filter(isPersonalTransaction).filter(txn => !state.personalOwnerFilter || personalAmountForOwner(txn, state.personalOwnerFilter) > 0 || txn.owner === state.personalOwnerFilter);
+        const allPersonalRows = activeTransactions(month).filter(isPersonalTransaction).filter(txn => !state.personalOwnerFilter || personalAmountForOwner(txn, state.personalOwnerFilter) > 0 || txn.owner === state.personalOwnerFilter);
         const personalRows = allPersonalRows.filter(txn => {
           if (!search) return true;
           const haystack = [txn.description, txn.category, txn.notes, txn.account, txn.owner, personalSplitLabel(txn)].join(" ").toLowerCase();
@@ -6071,13 +6162,18 @@ function renderProtectionLists(month = currentMonth(), plan = safeNextPaycheckPl
         // If you intentionally categorized it as Personal, it counts as Personal Money.
         // Household bills and vault/reserve movements stay out.
         return Boolean(txn.reconciled)
+          && !isIgnoredTransaction(txn)
           && Number(txn.amount || 0) < 0
           && category.toLowerCase() === "personal"
           && !hasAssignedBill
           && !isVaultMovementTxn(txn);
       }
-      function personalUsedByOwner(month, owner) { return sum(month.transactions.filter(isPersonalTransaction), txn => personalAmountForOwner(txn, owner)); }
-      function actualPersonalSpending(month) { return sum(month.transactions.filter(isPersonalTransaction), txn => personalAmountTotal(txn)); }
+      function personalUsedByOwner(month, owner) {
+        return sum(activeTransactions(month).filter(isPersonalTransaction), txn => personalAmountForOwner(txn, owner));
+      }
+      function actualPersonalSpending(month) {
+        return sum(activeTransactions(month).filter(isPersonalTransaction), txn => personalAmountTotal(txn));
+      }
 
 
       function openPersonalSplitModal(txn) {
@@ -6693,8 +6789,12 @@ function renderCompare() {
         });
       }
 
-      function actualByCategory(month, category) { return Math.abs(sum(month.transactions.filter(t => t.reconciled && t.category === category && Number(t.amount) < 0), t => t.amount)); }
-      function actualByAsset(month, assetList) { return Math.abs(sum(month.transactions.filter(t => t.reconciled && assetList.includes(t.asset) && Number(t.amount) < 0), t => t.amount)); }
+      function actualByCategory(month, category) {
+        return Math.abs(sum(activeTransactions(month).filter(t => t.reconciled && t.category === category && Number(t.amount) < 0), t => t.amount));
+      }
+      function actualByAsset(month, assetList) {
+        return Math.abs(sum(activeTransactions(month).filter(t => t.reconciled && assetList.includes(t.asset) && Number(t.amount) < 0), t => t.amount));
+      }
 
       function comparisonTable(rows) {
         return `<div class="table-wrap"><table><thead><tr><th>Month</th><th class="money">Planned</th><th class="money">Actual</th><th class="money">Breathing room</th><th class="money">Groceries</th><th class="money">Utilities</th><th class="money">Debt</th><th class="money">Personal</th><th>Review</th></tr></thead><tbody>
@@ -6860,7 +6960,7 @@ function renderCompare() {
 
       function linkedBillTransactionActual(month, billId) {
         if (!billId) return 0;
-        return Math.abs(sum((month.transactions || []).filter(txn =>
+        return Math.abs(sum(activeTransactions(month).filter(txn =>
           txn.reconciled &&
           txn.billId === billId &&
           Number(txn.amount || 0) < 0
@@ -6915,7 +7015,7 @@ function renderCompare() {
       }
 
       function incomeTransactionRows(month, typeMatcher) {
-        return (month.transactions || []).filter(txn =>
+        return activeTransactions(month).filter(txn =>
           txn.reconciled &&
           Number(txn.amount || 0) > 0 &&
           typeMatcher(txn)
@@ -6938,70 +7038,157 @@ function renderCompare() {
         }, {});
       }
 
+
+      function closeoutIncomeText(item) {
+        return [
+          item?.description,
+          item?.merchant,
+          item?.name,
+          item?.source,
+          item?.type,
+          item?.category,
+          item?.incomeType,
+          item?.owner,
+          item?.notes,
+          item?.label,
+          item?.account
+        ].join(" ").toLowerCase();
+      }
+
+      function closeoutIsJanisIncome(item) {
+        return /\bjanis\b|remiesiewicz/.test(closeoutIncomeText(item));
+      }
+
+      function closeoutIsInternalOrVaultIncome(item) {
+        return /vault|saving|savings|quarter|quarterly|transfer|from vacation|from debt|from quarterly|escrow|reimburse|reimbursement|refund/.test(closeoutIncomeText(item));
+      }
+
+      function closeoutIsPaycheckLikeTxn(txn) {
+        if (!isIncomeTxn(txn)) return false;
+        if (closeoutIsJanisIncome(txn)) return false;
+        if (isSideHustleTransaction(txn)) return false;
+        if (closeoutIsInternalOrVaultIncome(txn)) return false;
+        const text = closeoutIncomeText(txn);
+        const type = normalizeIncomeType(txn.incomeType);
+        return type === "Job Income"
+          || /campus\s*crusade|\bcru\b|city\s*new\s*port\s*riche?y|citynewportriche|new\s*port\s*riche?y|direct_deposit|direct deposit|check_deposit|mobile check deposit/.test(text);
+      }
+
+      function closeoutActualJobIncomeRows(month = currentMonth()) {
+        return activeTransactions(month).filter(closeoutIsPaycheckLikeTxn);
+      }
+
+      function closeoutActualJobIncomeByOwner(month = currentMonth()) {
+        return closeoutActualJobIncomeRows(month).reduce((acc, txn) => {
+          const owner = txn.owner || "Unassigned";
+          if (!owner || String(owner).toLowerCase() === "shared") return acc;
+          acc[owner] = (acc[owner] || 0) + rawMoney(txn.amount);
+          return acc;
+        }, {});
+      }
+
+      function closeoutPaycheckPlannedMultiplier(row) {
+        const text = closeoutIncomeText(row);
+        const amount = rawMoney(row.amount);
+        if (amount <= 0) return 0;
+        if (/shared|flexible/.test(String(row.owner || "").toLowerCase()) || /shared|flexible/.test(text)) return 0;
+        const hasExplicitDay = firstDayNumber(row.expectedDay || row.label || row.notes);
+        if (/biweekly|every other|every\s*other\s*thursday/.test(text)) return 2;
+        if (/twice|semi|semi-monthly|semi monthly|10.*24|24.*10/.test(text) && !hasExplicitDay) return 2;
+        return 1;
+      }
+
+      function closeoutPlannedPaycheckByOwner(month = currentMonth()) {
+        return (month.paychecks || []).reduce((acc, row) => {
+          const owner = row.owner || "Unassigned";
+          if (!owner || String(owner).toLowerCase() === "shared") return acc;
+          const multiplier = closeoutPaycheckPlannedMultiplier(row);
+          if (!multiplier) return acc;
+          acc[owner] = (acc[owner] || 0) + rawMoney(row.amount) * multiplier;
+          return acc;
+        }, {});
+      }
+
+      function closeoutFixedRegularIncomeRows() {
+        return regularIncomeRows()
+          .filter(row => {
+            const text = closeoutIncomeText(row);
+            if (closeoutIsJanisIncome(row)) return true;
+            if (/extra\s*regular/.test(text)) return false;
+            if (/regular\s*paycheck|paycheck|salary|job/.test(text)) return false;
+            if (closeoutIsInternalOrVaultIncome(row)) return false;
+            // Do not duplicate job-income rows like Alec Regular income 3384 or Patricia 5894.
+            if (/regular\s*income/.test(text) && ["alec", "patricia"].includes(String(row.owner || "").toLowerCase()) && rawMoney(row.monthly) > 1000) return false;
+            return false;
+          });
+      }
+
+      function closeoutActualFixedIncomeForRow(month, row) {
+        if (closeoutIsJanisIncome(row)) {
+          return sum(activeTransactions(month).filter(txn =>
+            isIncomeTxn(txn) &&
+            closeoutIsJanisIncome(txn) &&
+            !isSideHustleTransaction(txn)
+          ), txn => rawMoney(txn.amount));
+        }
+        return 0;
+      }
+
+      function closeoutOtherActualIncomeRows(month = currentMonth()) {
+        return activeTransactions(month).filter(txn =>
+          isIncomeTxn(txn) &&
+          !closeoutIsPaycheckLikeTxn(txn) &&
+          !closeoutIsJanisIncome(txn) &&
+          !isSideHustleTransaction(txn) &&
+          !closeoutIsInternalOrVaultIncome(txn)
+        );
+      }
+
+
       function plannedActualIncomeRows(month = currentMonth()) {
         const rows = [];
-        const plannedByOwner = plannedPaycheckByOwner(month);
-        const actualByOwner = actualJobIncomeByOwner(month);
-        Array.from(new Set([...Object.keys(plannedByOwner), ...Object.keys(actualByOwner)])).sort().forEach(owner => {
-          const planned = rawMoney(plannedByOwner[owner]);
-          const actual = rawMoney(actualByOwner[owner]);
-          rows.push({
-            section: "Income",
-            name: `Job income — ${owner}`,
-            owner,
-            category: "Job Income",
-            planned,
-            actual,
-            variance: varianceAmount(actual, planned),
-            notes: varianceNeedsReview(actual, planned) ? "Review: job income planned and actual differ by more than $1." : "Expected paychecks vs reconciled job income.",
-            reviewFlag: varianceNeedsReview(actual, planned)
-          });
-        });
+        const plannedByOwner = closeoutPlannedPaycheckByOwner(month);
+        const actualByOwner = closeoutActualJobIncomeByOwner(month);
 
-        reliableJobIncomeRows().forEach(row => {
-          // Only include non-paycheck reliable lines if they are not already represented by paycheck buckets.
-          const label = `${row.owner || "Shared"}|${row.type || "Income"}`;
-          if (/job|paycheck|salary/i.test(String(row.type || row.incomeType || ""))) return;
+        Array.from(new Set([...Object.keys(plannedByOwner), ...Object.keys(actualByOwner)]))
+          .filter(owner => owner && String(owner).toLowerCase() !== "shared")
+          .sort()
+          .forEach(owner => {
+            const planned = rawMoney(plannedByOwner[owner]);
+            const actual = rawMoney(actualByOwner[owner]);
+            rows.push({
+              section: "Income",
+              name: `Job income — ${owner}`,
+              owner,
+              category: "Job Income",
+              planned,
+              actual,
+              variance: varianceAmount(actual, planned),
+              notes: varianceNeedsReview(actual, planned)
+                ? "Review: expected paycheck total vs reconciled paycheck/job deposits differ by more than $1."
+                : "Expected paycheck total vs reconciled paycheck/job deposits.",
+              reviewFlag: varianceNeedsReview(actual, planned)
+            });
+          });
+
+        closeoutFixedRegularIncomeRows().forEach(row => {
           const planned = rawMoney(row.monthly);
-          const actual = sum(incomeTransactionRows(month, txn =>
-            transactionMatchesIncomeOwner(txn, row.owner) &&
-            !isSideHustleTransaction(txn) &&
-            !isActualJobIncomeForPaycheck(txn)
-          ), txn => rawMoney(txn.amount));
+          const actual = closeoutActualFixedIncomeForRow(month, row);
+          const name = closeoutIsJanisIncome(row) ? "Fixed regular income — Janis rent" : (row.type || "Fixed regular income");
           rows.push({
             section: "Income",
-            name: row.type || label,
+            name,
             owner: row.owner || "Shared",
-            category: row.type || "Income",
+            category: "Fixed Regular Income",
             planned,
             actual,
             variance: varianceAmount(actual, planned),
-            notes: row.notes || "Reliable planned income source.",
+            notes: row.notes || "Fixed regular income. Actual comes only from matching reconciled deposits.",
             reviewFlag: varianceNeedsReview(actual, planned)
           });
         });
 
-        otherPlannedIncomeRows().forEach(row => {
-          const planned = rawMoney(row.monthly);
-          const actual = sum(incomeTransactionRows(month, txn =>
-            transactionMatchesIncomeOwner(txn, row.owner) &&
-            !isSideHustleTransaction(txn) &&
-            !isActualJobIncomeForPaycheck(txn)
-          ), txn => rawMoney(txn.amount));
-          rows.push({
-            section: "Income",
-            name: row.type || "Other planned income",
-            owner: row.owner || "Shared",
-            category: row.type || "Other Income",
-            planned,
-            actual,
-            variance: varianceAmount(actual, planned),
-            notes: row.notes || "Planned non-job income compared to reconciled non-job deposits.",
-            reviewFlag: varianceNeedsReview(actual, planned)
-          });
-        });
-
-        actualOtherIncomeRows(month).forEach(txn => {
+        closeoutOtherActualIncomeRows(month).forEach(txn => {
           const name = txn.description || txn.merchant || "Other income deposit";
           rows.push({
             section: "Income",
@@ -7011,7 +7198,7 @@ function renderCompare() {
             planned: 0,
             actual: rawMoney(txn.amount),
             variance: rawMoney(txn.amount),
-            notes: "Side income / other deposit. Planned left as $0 unless modeled separately.",
+            notes: "Other side income / deposit. Planned left as $0 unless modeled separately. Not counted as job income.",
             reviewFlag: Math.abs(rawMoney(txn.amount)) > 1
           });
         });
@@ -7671,7 +7858,7 @@ function renderCompare() {
 
       // ── SHARED HELPERS ───────────────────────────────────────────────────────
       function applyBillPaymentStatuses(month) {
-        const paidByBill = month.transactions.reduce((totals, txn) => {
+        const paidByBill = activeTransactions(month).reduce((totals, txn) => {
           if (!txn.billId || Number(txn.amount||0) === 0) return totals;
           totals[txn.billId] = (totals[txn.billId] || 0) + Math.abs(Number(txn.amount||0));
           return totals;

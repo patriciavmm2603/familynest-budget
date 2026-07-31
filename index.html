@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Kingdom Builder</title>
-  <!-- v128 ignored lines stay visible -->
+  <!-- v129 closeout transaction coverage -->
   <!-- v84 safe next paycheck -->
   <!-- v82 expected income actuals -->
   <!-- v81 fix csv amount sort -->
@@ -2226,7 +2226,7 @@
       /* v114: monthly plan remaining cell shows overage instead of zero */
 
 
-      /* v128 ignored lines stay visible: cleaner dark mode and mobile readability */
+      /* v129 closeout transaction coverage: cleaner dark mode and mobile readability */
       @media (prefers-color-scheme: dark) {
         :root {
           --bg: #14120f;
@@ -7427,6 +7427,246 @@ function renderCompare() {
       }
 
 
+
+      function transactionCoverageId(txn) {
+        return txn?.id || transactionKey(txn);
+      }
+
+      function transactionCoverageText(txn) {
+        return [
+          txn?.description,
+          txn?.category,
+          txn?.incomeType,
+          txn?.owner,
+          txn?.asset,
+          txn?.notes,
+          txn?.account,
+          txn?.ignoreReason
+        ].join(" ").toLowerCase();
+      }
+
+      function isContributionTransaction(txn) {
+        const text = transactionCoverageText(txn);
+        const category = String(txn?.category || "").trim().toLowerCase();
+        return Boolean(txn && txn.reconciled)
+          && !isIgnoredTransaction(txn)
+          && Number(txn.amount || 0) > 0
+          && (/contribution|daughter|andrea|maria/.test(text) || category === "contributions");
+      }
+
+      function isDebtPaymentTransaction(txn) {
+        const category = String(txn?.category || "").trim().toLowerCase();
+        const asset = String(txn?.asset || "").trim().toLowerCase();
+        return Boolean(txn && txn.reconciled)
+          && !isIgnoredTransaction(txn)
+          && Number(txn.amount || 0) < 0
+          && !txn.billId
+          && (category === "debt" || asset === "debt" || /capital one|bank of america|irs|citi|credit card|loan/.test(transactionCoverageText(txn)));
+      }
+
+      function isVaultReserveTransaction(txn) {
+        if (!txn) return false;
+        const text = transactionCoverageText(txn);
+        const category = String(txn.category || "").trim().toLowerCase();
+        return Boolean(txn.reconciled)
+          && !isIgnoredTransaction(txn)
+          && (isVaultMovementTxn(txn)
+            || /vault|reserve|savings|saving|quarterly|from quarterly|from vacation|emergency fund/.test(text)
+            || /vault|reserve|savings|saving|quarterly/.test(category));
+      }
+
+      function transactionCoverageBucket(month, txn) {
+        if (isIgnoredTransaction(txn)) return {
+          key: "ignored",
+          label: "Ignored / Excluded",
+          status: "info",
+          reason: txn.ignoreReason || "Ignored/excluded from this month."
+        };
+
+        if (!txn.reconciled || !txn.category || !txn.owner || txn.category === "Uncategorized") return {
+          key: "needsReview",
+          label: "Needs Review",
+          status: "block",
+          reason: "Not fully reconciled or missing category/owner."
+        };
+
+        const bill = txn.billId ? (month.budgetLines || []).find(line => line.id === txn.billId) : null;
+        if (bill) return {
+          key: "bills",
+          label: "Bills",
+          status: "ok",
+          reason: billLineName(bill)
+        };
+
+        if (isPersonalTransaction(txn)) return {
+          key: "personal",
+          label: "Personal / Allowance",
+          status: "ok",
+          reason: hasPersonalSplit(txn) ? `Split ${personalSplitLabel(txn)}` : (txn.owner || "Personal")
+        };
+
+        if (isSideHustleTransaction(txn) || transactionIncomeType(txn) === "Side Hustle Income") return {
+          key: "sideHustles",
+          label: "Side Hustles",
+          status: "ok",
+          reason: "Side hustle income"
+        };
+
+        if (isContributionTransaction(txn)) return {
+          key: "contributions",
+          label: "Contributions",
+          status: "ok",
+          reason: "Family contribution"
+        };
+
+        if (isDebtPaymentTransaction(txn)) return {
+          key: "debtPayments",
+          label: "Debt / Extra Debt Payments",
+          status: "ok",
+          reason: "Reconciled debt payment outside monthly bill plan"
+        };
+
+        if (isVaultReserveTransaction(txn)) return {
+          key: "vaultReserve",
+          label: "Vault / Reserve Movements",
+          status: "info",
+          reason: "Internal reserve/vault movement"
+        };
+
+        if (Number(txn.amount || 0) > 0) return {
+          key: "income",
+          label: "Income",
+          status: "ok",
+          reason: transactionIncomeType(txn) || txn.incomeType || "Income"
+        };
+
+        if (Number(txn.amount || 0) < 0) return {
+          key: "otherSpending",
+          label: "Other Reconciled Spending",
+          status: "review",
+          reason: "Reconciled spending not linked to a bill, personal, debt, or reserve bucket"
+        };
+
+        return {
+          key: "needsReview",
+          label: "Needs Review",
+          status: "block",
+          reason: "Could not classify transaction for closeout."
+        };
+      }
+
+      function closeoutTransactionCoverageRows(month = currentMonth()) {
+        return (month.transactions || []).map(txn => {
+          const bucket = transactionCoverageBucket(month, txn);
+          return {
+            id: transactionCoverageId(txn),
+            date: txn.date || "",
+            description: txn.description || "",
+            owner: txn.owner || "",
+            category: txn.category || "Uncategorized",
+            incomeType: txn.incomeType || "",
+            amount: rawMoney(txn.amount || 0),
+            billId: txn.billId || "",
+            reconciled: Boolean(txn.reconciled),
+            ignored: Boolean(txn.ignored),
+            bucketKey: bucket.key,
+            bucketLabel: bucket.label,
+            bucketStatus: bucket.status,
+            reason: bucket.reason || "",
+            notes: txn.notes || "",
+            ignoreReason: txn.ignoreReason || ""
+          };
+        });
+      }
+
+      function closeoutTransactionCoverageSummary(month = currentMonth()) {
+        const rows = closeoutTransactionCoverageRows(month);
+        const buckets = rows.reduce((acc, row) => {
+          acc[row.bucketKey] ||= {
+            key: row.bucketKey,
+            label: row.bucketLabel,
+            status: row.bucketStatus,
+            count: 0,
+            inflow: 0,
+            outflow: 0,
+            net: 0,
+            rows: []
+          };
+          const bucket = acc[row.bucketKey];
+          bucket.count += 1;
+          bucket.net = rawMoney(bucket.net + row.amount);
+          if (row.amount >= 0) bucket.inflow = rawMoney(bucket.inflow + row.amount);
+          else bucket.outflow = rawMoney(bucket.outflow + Math.abs(row.amount));
+          bucket.rows.push(row);
+          if (["block", "review"].includes(row.bucketStatus) && bucket.status !== "block") bucket.status = row.bucketStatus;
+          return acc;
+        }, {});
+
+        const orderedKeys = ["bills","income","sideHustles","personal","contributions","debtPayments","vaultReserve","ignored","otherSpending","needsReview"];
+        const ordered = orderedKeys.filter(key => buckets[key]).map(key => buckets[key])
+          .concat(Object.keys(buckets).filter(key => !orderedKeys.includes(key)).sort().map(key => buckets[key]));
+
+        return {
+          totalTransactions: rows.length,
+          activeReconciledCount: rows.filter(row => row.reconciled && !row.ignored).length,
+          ignoredCount: rows.filter(row => row.ignored).length,
+          issueCount: rows.filter(row => ["block","review"].includes(row.bucketStatus)).length,
+          unplacedCount: rows.filter(row => ["needsReview","otherSpending"].includes(row.bucketKey)).length,
+          rows,
+          buckets: ordered,
+          blockerRows: rows.filter(row => row.bucketStatus === "block"),
+          reviewRows: rows.filter(row => row.bucketStatus === "review")
+        };
+      }
+
+      function renderCloseoutCoverageBucketTable(bucket) {
+        const rows = bucket.rows || [];
+        if (!rows.length) return `<div class="empty">No transactions in this bucket.</div>`;
+        return `<div class="table-wrap"><table><thead><tr><th>Date</th><th>Description</th><th>Owner</th><th>Category</th><th class="money">Amount</th><th>Why it lands here</th></tr></thead><tbody>
+          ${rows.map(row => `<tr class="${row.ignored ? "kb-ignored-txn" : ""}">
+            <td>${escapeHtml(row.date)}</td>
+            <td><strong>${escapeHtml(row.description || "Transaction")}</strong>${row.ignored ? `<div class="muted small">Ignored: ${escapeHtml(row.ignoreReason || "Excluded")}</div>` : ""}${row.billId ? `<div class="muted small">Linked bill</div>` : ""}</td>
+            <td>${escapeHtml(row.owner || "-")}</td>
+            <td>${escapeHtml(row.category || "Uncategorized")}${row.incomeType ? `<div class="muted small">${escapeHtml(row.incomeType)}</div>` : ""}</td>
+            <td class="money" style="color:${row.amount >= 0 ? "var(--green)" : "var(--red)"}">${money.format(row.amount)}</td>
+            <td>${escapeHtml(row.reason || bucket.label)}</td>
+          </tr>`).join("")}
+        </tbody></table></div>`;
+      }
+
+      function renderCloseoutTransactionCoverageSection(report) {
+        const coverage = report.transactionCoverage || closeoutTransactionCoverageSummary(currentMonth());
+        const buckets = coverage.buckets || [];
+        const issueBuckets = buckets.filter(bucket => ["block","review"].includes(bucket.status));
+        return `
+          <div class="card">
+            <div class="section-title"><h3>Transaction Coverage Preflight</h3><span>Every transaction must land in exactly one closeout bucket</span></div>
+            <div class="cards kb-simple-dashboard-cards">
+              ${metric("Active reconciled", coverage.activeReconciledCount || 0, "Rows that count in July closeout.", "green")}
+              ${metric("Ignored / audit only", coverage.ignoredCount || 0, "Rows saved but excluded from totals.", "blue")}
+              ${metric("Coverage buckets", buckets.length || 0, "Where transactions land in the closeout report.")}
+              ${metric("Needs attention", coverage.unplacedCount || coverage.issueCount || 0, "Needs Review or Other Reconciled Spending.", (coverage.unplacedCount || coverage.issueCount) ? "red" : "green")}
+            </div>
+            ${(coverage.unplacedCount || coverage.issueCount) ? `<div class="banner" style="background:var(--red-soft);border-color:#e7b8ae;color:var(--red);margin-top:.6rem"><div><strong>${coverage.unplacedCount || coverage.issueCount} transaction${(coverage.unplacedCount || coverage.issueCount) === 1 ? "" : "s"} need a better home before locking</strong><span>Debt payments now have their own bucket, so only Needs Review / Other Reconciled Spending should block confidence.</span></div></div>` : `<div class="banner" style="background:var(--green-soft);border-color:#b8d6c3;color:var(--green);margin-top:.6rem"><div><strong>Every reconciled transaction has a closeout bucket</strong><span>Nothing is silently falling out of the summary.</span></div></div>`}
+          </div>
+          <div class="card">
+            <div class="section-title"><h3>Coverage buckets</h3><span>Counts and totals by landing place</span></div>
+            <div class="table-wrap"><table><thead><tr><th>Bucket</th><th class="money">Count</th><th class="money">Inflow</th><th class="money">Outflow</th><th class="money">Net</th><th>Status</th></tr></thead><tbody>
+              ${buckets.map(bucket => `<tr>
+                <td><strong>${escapeHtml(bucket.label)}</strong></td>
+                <td class="money">${bucket.count || 0}</td>
+                <td class="money">${money.format(bucket.inflow || 0)}</td>
+                <td class="money">${money.format(bucket.outflow || 0)}</td>
+                <td class="money">${money.format(bucket.net || 0)}</td>
+                <td>${bucket.status === "block" ? `<span class="pill red">Block</span>` : bucket.status === "review" ? `<span class="pill yellow">Review</span>` : bucket.status === "info" ? `<span class="pill blue">Info</span>` : `<span class="pill green">Covered</span>`}</td>
+              </tr>`).join("")}
+            </tbody></table></div>
+          </div>
+          ${buckets.map(bucket => `<div class="card"><div class="section-title"><h3>${escapeHtml(bucket.label)}</h3><span>${bucket.count || 0} transaction${(bucket.count || 0) === 1 ? "" : "s"}</span></div>${renderCloseoutCoverageBucketTable(bucket)}</div>`).join("")}
+        `;
+      }
+
+
       function buildCloseoutReport(month = currentMonth()) {
         const rows = closeoutReportRows(month);
         const openRows = rows.filter(row => row.remaining > 0.005);
@@ -7440,6 +7680,7 @@ function renderCompare() {
         const plannedActualSections = plannedActualRowsBySection(month);
         const plannedActualTotals = plannedActualReportTotals(plannedActualSections);
         const plannedActualFlags = plannedActualReviewFlags(plannedActualSections);
+        const transactionCoverage = closeoutTransactionCoverageSummary(month);
 
         const report = {
           id: `closeout-${state.activeMonth || Date.now()}`,
@@ -7484,6 +7725,7 @@ function renderCompare() {
             totals: plannedActualTotals,
             reviewFlags: plannedActualFlags
           },
+          transactionCoverage,
           byCategory: groupCloseoutTotals(rows, row => row.category),
           byOwner: groupCloseoutTotals(rows, row => row.owner),
           lines: rows.map(row => ({
@@ -7681,6 +7923,8 @@ function renderCompare() {
 
           renderPlannedActualCloseoutSection(savedReport || draftReport),
 
+          renderCloseoutTransactionCoverageSection(savedReport || draftReport),
+
           savedReport ? `<div class="card"><div class="section-title"><h3>Saved report detail</h3><span>Historical record</span></div>
             <div class="table-wrap"><table><thead><tr><th>Bill</th><th>Action</th><th class="money">Planned</th><th class="money">Paid</th><th class="money">Remaining reviewed</th><th class="money">Action amount</th></tr></thead><tbody>
               ${(savedReport.lines || []).map(row => `<tr><td><strong>${escapeHtml(row.payee)}</strong><div class="muted small">${escapeHtml(row.category)} · ${escapeHtml(row.owner)}</div></td><td>${escapeHtml(row.actionLabel || row.action)}</td><td class="money">${money.format(row.planned || 0)}</td><td class="money">${money.format(row.paid || 0)}</td><td class="money">${money.format(row.remaining || 0)}</td><td class="money">${money.format(row.actionAmount || 0)}</td></tr>`).join("")}
@@ -7716,9 +7960,12 @@ function renderCompare() {
         document.querySelector("#saveFinalCloseout").addEventListener("click", () => {
           saveDraft();
           if (!closeoutComplete(month)) return alert("Check all closeout items first.");
-          const flags = buildCloseoutReport(month).plannedActual?.reviewFlags || [];
+          const reportNow = buildCloseoutReport(month);
+          const flags = reportNow.plannedActual?.reviewFlags || [];
+          const coverageIssues = reportNow.transactionCoverage?.unplacedCount || 0;
           const flagText = flags.length ? `\n\n${flags.length} planned-vs-actual review flag${flags.length === 1 ? "" : "s"} will be saved in the report. Review them before locking if needed.` : "";
-          if (!confirm("Save the final closeout report and close remaining July lines using the selected actions?" + flagText)) return;
+          const coverageText = coverageIssues ? `\n\n${coverageIssues} transaction coverage issue${coverageIssues === 1 ? "" : "s"} remain. These should be reviewed before final close.` : "";
+          if (!confirm("Save the final closeout report and close remaining July lines using the selected actions?" + flagText + coverageText)) return;
           finalizeCloseoutReport(month);
           render();
         });

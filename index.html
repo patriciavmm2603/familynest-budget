@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Kingdom Builder</title>
-  <!-- v130 simplify bill editing -->
+  <!-- v131 subscriptions category -->
   <!-- v84 safe next paycheck -->
   <!-- v82 expected income actuals -->
   <!-- v81 fix csv amount sort -->
@@ -2226,7 +2226,7 @@
       /* v114: monthly plan remaining cell shows overage instead of zero */
 
 
-      /* v130 simplify bill editing: cleaner dark mode and mobile readability */
+      /* v131 subscriptions category: cleaner dark mode and mobile readability */
       @media (prefers-color-scheme: dark) {
         :root {
           --bg: #14120f;
@@ -2531,7 +2531,7 @@
       const PAYPAL_SIDE_HUSTLE_TAX_RATE = 30;
       const owners = ["Patricia", "Alec", "Shared"];
       const assets = ["House 1", "House 2", "Car 1", "Car 2", "Family", "Debt", "Giving", "Kids", "Personal"];
-      const categories = ["Personal", "Credit Cards", "Medical", "Entertainment", "Fuel", "Groceries", "Insurance", "HOA", "Mortgage", "Patinada", "Utilities", "Income", "Side Hustles", "Side Gig", "Contribution", "Debt", "Savings", "Next Month Mortgage Reserve / Vault", "Bill Still Due This Month Reserve / Vault", "This Month Bill Reserve / Vault", "Transfer / Vault Movement", "Quarterly Reserve / Vault Set-Aside", "Paid from Vault / Already Reserved", "Uncategorized"];
+      const categories = ["Personal", "Credit Cards", "Medical", "Subscriptions","Entertainment", "Fuel", "Groceries", "Insurance", "HOA", "Mortgage", "Patinada", "Utilities", "Income", "Side Hustles", "Side Gig", "Contribution", "Debt", "Savings", "Next Month Mortgage Reserve / Vault", "Bill Still Due This Month Reserve / Vault", "This Month Bill Reserve / Vault", "Transfer / Vault Movement", "Quarterly Reserve / Vault Set-Aside", "Paid from Vault / Already Reserved", "Uncategorized"];
       const incomeTypes = ["", "Job Income", "Side Hustle Income", "Other Income"];
       const statuses = ["Not Paid", "Scheduled", "Committed", "Funded", "Paid", "Partial", "Auto-pay", "Review", "Skipped", "Closed", "Rolled Over"];
       const navItems = [
@@ -5511,6 +5511,18 @@ function renderProtectionLists(month = currentMonth(), plan = safeNextPaycheckPl
 
       }
 
+
+      function categoryForBudgetLineSave(data, existing) {
+        data ||= {};
+        existing ||= {};
+        const selected = data.category || existing.category || "Utilities";
+        const text = [data.payee, data.notes, existing.payee, existing.notes].join(" ").toLowerCase();
+        if (/subscription|subscriptions|google one|google\s*\*|icloud|apple\.com\/bill|microsoft|chatgpt|openai|netflix|spotify|hulu|disney|youtube premium/.test(text)) {
+          return selected === "Entertainment" || selected === "Utilities" ? "Subscriptions" : selected;
+        }
+        return selected;
+      }
+
       function openBudgetModal(line, targetLines = currentMonth().budgetLines, context = "month") {
         const editing = Boolean(line);
         const value = line || { owner: "Shared", dueDay: "", payee: "", category: "Utilities", paymentType: "Utilities", amount: 0, asset: "Family", status: "Not Paid", paycheckId: "pc-shared-flex", notes: "", recurring: true, expenseType: "Fixed" };
@@ -5532,7 +5544,7 @@ function renderProtectionLists(month = currentMonth(), plan = safeNextPaycheckPl
         document.querySelector("#budgetForm").addEventListener("submit", event => {
           event.preventDefault();
           const data = formData(event.currentTarget);
-          const category = data.category || value.category || "Utilities";
+          const category = categoryForBudgetLineSave(data, value);
           const next = {
             ...value,
             ...data,
@@ -5981,7 +5993,8 @@ function renderProtectionLists(month = currentMonth(), plan = safeNextPaycheckPl
           [/wrec|frontier|t-mobile|netflix|pasco utilities|water|electric|trash|apple\.com\/bill/, "Utilities","","",false],
           [/sofi|synchrony|citi|bank of america|care credit|rooms to go/, "Debt","Patricia","Debt",true],
           [/adventhealth|health|dental|ortho|anemia|medical/, "Medical","Patricia","Family",false],
-          [/uber|amazon|five below|subscription|gym/, "Entertainment","","",false],
+          [/google\s*\*?google one|google one|apple\.com\/bill|icloud|microsoft|chatgpt|openai|subscription|subscriptions|netflix|spotify|hulu|disney|prime video|youtube premium/, "Subscriptions","Shared","Family",false],
+          [/uber|amazon|five below|gym/, "Entertainment","","",false],
           [/journey|tithe|church/, "Entertainment","Alec","Giving",false]
         ];
         const found = rules.find(([pattern]) => pattern.test(d));
@@ -6039,7 +6052,7 @@ function renderProtectionLists(month = currentMonth(), plan = safeNextPaycheckPl
         document.querySelector("#createBillFromTxn").addEventListener("click", () => {
           const form = document.querySelector("#txnForm");
           const suggestion = autoCategorizeFromText(form.elements.description.value, Number(form.elements.amount.value||0));
-          const bill = { id: uid("bill"), owner: suggestion.owner||form.elements.owner.value||"Shared", dueDay: "", payee: cleanPayeeName(form.elements.description.value), category: suggestion.category && suggestion.category!=="Uncategorized" ? suggestion.category : (form.elements.category.value||"Uncategorized"), paymentType: suggestion.category||form.elements.category.value||"Uncategorized", amount: Math.abs(Number(form.elements.amount.value||0)), asset: suggestion.asset||value.asset||"Family", status: "Not Paid", notes: "Created while reviewing transaction.", recurring: true };
+          const bill = { id: uid("bill"), owner: suggestion.owner||form.elements.owner.value||"Shared", dueDay: "", payee: cleanPayeeName(form.elements.description.value), category: categoryForBudgetLineSave({ payee: form.elements.description.value, notes: "", category: suggestion.category && suggestion.category!=="Uncategorized" ? suggestion.category : (form.elements.category.value||"Uncategorized") }, {}), paymentType: categoryForBudgetLineSave({ payee: form.elements.description.value, notes: "", category: suggestion.category && suggestion.category!=="Uncategorized" ? suggestion.category : (form.elements.category.value||"Uncategorized") }, {}), amount: Math.abs(Number(form.elements.amount.value||0)), asset: suggestion.asset||value.asset||"Family", status: "Not Paid", notes: "Created while reviewing transaction.", recurring: true };
           currentMonth().budgetLines.push(bill);
           form.elements.billId.innerHTML = optionHtml(billOptions(), bill.id);
           form.elements.billId.value = bill.id;

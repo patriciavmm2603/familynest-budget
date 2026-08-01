@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Kingdom Builder</title>
-  <!-- v132 closeout current remaining -->
+  <!-- v133 next paycheck protection -->
   <!-- v84 safe next paycheck -->
   <!-- v82 expected income actuals -->
   <!-- v81 fix csv amount sort -->
@@ -2226,7 +2226,7 @@
       /* v114: monthly plan remaining cell shows overage instead of zero */
 
 
-      /* v132 closeout current remaining: cleaner dark mode and mobile readability */
+      /* v133 next paycheck protection: cleaner dark mode and mobile readability */
       @media (prefers-color-scheme: dark) {
         :root {
           --bg: #14120f;
@@ -4556,16 +4556,70 @@ function renderProtectionControls(row) {
       }
 
 
+
+      function protectionWindowStartDay(month = currentMonth()) {
+        const status = activeMonthStatus();
+        if (status === "past") return daysInActiveMonth() + 1;
+        if (status === "future") return 1;
+        return clampDay(new Date().getDate());
+      }
+
+      function protectionDaysUntilPaycheck(plan = safeNextPaycheckBasePlan(), month = currentMonth()) {
+        const startDay = protectionWindowStartDay(month);
+        const maxDay = daysInActiveMonth();
+        const payDay = plan?.paycheck?.date instanceof Date ? clampDay(plan.paycheck.date.getDate()) : null;
+        if (!payDay) return Math.max(0, maxDay - startDay + 1);
+        if (activeMonthStatus() === "future") return Math.max(1, payDay);
+        return Math.max(1, payDay - startDay + 1);
+      }
+
+      function lineDueBeforeNextPaycheck(line, plan = safeNextPaycheckBasePlan(), month = currentMonth()) {
+        if (activeMonthStatus() === "past") return false;
+        const day = dueDayNumber(line?.dueDay);
+        if (!day) return false;
+        const payDay = plan?.paycheck?.date instanceof Date ? clampDay(plan.paycheck.date.getDate()) : null;
+        const startDay = protectionWindowStartDay(month);
+        if (!payDay) return day >= startDay;
+        if (activeMonthStatus() === "future") return day <= payDay;
+        return day >= startDay && day <= payDay;
+      }
+
+      function flexibleProtectionAmountBeforePaycheck(line, plan = safeNextPaycheckBasePlan(), month = currentMonth()) {
+        const remaining = Math.max(0, remainingForLine(line));
+        const base = Math.max(0, Number(line?.amount || 0));
+        const amount = remaining > 0 ? Math.min(remaining, base || remaining) : base;
+        if (amount <= 0) return 0;
+        const days = protectionDaysUntilPaycheck(plan, month);
+        return roundMoney(amount * days / daysInActiveMonth());
+      }
+
+      function shouldShowFlexibleBeforePaycheck(line) {
+        if (!line) return false;
+        if (isMortgageFundingLine(line)) return false;
+        if (dueDayNumber(line.dueDay)) return false;
+        return isLivingNeedLine(line) || expenseTypeForLine(line) === "Flexible" || /personal|allowance/.test(textForLine(line));
+      }
+
 function currentMonthProtectedRows(month = currentMonth(), plan = safeNextPaycheckBasePlan(month)) {
         const rows = [];
 
         notFullyPaidMonthlyRows(month).forEach(line => {
+          if (isMortgageFundingLine(line)) return;
+
+          const hasDueDay = Boolean(dueDayNumber(line.dueDay));
+          const includeFullAmount = hasDueDay && lineDueBeforeNextPaycheck(line, plan, month);
+          const includeFlexibleEstimate = !hasDueDay && shouldShowFlexibleBeforePaycheck(line);
+
+          if (!includeFullAmount && !includeFlexibleEstimate) return;
+
           const key = scopedProtectionKey(line, "current");
-          const fallback = remainingForLine(line);
+          const fallback = includeFullAmount ? remainingForLine(line) : flexibleProtectionAmountBeforePaycheck(line, plan, month);
+          if (fallback <= 0.005) return;
+
           const protectAmount = protectionAmountForKey(key, fallback, month);
           rows.push({
-            name: billLineName(line),
-            dueDate: dueDisplayForLine(line),
+            name: includeFullAmount ? billLineName(line) : `${billLineName(line)} — until next paycheck`,
+            dueDate: includeFullAmount ? dueDisplayForLine(line) : `estimate for ${protectionDaysUntilPaycheck(plan, month)} day(s)`,
             amountLeft: fallback,
             amount: protectAmount,
             protectAmount,
@@ -4578,18 +4632,23 @@ function currentMonthProtectedRows(month = currentMonth(), plan = safeNextPayche
           });
         });
 
+        const days = protectionDaysUntilPaycheck(plan, month);
+        const daysInMonth = daysInActiveMonth();
+
         personalRemainingRowsByOwner(month).forEach(personal => {
           if (personal.remaining <= 0) return;
+          const fallback = roundMoney(Number(personal.remaining || 0) * days / daysInMonth);
+          if (fallback <= 0.005) return;
           const personalLine = { id: `personal-money-current-${personal.owner}`, payee: `Personal Money — ${personal.owner}`, category: "Personal", expenseType: "Flexible" };
           const key = scopedProtectionKey(personalLine, "current");
-          const protectAmount = protectionAmountForKey(key, personal.remaining, month);
+          const protectAmount = protectionAmountForKey(key, fallback, month);
           rows.push({
-            name: `Personal Money — ${escapeHtml(personal.owner)}`,
-            dueDate: "—",
-            amountLeft: personal.remaining,
+            name: `Personal Money — ${escapeHtml(personal.owner)} — until next paycheck`,
+            dueDate: `estimate for ${days} day(s)`,
+            amountLeft: fallback,
             amount: protectAmount,
             protectAmount,
-            defaultAmount: personal.remaining,
+            defaultAmount: fallback,
             controlKey: key,
             ignored: isProtectionKeyIgnored(key, month),
             overrideValue: protectionAmountOverrideForKey(key, month),
@@ -4613,6 +4672,9 @@ function currentMonthProtectedRows(month = currentMonth(), plan = safeNextPayche
 
 
 function earlyNextMonthProtectedRows(month = currentMonth(), plan = safeNextPaycheckBasePlan(month)) {
+        if (activeMonthStatus() === "future" || plan?.paycheck) {
+          return manualProtectionRows(month).filter(row => Number(row.amountLeft ?? row.amount ?? 0) > 0.005);
+        }
         const rows = [];
         const days = daysInNextMonthFromActive();
 
@@ -4725,14 +4787,14 @@ function renderProtectionLists(month = currentMonth(), plan = safeNextPaycheckPl
               <span>${money.format(currentTotal)} + ${money.format(nextTotal)} = ${money.format(listTotal)}</span>
             </div>
             <p class="muted small" style="margin-top:-.25rem">
-              Ignore keeps a row visible but removes it from the counted total. Protect amount is the number used in the math.
+              This list only counts bills due before the next paycheck plus prorated flexible needs. Ignore keeps a row visible but removes it from the counted total.
             </p>
             <div style="display:flex;justify-content:flex-end;margin:.5rem 0 .75rem">
               <button type="button" class="secondary" id="addManualProtectionLineBtn">+ Add protection line</button>
             </div>
             <div class="kb-list-stack">
-              ${twoColumnMoneyList("This Month Not Fully Paid", currentRows, "Everything in the monthly plan is fully paid.")}
-              ${twoColumnMoneyList("Hold for Early Next Paycheck", nextRows, "No early protection lines.")}
+              ${twoColumnMoneyList("Due / needed before next paycheck", currentRows, "Nothing due or needed before the next paycheck.")}
+              ${twoColumnMoneyList("Extra manual protection", nextRows, "No extra manual protection lines.")}
             </div>
             <div class="card kb-reconcile-card" style="padding:1rem;margin-top:.4rem">
               <div class="kb-money-total" style="display:grid;grid-template-columns:minmax(0,1fr) 9rem;gap:1rem;align-items:center;font-weight:900;">

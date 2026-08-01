@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Kingdom Builder</title>
-  <!-- v133 next paycheck protection -->
+  <!-- v134 mortgage normal bills -->
   <!-- v84 safe next paycheck -->
   <!-- v82 expected income actuals -->
   <!-- v81 fix csv amount sort -->
@@ -2226,7 +2226,7 @@
       /* v114: monthly plan remaining cell shows overage instead of zero */
 
 
-      /* v133 next paycheck protection: cleaner dark mode and mobile readability */
+      /* v134 mortgage normal bills: cleaner dark mode and mobile readability */
       @media (prefers-color-scheme: dark) {
         :root {
           --bg: #14120f;
@@ -4048,9 +4048,10 @@ function actualJobDepositsForExpectedIncome(month = currentMonth()) {
 
 
       function isMortgageFundingLine(line) {
-        const text = [line.payee, line.name, line.category, line.paymentType, line.notes, line.description, line.vendor, line.merchant].join(" ").toLowerCase();
-        // Mortgage funding means PennyMac and Truist only. Achieva is intentionally not mortgage funding.
-        return /pennymac|truist/.test(text);
+        // v134: no special "committed mortgage funding" exclusion.
+        // PennyMac, Truist, and other mortgage rows must behave like normal bills:
+        // Not Paid until a transaction is matched or the bill is manually marked paid.
+        return false;
       }
 
       function mortgageBillRows(month = currentMonth()) {

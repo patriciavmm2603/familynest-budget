@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Kingdom Builder</title>
-  <!-- v131 subscriptions category -->
+  <!-- v132 closeout current remaining -->
   <!-- v84 safe next paycheck -->
   <!-- v82 expected income actuals -->
   <!-- v81 fix csv amount sort -->
@@ -2226,7 +2226,7 @@
       /* v114: monthly plan remaining cell shows overage instead of zero */
 
 
-      /* v131 subscriptions category: cleaner dark mode and mobile readability */
+      /* v132 closeout current remaining: cleaner dark mode and mobile readability */
       @media (prefers-color-scheme: dark) {
         :root {
           --bg: #14120f;
@@ -6862,6 +6862,23 @@ function renderCompare() {
         return `<select data-closeout-action="${escapeHtml(key)}">${closeoutActionLabels().map(option => `<option value="${option.value}" ${option.value === value ? "selected" : ""}>${escapeHtml(option.label)}</option>`).join("")}</select>`;
       }
 
+
+      function syncCloseoutActionAmounts(month = currentMonth()) {
+        month.closeout = month.closeout && typeof month.closeout === "object" ? month.closeout : {};
+        month.closeout.lineActions = month.closeout.lineActions && typeof month.closeout.lineActions === "object" ? month.closeout.lineActions : {};
+        closeoutOpenLines(month).forEach(line => {
+          const key = closeoutLineKey(line);
+          const remaining = roundMoney(remainingForLine(line));
+          const existing = month.closeout.lineActions[key] && typeof month.closeout.lineActions[key] === "object" ? month.closeout.lineActions[key] : {};
+          month.closeout.lineActions[key] = {
+            action: existing.action || "close-unused",
+            amount: remaining,
+            notes: existing.notes || ""
+          };
+        });
+        return month.closeout.lineActions;
+      }
+
       function ensureCloseoutState(month = currentMonth()) {
         month.closeout = month.closeout && typeof month.closeout === "object" ? month.closeout : {};
         month.closeout.lineActions = month.closeout.lineActions && typeof month.closeout.lineActions === "object" ? month.closeout.lineActions : {};
@@ -6869,22 +6886,7 @@ function renderCompare() {
         ["billsChecked", "transactionsChecked", "allowanceChecked", "incomeChecked"].forEach(key => {
           month.closeout[key] = Boolean(month.closeout[key]);
         });
-        closeoutOpenLines(month).forEach(line => {
-          const key = closeoutLineKey(line);
-          const remaining = remainingForLine(line);
-          if (!month.closeout.lineActions[key]) {
-            month.closeout.lineActions[key] = {
-              action: "close-unused",
-              amount: remaining,
-              notes: ""
-            };
-          } else {
-            const action = month.closeout.lineActions[key];
-            action.action ||= "close-unused";
-            if (action.amount === undefined || action.amount === null || action.amount === "") action.amount = remaining;
-            action.notes ||= "";
-          }
-        });
+        syncCloseoutActionAmounts(month);
         return month.closeout;
       }
 
@@ -6944,12 +6946,12 @@ function renderCompare() {
         const closeout = ensureCloseoutState(month);
         return closeoutAllRows(month).map(row => {
           const action = closeout.lineActions[row.key] || {};
-          const amount = Number(action.amount ?? row.remaining ?? 0);
+          const currentRemaining = roundMoney(row.remaining || 0);
           return {
             ...row,
             action: row.remaining > 0.005 ? (action.action || "close-unused") : "already-closed",
             actionLabel: row.remaining > 0.005 ? closeoutActionLabel(action.action || "close-unused") : "Already closed",
-            actionAmount: row.remaining > 0.005 ? roundMoney(Number.isFinite(amount) ? Math.max(0, amount) : row.remaining) : 0,
+            actionAmount: row.remaining > 0.005 ? currentRemaining : 0,
             actionNotes: action.notes || ""
           };
         });
@@ -7927,7 +7929,7 @@ function renderCompare() {
                 </tr>`;
               }).join("")}
             </tbody></table></div>` : `<div class="empty">Everything is paid, closed, skipped, or already has no remaining amount.</div>`}
-            <p class="muted small" style="margin-top:.8rem">Default is “Close as unused / not needed.” Use “Roll over” only for something August really needs to carry.</p>
+            <p class="muted small" style="margin-top:.8rem">Default is “Close as unused / not needed.” Closeout now uses the current Remaining column amount, so old hidden draft amounts cannot override these rows. Use “Roll over” only for something August really needs to carry.</p>
           </div>`,
 
           `<div class="split">
@@ -7948,11 +7950,13 @@ function renderCompare() {
         const saveDraft = () => {
           document.querySelectorAll("[data-closeout]").forEach(box => { closeout[box.dataset.closeout] = box.checked; });
           closeout.notes = document.querySelector("#closeoutNotes").value;
+          syncCloseoutActionAmounts(month);
           saveState();
         };
 
         document.querySelector("#saveCloseoutDraft").addEventListener("click", () => {
           saveDraft();
+          alert("Closeout draft saved with current Remaining amounts.");
           renderCloseout();
         });
 

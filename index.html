@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Kingdom Builder</title>
-  <!-- v135 remove committed mortgage seed -->
+  <!-- v136 overdue bills protected -->
   <!-- v84 safe next paycheck -->
   <!-- v82 expected income actuals -->
   <!-- v81 fix csv amount sort -->
@@ -2226,7 +2226,7 @@
       /* v114: monthly plan remaining cell shows overage instead of zero */
 
 
-      /* v135 remove committed mortgage seed: cleaner dark mode and mobile readability */
+      /* v136 overdue bills protected: cleaner dark mode and mobile readability */
       @media (prefers-color-scheme: dark) {
         :root {
           --bg: #14120f;
@@ -4601,10 +4601,16 @@ function renderProtectionControls(row) {
         const day = dueDayNumber(line?.dueDay);
         if (!day) return false;
         const payDay = plan?.paycheck?.date instanceof Date ? clampDay(plan.paycheck.date.getDate()) : null;
-        const startDay = protectionWindowStartDay(month);
-        if (!payDay) return day >= startDay;
-        if (activeMonthStatus() === "future") return day <= payDay;
-        return day >= startDay && day <= payDay;
+
+        // Future month: protect bills due before/on the first expected paycheck.
+        if (activeMonthStatus() === "future") return payDay ? day <= payDay : true;
+
+        // Current month: overdue unpaid bills still need to be protected.
+        // Example: on Aug 2, PennyMac due Aug 1 must still count before the Aug 10 paycheck.
+        if (payDay) return day <= payDay;
+
+        // No more paycheck found this month: protect all remaining dated bills.
+        return true;
       }
 
       function flexibleProtectionAmountBeforePaycheck(line, plan = safeNextPaycheckBasePlan(), month = currentMonth()) {

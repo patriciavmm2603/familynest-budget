@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Kingdom Builder</title>
-  <!-- v136 overdue bills protected -->
+  <!-- v137 claude audit safe fixes -->
   <!-- v84 safe next paycheck -->
   <!-- v82 expected income actuals -->
   <!-- v81 fix csv amount sort -->
@@ -2226,7 +2226,7 @@
       /* v114: monthly plan remaining cell shows overage instead of zero */
 
 
-      /* v136 overdue bills protected: cleaner dark mode and mobile readability */
+      /* v137 claude audit safe fixes: cleaner dark mode and mobile readability */
       @media (prefers-color-scheme: dark) {
         :root {
           --bg: #14120f;
@@ -2912,10 +2912,6 @@
               line.remainingAmount = Math.max(0, Number(line.amount || 0) - Number(line.paidAmount || 0));
             }
           }
-          const payee = String(line.payee || line.name || "").toLowerCase();
-          if (payee.includes("pennymac") && String(line.dueDay || "").trim() === "30") {
-            line.dueDay = "1";
-          }
         });
         return lines;
       }
@@ -3352,6 +3348,7 @@ function normalizeState(parsed) {
         const current = normalizeIncomeType(item?.incomeType);
         const text = incomeDetectionText(item);
         if (/paypal|pay\s*pal|pp\*|prolific/.test(text)) return "Side Hustle Income";
+        // Janis is Alec income per household rule; keep it as income.
         if (/campus\s*crusade|\bcru\b|city\s*(of\s*)?new\s*port\s*richey|new\s*port\s*richey|\bjanis\b/.test(text)) return "Job Income";
         if (/vault|saving|savings|quarter|quarterly|bonus|reimburse|reimbursement|refund|transfer|one[-\s]?time|extra|gift|tax\s*refund|irs|escrow/.test(text)) return "Other Income";
         return current || "Job Income";
@@ -3848,14 +3845,7 @@ function actualJobDepositsForExpectedIncome(month = currentMonth()) {
         return overSpentForLine(line) > 0.005;
       }
 
-      function remainingOrOverspentBadge(line) {
-        const over = overSpentForLine(line);
-        if (over > 0.005) {
-          return `<span class="pill red">Over ${money.format(over)}</span>`;
-        }
-        const remaining = remainingForLine(line);
-        return `${remainingOrOverspentBadge(line)}`;
-      }
+      
 
 
 
@@ -7993,7 +7983,7 @@ function renderCompare() {
               <button id="saveCloseoutDraft" type="button">Save Draft</button>
               <button id="saveFinalCloseout" class="secondary" type="button"${complete ? "" : " disabled"}>Save Final Closeout Report</button>
               <button id="exportCloseoutReport" class="secondary" type="button">Export Report</button>
-              <button id="copyNextFromCloseout" class="secondary" type="button"${savedReport ? "" : " disabled"}>Create Next Month From Closeout</button>
+              <button id="copyNextFromCloseout" class="secondary" type="button"${savedReport ? "" : " disabled"}>Create Next Month From Base Template</button>
             </div>
           </div>`,
 
@@ -8086,7 +8076,7 @@ function renderCompare() {
 
         document.querySelector("#copyNextFromCloseout").addEventListener("click", () => {
           if (!month.closeoutReport) return alert("Save the final closeout report first.");
-          createMonthFromSource(nextMonthKey(state.activeMonth), state.activeMonth);
+          createMonthFromSource(nextMonthKey(state.activeMonth), "__baseTemplate");
         });
       }
 

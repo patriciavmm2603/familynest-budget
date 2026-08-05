@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Kingdom Builder</title>
-  <!-- v137 claude audit safe fixes -->
+  <!-- v138 preserve csv sort -->
   <!-- v84 safe next paycheck -->
   <!-- v82 expected income actuals -->
   <!-- v81 fix csv amount sort -->
@@ -2226,7 +2226,7 @@
       /* v114: monthly plan remaining cell shows overage instead of zero */
 
 
-      /* v137 claude audit safe fixes: cleaner dark mode and mobile readability */
+      /* v138 preserve csv sort: cleaner dark mode and mobile readability */
       @media (prefers-color-scheme: dark) {
         :root {
           --bg: #14120f;
@@ -5652,6 +5652,57 @@ function renderProtectionLists(month = currentMonth(), plan = safeNextPaycheckPl
       }
 
       // ── TRANSACTIONS ─────────────────────────────────────────────────────────
+
+
+      function cssEscape(value) {
+        if (window.CSS && typeof window.CSS.escape === "function") return window.CSS.escape(value);
+        return String(value).replace(/[^a-zA-Z0-9_-]/g, "\\$&");
+      }
+
+      function captureTransactionReviewState(focusTxnId = "") {
+        const root = document.querySelector("#transactions");
+        const getValue = selector => root?.querySelector(selector)?.value;
+        const snapshot = {
+          transactionSearch: getValue("[name='transactionSearch']") ?? state.transactionSearch ?? "",
+          transactionFilter: getValue("[name='transactionFilter']") ?? state.transactionFilter ?? "All",
+          transactionCategoryFilter: getValue("[name='transactionCategoryFilter']") ?? state.transactionCategoryFilter ?? "All",
+          transactionSort: getValue("[name='transactionSort']") ?? state.transactionSort ?? "Date newest",
+          selectedTransactionIds: Array.isArray(state.selectedTransactionIds) ? [...state.selectedTransactionIds] : [],
+          focusTxnId: focusTxnId || "",
+          scrollY: typeof window !== "undefined" ? window.scrollY : 0
+        };
+        state.transactionSearch = snapshot.transactionSearch;
+        state.transactionFilter = snapshot.transactionFilter;
+        state.transactionCategoryFilter = snapshot.transactionCategoryFilter;
+        state.transactionSort = snapshot.transactionSort;
+        state.selectedTransactionIds = snapshot.selectedTransactionIds;
+        return snapshot;
+      }
+
+      function restoreTransactionReviewState(snapshot = {}) {
+        if (!snapshot || state.activeView !== "transactions") return;
+        state.transactionSearch = snapshot.transactionSearch ?? state.transactionSearch ?? "";
+        state.transactionFilter = snapshot.transactionFilter ?? state.transactionFilter ?? "All";
+        state.transactionCategoryFilter = snapshot.transactionCategoryFilter ?? state.transactionCategoryFilter ?? "All";
+        state.transactionSort = snapshot.transactionSort ?? state.transactionSort ?? "Date newest";
+        state.selectedTransactionIds = Array.isArray(snapshot.selectedTransactionIds) ? [...snapshot.selectedTransactionIds] : (state.selectedTransactionIds || []);
+        requestAnimationFrame(() => {
+          const root = document.querySelector("#transactions");
+          if (!root) return;
+          const setValue = (selector, value) => { const el = root.querySelector(selector); if (el) el.value = value ?? ""; };
+          setValue("[name='transactionSearch']", state.transactionSearch || "");
+          setValue("[name='transactionFilter']", state.transactionFilter || "All");
+          setValue("[name='transactionCategoryFilter']", state.transactionCategoryFilter || "All");
+          setValue("[name='transactionSort']", state.transactionSort || "Date newest");
+          if (snapshot.focusTxnId) {
+            const rowButton = root.querySelector(`[data-edit-txn="${cssEscape(String(snapshot.focusTxnId))}"]`);
+            rowButton?.closest("tr")?.scrollIntoView({ block: "center", behavior: "instant" });
+          } else if (Number.isFinite(snapshot.scrollY)) {
+            window.scrollTo({ top: snapshot.scrollY, behavior: "instant" });
+          }
+        });
+      }
+
       function renderTransactions() {
         const month = currentMonth();
         const rows = sortTransactions(filteredTransactions(month));
@@ -5836,12 +5887,22 @@ function renderProtectionLists(month = currentMonth(), plan = safeNextPaycheckPl
       function sortTransactions(rows) {
         const sort = state.transactionSort || "Date newest";
         const copy = rows.slice();
-        if (sort === "Date oldest") return copy.sort((a, b) => String(a.date).localeCompare(String(b.date)));
-        if (sort === "Description A-Z") return copy.sort((a, b) => String(a.description).localeCompare(String(b.description)));
-        if (sort === "Needs review first") return copy.sort((a, b) => Number(transactionNeedsReview(b)) - Number(transactionNeedsReview(a)) || String(b.date).localeCompare(String(a.date)));
-        if (sort === "Amount highest") return copy.sort((a, b) => Number(b.amount || 0) - Number(a.amount || 0));
-        if (sort === "Amount lowest") return copy.sort((a, b) => Number(a.amount || 0) - Number(b.amount || 0));
-        return copy.sort((a, b) => String(b.date).localeCompare(String(a.date)));
+        const originalIndex = new Map(copy.map((row, index) => [row.id || `${row.date}|${row.description}|${row.amount}|${index}`, index]));
+        const stable = compare => (a, b) => {
+          const primary = compare(a, b);
+          if (primary) return primary;
+          const dateTie = String(b.date || "").localeCompare(String(a.date || ""));
+          if (dateTie) return dateTie;
+          const descTie = String(a.description || "").localeCompare(String(b.description || ""));
+          if (descTie) return descTie;
+          return (originalIndex.get(a.id) ?? 0) - (originalIndex.get(b.id) ?? 0);
+        };
+        if (sort === "Date oldest") return copy.sort(stable((a, b) => String(a.date || "").localeCompare(String(b.date || ""))));
+        if (sort === "Description A-Z") return copy.sort(stable((a, b) => String(a.description || "").localeCompare(String(b.description || ""))));
+        if (sort === "Needs review first") return copy.sort(stable((a, b) => Number(transactionNeedsReview(b)) - Number(transactionNeedsReview(a))));
+        if (sort === "Amount highest") return copy.sort(stable((a, b) => Number(b.amount || 0) - Number(a.amount || 0)));
+        if (sort === "Amount lowest") return copy.sort(stable((a, b) => Number(a.amount || 0) - Number(b.amount || 0)));
+        return copy.sort(stable((a, b) => String(b.date || "").localeCompare(String(a.date || ""))));
       }
 
       function transactionRow(txn) {
@@ -6118,10 +6179,11 @@ function renderProtectionLists(month = currentMonth(), plan = safeNextPaycheckPl
           if (next.ignored) { next.reconciled = true; next.billId = ""; next.ignoreReason ||= "Ignored / excluded from this month"; }
           else next.reconciled = Boolean(next.billId || (next.category && next.owner && next.category !== "Uncategorized"));
           if (next.category !== "Personal" || next.billId || Number(next.amount || 0) >= 0) delete next.personalSplit;
+          const reviewState = captureTransactionReviewState(next.id);
           if (editing) Object.assign(value, next); else currentMonth().transactions.push(next);
           if (next.ignored) removeSideGigForTransaction(currentMonth(), next);
           syncSideGigsFromTransactions(currentMonth(), [editing ? value : next]);
-          applyBillPaymentStatuses(currentMonth()); closeModal(); render();
+          applyBillPaymentStatuses(currentMonth()); closeModal(); render(); restoreTransactionReviewState(reviewState); saveState();
         });
         document.querySelector("#txnForm").elements.billId.addEventListener("change", () => {
           const form = document.querySelector("#txnForm");
@@ -6147,8 +6209,9 @@ function renderProtectionLists(month = currentMonth(), plan = safeNextPaycheckPl
         const deleteBtn = document.querySelector("#deleteTxn");
         if (deleteBtn) deleteBtn.addEventListener("click", () => {
           if (!confirm("Delete this transaction?")) return;
+          const reviewState = captureTransactionReviewState("");
           currentMonth().transactions = currentMonth().transactions.filter(item => item.id !== value.id);
-          closeModal(); render();
+          closeModal(); render(); restoreTransactionReviewState(reviewState); saveState();
         });
       }
 

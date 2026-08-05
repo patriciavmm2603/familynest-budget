@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Kingdom Builder</title>
-  <!-- v138 preserve csv sort -->
+  <!-- v139 planned with personal money -->
   <!-- v84 safe next paycheck -->
   <!-- v82 expected income actuals -->
   <!-- v81 fix csv amount sort -->
@@ -2226,7 +2226,7 @@
       /* v114: monthly plan remaining cell shows overage instead of zero */
 
 
-      /* v138 preserve csv sort: cleaner dark mode and mobile readability */
+      /* v139 planned with personal money: cleaner dark mode and mobile readability */
       @media (prefers-color-scheme: dark) {
         :root {
           --bg: #14120f;
@@ -4052,6 +4052,23 @@ function actualJobDepositsForExpectedIncome(month = currentMonth()) {
         return { rows, planned, paid, left, overpaid };
       }
 
+      function plannedWithPersonalMoneySummary(month = currentMonth()) {
+        const monthPlan = currentMonthPlannedPaidLeft(month);
+        const personal = personalBudgetByOwner(month);
+        const patricia = roundMoney(Number(personal.Patricia || 0));
+        const alec = roundMoney(Number(personal.Alec || 0));
+        const personalTotal = roundMoney(patricia + alec);
+        return {
+          plannedBills: monthPlan.planned,
+          personalTotal,
+          patricia,
+          alec,
+          total: roundMoney(monthPlan.planned + personalTotal),
+          hint: `Bills ${money.format(monthPlan.planned)} + Personal Money ${money.format(personalTotal)}. Patricia ${money.format(patricia)} · Alec ${money.format(alec)}.`
+        };
+      }
+
+
       function notFullyPaidMonthlyRows(month = currentMonth()) {
         return dashboardBudgetLines(month, "Everyone")
           .filter(line => !isMortgageFundingLine(line))
@@ -4878,6 +4895,7 @@ function renderProtectionLists(month = currentMonth(), plan = safeNextPaycheckPl
 
         const count = unreconciledCount(month);
         const monthPlan = currentMonthPlannedPaidLeft(month);
+        const plannedWithPersonal = plannedWithPersonalMoneySummary(month);
         const safePaycheckPlan = safeNextPaycheckPlan(month);
 
         document.querySelector("#dashboard").innerHTML = `
@@ -4887,7 +4905,8 @@ function renderProtectionLists(month = currentMonth(), plan = safeNextPaycheckPl
           </div>
 
           <div class="cards kb-simple-dashboard-cards">
-            ${metric("Planned", monthPlan.planned, "Total planned bills for this budget month, not including income details.")}
+            ${metric("Planned", monthPlan.planned, "Total planned bills for this budget month, not including personal money or income details.")}
+            ${metric("Planned with Personal Money", plannedWithPersonal.total, plannedWithPersonal.hint)}
             ${metric("Paid", monthPlan.paid, "Bills already matched or marked paid for this month.", "green")}
             ${metric("Still due", monthPlan.left, monthPlan.overpaid > 0 ? `Line-by-line remaining. Overpaid bills add ${money.format(monthPlan.overpaid)} but do not reduce other bills.` : "Line-by-line remaining for this month.", monthPlan.left > 0 ? "yellow" : "green")}
           </div>

@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Kingdom Builder</title>
-  <!-- v139 planned with personal money -->
+  <!-- v140 Alec next paycheck owner match -->
   <!-- v84 safe next paycheck -->
   <!-- v82 expected income actuals -->
   <!-- v81 fix csv amount sort -->
@@ -2226,7 +2226,7 @@
       /* v114: monthly plan remaining cell shows overage instead of zero */
 
 
-      /* v139 planned with personal money: cleaner dark mode and mobile readability */
+      /* v140 Alec next paycheck owner match: cleaner dark mode and mobile readability */
       @media (prefers-color-scheme: dark) {
         :root {
           --bg: #14120f;
@@ -3708,11 +3708,33 @@ function normalizeState(parsed) {
         return Number.isNaN(d.getTime()) ? null : d;
       }
 
+      function paycheckOwnerForMatch(value) {
+        if (value && typeof value === "object") {
+          const direct = normalizedOwnerName(value.owner || value.person || value.assignedTo || value.name || "");
+          if (direct === "Alec" || direct === "Patricia") return direct;
+          const text = [value.owner, value.person, value.assignedTo, value.name, value.label, value.payee, value.merchant, value.description, value.notes, value.source].join(" ");
+          const guessed = normalizedOwnerName(text);
+          if (guessed === "Alec" || guessed === "Patricia") return guessed;
+          return direct;
+        }
+        return normalizedOwnerName(value);
+      }
+
       function sameOwnerForPaycheck(a, b) {
-        const left = String(a || "").trim().toLowerCase();
-        const right = String(b || "").trim().toLowerCase();
-        if (!left || !right || left === "shared" || right === "shared" || left === "unassigned" || right === "unassigned") return true;
-        return left === right;
+        const left = paycheckOwnerForMatch(a);
+        const right = paycheckOwnerForMatch(b);
+        const leftKnown = left === "Alec" || left === "Patricia";
+        const rightKnown = right === "Alec" || right === "Patricia";
+
+        // v140: do not let Patricia's received paycheck mark Alec's expected paycheck as received.
+        // The old code stringified objects, so both sides became "[object Object]" and cross-owner
+        // paycheck matches were possible inside paycheckOccurrenceWasAlreadyReceived().
+        if (leftKnown && rightKnown) return left === right;
+        if (leftKnown || rightKnown) return false;
+
+        // Only fall back to loose matching when neither side has a known owner.
+        if (!left || !right || left === "Shared" || right === "Shared" || left === "Unassigned" || right === "Unassigned") return true;
+        return String(left).trim().toLowerCase() === String(right).trim().toLowerCase();
       }
 
       function closePaycheckAmount(a, b) {

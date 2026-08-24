@@ -4,6 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Kingdom Builder</title>
+  <!-- v141 manual must protect dashboard -->
   <!-- v140 Alec next paycheck owner match -->
   <!-- v84 safe next paycheck -->
   <!-- v82 expected income actuals -->
@@ -546,7 +547,7 @@
         }
 
         table {
-          min-width: 720px;
+          min-width: 980px;
         }
       }
 /* v14 phone navigation: wrap tabs instead of cutting off sideways */
@@ -2091,7 +2092,7 @@
       .kb-protection-header,
       .kb-protection-row {
         display: grid;
-        grid-template-columns: minmax(220px, 2fr) 4.5rem 8rem 8.5rem 9rem 4.5rem;
+        grid-template-columns: 4.5rem minmax(220px, 2fr) 5.5rem 8rem 8.5rem 8.5rem 9rem 5rem;
         gap: .75rem;
         align-items: center;
       }
@@ -2123,6 +2124,7 @@
         font-weight: 750;
       }
       .kb-type select,
+      .kb-protect-day-input,
       .kb-protect-amount-input {
         width: 100%;
         min-height: 2.15rem;
@@ -2132,14 +2134,26 @@
       .kb-money-num,
       .kb-protect-edit,
       .kb-ignore,
-      .kb-protection-header div:nth-child(4),
+      .kb-protect-day,
+      .kb-protection-header div:nth-child(3),
       .kb-protection-header div:nth-child(5),
-      .kb-protection-header div:nth-child(6) {
+      .kb-protection-header div:nth-child(6),
+      .kb-protection-header div:nth-child(7),
+      .kb-protection-header div:nth-child(8) {
         text-align: right;
       }
       .kb-ignore {
         display: flex;
         justify-content: flex-end;
+      }
+      .kb-count-cell {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+      }
+      .kb-count-cell input {
+        width: 1.1rem;
+        height: 1.1rem;
       }
       .kb-protection-total {
         display: grid;
@@ -2155,8 +2169,8 @@
         }
         .kb-protection-header,
         .kb-protection-row {
-          grid-template-columns: 240px 4.5rem 8rem 8.5rem 9rem 4.5rem;
-          min-width: 720px;
+          grid-template-columns: 4.5rem 240px 5.5rem 8rem 8.5rem 8.5rem 9rem 5rem;
+          min-width: 980px;
         }
       }
       /* v99: stacked protection tables, visible ignored rows, reset overrides */
@@ -2320,13 +2334,13 @@
         }
         .card { padding: .85rem; }
         .metric .value { font-size: 1.45rem; }
-        table { min-width: 48rem; }
+        table { min-width: 62rem; }
         .kb-protection-table {
           overflow-x: auto;
         }
         .kb-protection-header,
         .kb-protection-row {
-          min-width: 48rem;
+          min-width: 62rem;
         }
         .kb-action-grid {
           grid-template-columns: 1fr 1fr;
@@ -4431,6 +4445,7 @@ function billLineName(line) {
         settings.lines[key] = settings.lines[key] && typeof settings.lines[key] === "object" ? settings.lines[key] : {};
         if (field === "ignore") settings.lines[key].ignore = Boolean(value);
         if (field === "amountOverride") settings.lines[key].amountOverride = value;
+        if (field === "dayOverride") settings.lines[key].dayOverride = value;
         saveState();
         renderDashboard();
       }
@@ -4476,15 +4491,20 @@ function billLineName(line) {
 function renderProtectionControls(row) {
         if (row.manualId) {
           return {
+            countInput: `<input type="checkbox" data-manual-protect-ignore="${escapeHtml(row.manualId)}" ${row.ignored ? "" : "checked"} title="Count this line in Must Protect">`,
+            dayInput: "",
             amountInput: `<input class="kb-protect-amount-input" type="number" step="0.01" data-manual-protect-amount="${escapeHtml(row.manualId)}" value="${Number(row.amount || 0).toFixed(2)}" placeholder="${Number(row.defaultAmount || row.protectAmount || 0).toFixed(2)}">`,
-            ignoreInput: `<div class="toolbar" style="gap:.35rem;justify-content:flex-end;align-items:center"><input type="checkbox" data-manual-protect-ignore="${escapeHtml(row.manualId)}" ${row.ignored ? "checked" : ""} title="Ignore in Money to protect"><button type="button" class="danger kb-mini-button" data-manual-protect-delete="${escapeHtml(row.manualId)}">Remove</button></div>`
+            ignoreInput: `<button type="button" class="danger kb-mini-button" data-manual-protect-delete="${escapeHtml(row.manualId)}">Remove</button>`
           };
         }
-        if (!row.controlKey) return { amountInput: "", ignoreInput: `<input type="checkbox" disabled ${row.ignored ? "checked" : ""}>` };
+        if (!row.controlKey) return { countInput: `<input type="checkbox" disabled ${row.checked ? "checked" : ""}>`, dayInput: "", amountInput: "", ignoreInput: "" };
         const amountValue = row.overrideValue === null || row.overrideValue === undefined ? "" : String(row.overrideValue);
+        const dayValue = row.dayOverrideValue === null || row.dayOverrideValue === undefined ? "" : String(row.dayOverrideValue);
         return {
+          countInput: `<input type="checkbox" data-protect-count="${escapeHtml(row.controlKey)}" ${row.checked ? "checked" : ""} title="Count this line in Must Protect">`,
+          dayInput: `<input class="kb-protect-day-input" type="number" min="1" max="31" step="1" data-protect-day="${escapeHtml(row.controlKey)}" value="${escapeHtml(dayValue)}" placeholder="${escapeHtml(row.dueFallback || "day")}">`,
           amountInput: `<input class="kb-protect-amount-input" type="number" step="0.01" data-protect-amount="${escapeHtml(row.controlKey)}" value="${escapeHtml(amountValue)}" placeholder="${Number(row.defaultAmount || row.protectAmount || 0).toFixed(2)}">`,
-          ignoreInput: `<input type="checkbox" data-protect-ignore="${escapeHtml(row.controlKey)}" ${row.ignored ? "checked" : ""} title="Ignore in Money to protect">`
+          ignoreInput: ""
         };
       }
 
@@ -4493,8 +4513,8 @@ function renderProtectionControls(row) {
       function twoColumnMoneyList(title, rows, emptyText = "Nothing to show.") {
         const visibleRows = rows || [];
         const total = visibleRows.reduce((sum, row) => {
-          if (row && row.ignored === true) return sum;
-          const value = Number(row?.protectAmount ?? row?.amount ?? row?.amountLeft ?? 0);
+          if (!row || row.checked !== true) return sum;
+          const value = Number(row?.protectAmount ?? row?.amount ?? 0);
           return sum + (Number.isFinite(value) ? value : 0);
         }, 0);
 
@@ -4502,15 +4522,17 @@ function renderProtectionControls(row) {
           ? visibleRows.map(row => {
               const controls = renderProtectionControls(row);
               return `
-                <div class="kb-protection-row ${row.ignored ? "is-ignored" : ""}">
-                  <div class="kb-cell kb-bill-name">${row.name}</div>
-                  <div class="kb-cell kb-due">${escapeHtml(row.dueDate || "—")}</div>
+                <div class="kb-protection-row ${row.checked ? "" : "is-ignored"}">
+                  <div class="kb-cell kb-count-cell">${controls.countInput}</div>
+                  <div class="kb-cell kb-bill-name">${row.name}<div class="small muted">${escapeHtml(row.category || row.expenseType || "")}</div></div>
+                  <div class="kb-cell kb-protect-day">${controls.dayInput}</div>
                   <div class="kb-cell kb-type">
                     ${row.controlKey && row.showExpenseType ? `<select data-expense-type="${escapeHtml(row.controlKey)}"><option value="Fixed" ${row.expenseType === "Fixed" ? "selected" : ""}>Fixed</option><option value="Flexible" ${row.expenseType === "Flexible" ? "selected" : ""}>Flexible</option></select>` : escapeHtml(row.expenseType || "—")}
                   </div>
-                  <div class="kb-cell kb-money-num">${money.format(row.amountLeft ?? row.amount ?? 0)}</div>
-                  <div class="kb-cell kb-protect-edit">${controls.amountInput}${row.ignored ? `<div class="small muted">Not counted</div>` : ""}</div>
-                  <div class="kb-cell kb-ignore">${controls.ignoreInput}</div>
+                  <div class="kb-cell kb-money-num">${money.format(row.plannedAmount ?? 0)}</div>
+                  <div class="kb-cell kb-money-num">${money.format(row.paidAmount ?? 0)}</div>
+                  <div class="kb-cell kb-money-num">${money.format(row.amountLeft ?? 0)}</div>
+                  <div class="kb-cell kb-protect-edit">${controls.amountInput}${row.checked ? "" : `<div class="small muted">Not counted</div>`}</div>
                 </div>`;
             }).join("")
           : `<div class="empty small">${escapeHtml(emptyText)}</div>`;
@@ -4523,15 +4545,17 @@ function renderProtectionControls(row) {
             </div>
             <div class="kb-protection-table">
               <div class="kb-protection-header">
-                <div>Bill name</div>
-                <div>Due</div>
+                <div>Count</div>
+                <div>Bill / item</div>
+                <div>Day</div>
                 <div>Type</div>
-                <div>Amount left</div>
-                <div>Protect amount</div>
-                <div>Ignore</div>
+                <div>Planned</div>
+                <div>Paid</div>
+                <div>Remaining</div>
+                <div>Protect</div>
               </div>
               ${body}
-              ${visibleRows.length ? `<div class="kb-protection-total"><div>Total counted</div><div>${money.format(total)}</div></div>` : ""}
+              ${visibleRows.length ? `<div class="kb-protection-total"><div>Selected Must Protect total</div><div>${money.format(total)}</div></div>` : ""}
             </div>
           </div>`;
       }
@@ -4658,64 +4682,89 @@ function renderProtectionControls(row) {
         return isLivingNeedLine(line) || expenseTypeForLine(line) === "Flexible" || /personal|allowance/.test(textForLine(line));
       }
 
+
+      function protectionDayOverrideForKey(key, fallbackDay = "", month = currentMonth()) {
+        const raw = protectionOverrideForKey(key, month).dayOverride;
+        if (raw === null || raw === undefined || raw === "") return String(fallbackDay || "");
+        return String(raw || "");
+      }
+
+      function protectionRowDefaultChecked(key, fallbackAmount = 0, month = currentMonth()) {
+        const override = protectionOverrideForKey(key, month);
+        if (Object.prototype.hasOwnProperty.call(override, "ignore")) return !Boolean(override.ignore);
+        return Number(fallbackAmount || 0) > 0.005;
+      }
+
+      function billProtectDay(line) {
+        const day = dueDayNumber(line?.dueDay);
+        return day ? String(day) : "";
+      }
+
 function currentMonthProtectedRows(month = currentMonth(), plan = safeNextPaycheckBasePlan(month)) {
         const rows = [];
 
-        notFullyPaidMonthlyRows(month).forEach(line => {
-          if (isMortgageFundingLine(line)) return;
-
-          const hasDueDay = Boolean(dueDayNumber(line.dueDay));
-          const includeFullAmount = hasDueDay && lineDueBeforeNextPaycheck(line, plan, month);
-          const includeFlexibleEstimate = !hasDueDay && shouldShowFlexibleBeforePaycheck(line);
-
-          if (!includeFullAmount && !includeFlexibleEstimate) return;
-
-          const key = scopedProtectionKey(line, "current");
-          const fallback = includeFullAmount ? remainingForLine(line) : flexibleProtectionAmountBeforePaycheck(line, plan, month);
-          if (fallback <= 0.005) return;
-
-          const protectAmount = protectionAmountForKey(key, fallback, month);
+        activeBudgetLines(allBudgetLines(month)).forEach(line => {
+          const key = scopedProtectionKey(line, "monthly");
+          const remaining = remainingForLine(line);
+          const protectAmount = protectionAmountForKey(key, remaining, month);
+          const dueFallback = billProtectDay(line);
+          const checked = protectionRowDefaultChecked(key, remaining, month);
           rows.push({
-            name: includeFullAmount ? billLineName(line) : `${billLineName(line)} — until next paycheck`,
-            dueDate: includeFullAmount ? dueDisplayForLine(line) : `estimate for ${protectionDaysUntilPaycheck(plan, month)} day(s)`,
-            amountLeft: fallback,
+            name: billLineName(line),
+            dueDate: protectionDayOverrideForKey(key, dueFallback, month),
+            dueFallback,
+            category: line.category || "",
+            plannedAmount: Number(line.amount || 0),
+            paidAmount: Number(line.paidAmount || 0),
+            amountLeft: remaining,
             amount: protectAmount,
             protectAmount,
-            defaultAmount: fallback,
+            defaultAmount: remaining,
             controlKey: key,
-            ignored: isProtectionKeyIgnored(key, month),
+            checked,
+            ignored: !checked,
             overrideValue: protectionAmountOverrideForKey(key, month),
+            dayOverrideValue: protectionDayOverrideForKey(key, dueFallback, month),
             expenseType: expenseTypeForLine(line),
-            showExpenseType: true
+            showExpenseType: true,
+            rowType: "monthly"
           });
         });
-
-        const days = protectionDaysUntilPaycheck(plan, month);
-        const daysInMonth = daysInActiveMonth();
 
         personalRemainingRowsByOwner(month).forEach(personal => {
-          if (personal.remaining <= 0) return;
-          const fallback = roundMoney(Number(personal.remaining || 0) * days / daysInMonth);
-          if (fallback <= 0.005) return;
-          const personalLine = { id: `personal-money-current-${personal.owner}`, payee: `Personal Money — ${personal.owner}`, category: "Personal", expenseType: "Flexible" };
-          const key = scopedProtectionKey(personalLine, "current");
+          const personalLine = { id: `personal-money-${personal.owner}`, payee: `Personal Money — ${personal.owner}`, category: "Personal", expenseType: "Flexible" };
+          const key = scopedProtectionKey(personalLine, "personal");
+          const fallback = roundMoney(Number(personal.remaining || 0));
           const protectAmount = protectionAmountForKey(key, fallback, month);
+          const checked = protectionRowDefaultChecked(key, fallback, month);
           rows.push({
-            name: `Personal Money — ${escapeHtml(personal.owner)} — until next paycheck`,
-            dueDate: `estimate for ${days} day(s)`,
+            name: `Personal Money — ${escapeHtml(personal.owner)}`,
+            dueDate: protectionDayOverrideForKey(key, "", month),
+            dueFallback: "",
+            category: "Personal",
+            plannedAmount: Number(personal.budget || 0),
+            paidAmount: Number(personal.spent || 0),
             amountLeft: fallback,
             amount: protectAmount,
             protectAmount,
             defaultAmount: fallback,
             controlKey: key,
-            ignored: isProtectionKeyIgnored(key, month),
+            checked,
+            ignored: !checked,
             overrideValue: protectionAmountOverrideForKey(key, month),
+            dayOverrideValue: protectionDayOverrideForKey(key, "", month),
             expenseType: "Flexible",
-            showExpenseType: false
+            showExpenseType: true,
+            rowType: "personal"
           });
         });
 
-        return rows.filter(row => Number(row.amountLeft ?? row.amount ?? 0) > 0.005);
+        return rows.sort((a, b) => {
+          const ad = Number(a.dueDate || 99);
+          const bd = Number(b.dueDate || 99);
+          if (ad !== bd) return ad - bd;
+          return String(a.name || "").localeCompare(String(b.name || ""));
+        });
       }
 
       
@@ -4730,137 +4779,38 @@ function currentMonthProtectedRows(month = currentMonth(), plan = safeNextPayche
 
 
 function earlyNextMonthProtectedRows(month = currentMonth(), plan = safeNextPaycheckBasePlan(month)) {
-        if (activeMonthStatus() === "future" || plan?.paycheck) {
-          return manualProtectionRows(month).filter(row => Number(row.amountLeft ?? row.amount ?? 0) > 0.005);
-        }
-        const rows = [];
-        const days = daysInNextMonthFromActive();
-
-        earlyNextMonthFixedBills(month).forEach(line => {
-          const key = scopedProtectionKey(line, "next");
-          const fallback = Number(line.amount || 0);
-          const protectAmount = protectionAmountForKey(key, fallback, month);
-          rows.push({
-            name: billLineName(line),
-            dueDate: dueDisplayForLine(line),
-            amountLeft: fallback,
-            amount: protectAmount,
-            protectAmount,
-            defaultAmount: fallback,
-            controlKey: key,
-            ignored: isProtectionKeyIgnored(key, month),
-            overrideValue: protectionAmountOverrideForKey(key, month),
-            expenseType: expenseTypeForLine(line),
-            showExpenseType: true
-          });
-        });
-
-        // Achieva belongs here as Flexible. It is not mortgage funding and not fixed.
-        achievaProtectionRows(month).forEach(line => {
-          const key = scopedProtectionKey(line, "next-achieva");
-          const fallback = Number(line.amount || 0);
-          const protectAmount = protectionAmountForKey(key, fallback, month);
-          rows.push({
-            name: billLineName(line),
-            dueDate: dueDisplayForLine(line),
-            amountLeft: fallback,
-            amount: protectAmount,
-            protectAmount,
-            defaultAmount: fallback,
-            controlKey: key,
-            ignored: isProtectionKeyIgnored(key, month),
-            overrideValue: protectionAmountOverrideForKey(key, month),
-            expenseType: "Flexible",
-            showExpenseType: false
-          });
-        });
-
-        activeBudgetLines(allBudgetLines(month))
-          .filter(line => expenseTypeForLine(line) === "Flexible")
-          .filter(line => !isMortgageFundingLine(line))
-          .filter(line => !isAchievaLine(line))
-          .forEach(line => {
-            const key = scopedProtectionKey(line, "next");
-            const base = Number(line.amount || 0);
-            const fallback = base * 10 / days;
-            const protectAmount = protectionAmountForKey(key, fallback, month);
-            if (fallback > 0) rows.push({
-              name: `${billLineName(line)} — 10-day estimate`,
-              dueDate: "—",
-              amountLeft: fallback,
-              amount: protectAmount,
-              protectAmount,
-              defaultAmount: fallback,
-              controlKey: key,
-              ignored: isProtectionKeyIgnored(key, month),
-              overrideValue: protectionAmountOverrideForKey(key, month),
-              expenseType: expenseTypeForLine(line),
-              showExpenseType: true
-            });
-          });
-
-        const personalBudgets = personalBudgetByOwner(month);
-        ["Alec", "Patricia"].forEach(owner => {
-          const base = Number(personalBudgets[owner] || 0);
-          if (base <= 0) return;
-          const fallback = base * 10 / days;
-          const personalLine = { id: `personal-money-next-window-${owner}`, payee: `Personal Money — ${owner} — 10-day estimate`, category: "Personal", expenseType: "Flexible" };
-          const key = scopedProtectionKey(personalLine, "next");
-          const protectAmount = protectionAmountForKey(key, fallback, month);
-          rows.push({
-            name: `Personal Money — ${escapeHtml(owner)} — 10-day estimate`,
-            dueDate: "—",
-            amountLeft: fallback,
-            amount: protectAmount,
-            protectAmount,
-            defaultAmount: fallback,
-            controlKey: key,
-            ignored: isProtectionKeyIgnored(key, month),
-            overrideValue: protectionAmountOverrideForKey(key, month),
-            expenseType: "Flexible",
-            showExpenseType: false
-          });
-        });
-
-        return rows.concat(manualProtectionRows(month)).filter(row => Number(row.amountLeft ?? row.amount ?? 0) > 0.005);
+        return [];
       }
 
       
       
 
 function renderProtectionLists(month = currentMonth(), plan = safeNextPaycheckPlan(month)) {
-        return safeRenderDashboardBlock("Money to Protect Breakdown", () => {
+        return safeRenderDashboardBlock("Money We Can't Touch Planner", () => {
           const totals = buildProtectionTotals(month, plan);
-          const currentRows = totals.currentRows;
-          const nextRows = totals.nextRows;
-          const currentTotal = protectionRowsTotal(currentRows);
-          const nextTotal = protectionRowsTotal(nextRows);
-          const listTotal = currentTotal + nextTotal;
+          const rows = totals.currentRows;
+          const listTotal = protectionRowsTotal(rows);
           const difference = listTotal - Number(plan.amountToKeepSafe || 0);
           const matches = Math.abs(difference) < 0.01;
 
           return `
             <div class="section-title" style="margin:.25rem 0 .15rem">
-              <h3>Money to Protect Breakdown</h3>
-              <span>${money.format(currentTotal)} + ${money.format(nextTotal)} = ${money.format(listTotal)}</span>
+              <h3>Money We Can't Touch Planner</h3>
+              <span>${money.format(listTotal)}</span>
             </div>
             <p class="muted small" style="margin-top:-.25rem">
-              This list only counts bills due before the next paycheck plus prorated flexible needs. Ignore keeps a row visible but removes it from the counted total.
+              Dashboard-only planner. It lists every Monthly Plan line plus Personal Money for Patricia and Alec. Only checked rows count in Must Protect; editing Protect changes the dashboard math only.
             </p>
-            <div style="display:flex;justify-content:flex-end;margin:.5rem 0 .75rem">
-              <button type="button" class="secondary" id="addManualProtectionLineBtn">+ Add protection line</button>
-            </div>
             <div class="kb-list-stack">
-              ${twoColumnMoneyList("Due / needed before next paycheck", currentRows, "Nothing due or needed before the next paycheck.")}
-              ${twoColumnMoneyList("Extra manual protection", nextRows, "No extra manual protection lines.")}
+              ${twoColumnMoneyList("Monthly Plan + Personal Money", rows, "No monthly plan lines to protect.")}
             </div>
             <div class="card kb-reconcile-card" style="padding:1rem;margin-top:.4rem">
               <div class="kb-money-total" style="display:grid;grid-template-columns:minmax(0,1fr) 9rem;gap:1rem;align-items:center;font-weight:900;">
-                <span>Breakdown total</span>
+                <span>Must Protect from checked rows</span>
                 <span style="text-align:right;white-space:nowrap;">${money.format(listTotal)}</span>
               </div>
               <div class="small muted" style="margin-top:.35rem">
-                ${matches ? "Matches Money to protect." : `Does not match Money to protect by ${money.format(difference)} — review the list rules.`}
+                ${matches ? "Matches the Must Protect card." : `Does not match the Must Protect card by ${money.format(difference)} — review dashboard-only selections.`}
               </div>
             </div>`;
         });
@@ -4886,7 +4836,7 @@ function renderProtectionLists(month = currentMonth(), plan = safeNextPaycheckPl
         return `
           <div class="section-title" style="margin:.25rem 0 .15rem">
             <h3>Cash Protection Before Next Paycheck</h3>
-            <span>Focus on what is safe before the paycheck actually posts.</span>
+            <span>Must Protect is based on your checked Dashboard planner rows.</span>
           </div>
 
           <div class="cards kb-simple-dashboard-cards">
@@ -4897,7 +4847,7 @@ function renderProtectionLists(month = currentMonth(), plan = safeNextPaycheckPl
               <input id="todayCheckingBalanceInput" type="number" step="0.01" value="${escapeHtml(state.jointAccountBalance ?? "")}" placeholder="0.00" style="margin-top:.7rem;width:100%">
             </div>
 
-            ${metric("Must protect before paycheck", plan.amountToKeepSafe, "Bills and protected needs that should not be touched before payday.", "yellow")}
+            ${metric("Must protect before paycheck", plan.amountToKeepSafe, "Checked rows from the Money We Can't Touch Planner.", "yellow")}
             ${metric(safeBeforePay >= 0 ? "Safe to spend before paycheck" : "Short before paycheck", safeBeforePay, safeHint, safeBeforePay < 0 ? "red" : "green")}
             ${metric("Next paycheck", plan.cashComingIn, incomingHint, plan.cashComingIn > 0 ? "green" : "")}
           </div>
@@ -4973,6 +4923,18 @@ function renderProtectionLists(month = currentMonth(), plan = safeNextPaycheckPl
         document.querySelectorAll("[data-protect-ignore]").forEach(input => {
           input.addEventListener("change", event => updateProtectionOverride(event.target.dataset.protectIgnore, "ignore", event.target.checked));
         });
+        document.querySelectorAll("[data-protect-count]").forEach(input => {
+          input.addEventListener("change", event => updateProtectionOverride(event.target.dataset.protectCount, "ignore", !event.target.checked));
+        });
+        document.querySelectorAll("[data-protect-day]").forEach(input => {
+          input.addEventListener("change", event => updateProtectionOverride(event.target.dataset.protectDay, "dayOverride", event.target.value));
+          input.addEventListener("keydown", event => {
+            if (event.key !== "Enter") return;
+            event.preventDefault();
+            updateProtectionOverride(event.target.dataset.protectDay, "dayOverride", event.target.value);
+          });
+        });
+
         document.querySelectorAll("[data-protect-amount]").forEach(input => {
           input.addEventListener("change", event => updateProtectionOverride(event.target.dataset.protectAmount, "amountOverride", event.target.value));
           input.addEventListener("keydown", event => {

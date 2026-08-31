@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Kingdom Builder</title>
-  <!-- v145 compare line paypal personal -->
+  <!-- v146 compare closeout history -->
   <!-- v140 Alec next paycheck owner match -->
   <!-- v84 safe next paycheck -->
   <!-- v82 expected income actuals -->
@@ -7217,6 +7217,112 @@ function compareCanonicalBillName(line) {
         </tbody></table></div>`;
       }
 
+      function closeoutHistoryMonthKeys() {
+        return monthOptions().filter(key => state.months?.[key]?.closeoutReport);
+      }
+
+      function closeoutHistorySelectedKey(keys = closeoutHistoryMonthKeys()) {
+        if (!keys.length) return "";
+        if (state.compareCloseoutMonth && keys.includes(state.compareCloseoutMonth)) return state.compareCloseoutMonth;
+        if (state.activeMonth && keys.includes(state.activeMonth)) return state.activeMonth;
+        return keys[keys.length - 1];
+      }
+
+      function closeoutHistoryLineRows(report) {
+        return (report?.lines || []).map(line => ({
+          payee: line.payee || "Bill",
+          dueDay: line.dueDay || "—",
+          planned: roundMoney(Number(line.planned || 0)),
+          paid: roundMoney(Number(line.paid || 0)),
+          remaining: roundMoney(Number(line.remaining || 0)),
+          overpaid: roundMoney(Number(line.overpaid || 0)),
+          action: line.actionLabel || closeoutActionLabel(line.action || "already-closed"),
+          actionAmount: roundMoney(Number(line.actionAmount || 0)),
+          notes: line.actionNotes || "",
+          category: line.category || ""
+        })).sort((a, b) => {
+          const dayA = parseInt(a.dueDay, 10); const dayB = parseInt(b.dueDay, 10);
+          const normA = Number.isFinite(dayA) ? dayA : 99;
+          const normB = Number.isFinite(dayB) ? dayB : 99;
+          if (normA !== normB) return normA - normB;
+          return String(a.payee).localeCompare(String(b.payee));
+        });
+      }
+
+      function renderCloseoutHistoryLines(report) {
+        const rows = closeoutHistoryLineRows(report);
+        if (!rows.length) return `<div class="empty">No closeout line details saved for this month.</div>`;
+        return `<div class="table-wrap"><table><thead><tr><th>Line</th><th>Day</th><th class="money">Planned</th><th class="money">Paid</th><th class="money">Remaining at close</th><th>Close action</th><th class="money">Action amount</th></tr></thead><tbody>
+          ${rows.map(row => `<tr>
+            <td><strong>${escapeHtml(row.payee)}</strong>${row.notes ? `<div class="small muted">${escapeHtml(row.notes)}</div>` : ""}</td>
+            <td>${escapeHtml(row.dueDay || "—")}</td>
+            <td class="money">${money.format(row.planned)}</td>
+            <td class="money">${money.format(row.paid)}</td>
+            <td class="money">${money.format(row.remaining)}</td>
+            <td>${escapeHtml(row.action)}</td>
+            <td class="money">${row.actionAmount ? money.format(row.actionAmount) : "—"}</td>
+          </tr>`).join("")}
+        </tbody></table></div>`;
+      }
+
+      function renderCloseoutHistoryCoverage(report) {
+        const coverage = report?.transactionCoverage || null;
+        const buckets = coverage?.buckets || [];
+        if (!coverage || !buckets.length) return `<div class="empty">No transaction coverage snapshot was saved for this closeout.</div>`;
+        return `<div class="table-wrap"><table><thead><tr><th>Transaction bucket</th><th class="money">Count</th><th class="money">Inflow</th><th class="money">Outflow</th><th class="money">Net</th><th>Status</th></tr></thead><tbody>
+          ${buckets.map(bucket => `<tr>
+            <td><strong>${escapeHtml(bucket.label || "Bucket")}</strong></td>
+            <td class="money">${bucket.count || 0}</td>
+            <td class="money">${money.format(Number(bucket.inflow || 0))}</td>
+            <td class="money">${money.format(Number(bucket.outflow || 0))}</td>
+            <td class="money">${money.format(Number(bucket.net || 0))}</td>
+            <td>${bucket.status === "block" ? `<span class="pill red">Block</span>` : bucket.status === "review" ? `<span class="pill yellow">Review</span>` : bucket.status === "info" ? `<span class="pill blue">Info</span>` : `<span class="pill green">Covered</span>`}</td>
+          </tr>`).join("")}
+        </tbody></table></div>`;
+      }
+
+      function renderCompareCloseoutHistory() {
+        const keys = closeoutHistoryMonthKeys();
+        if (!keys.length) {
+          return `<div class="card"><div class="section-title"><h3>Closeout history</h3><span>No saved closeouts yet</span></div><div class="empty">When you save a final closeout report, it will show here by month. Nothing from the Closeout page is deleted by Compare Months.</div></div>`;
+        }
+        const selectedKey = closeoutHistorySelectedKey(keys);
+        const selectedMonth = state.months[selectedKey];
+        const report = selectedMonth?.closeoutReport;
+        if (!report) return `<div class="card"><div class="section-title"><h3>Closeout history</h3><span>No saved closeout selected</span></div></div>`;
+        const totals = report.totals || {};
+        const income = report.income || {};
+        const personal = report.personal || {};
+        const checklist = report.checklist || {};
+        const closedDate = report.closedAt || report.generatedAt;
+        return `<div class="card">
+          <div class="section-title"><div><h3>Closeout history</h3><p class="small muted" style="margin:.25rem 0 0">Saved closeout reports by month. This reads the closeout snapshot; it does not rely on categories being perfect.</p></div><span>${escapeHtml(keys.length)} saved month${keys.length === 1 ? "" : "s"}</span></div>
+          <div class="toolbar" style="justify-content:flex-start;gap:.45rem;flex-wrap:wrap;margin-bottom:1rem">
+            ${keys.map(key => `<button type="button" class="${key === selectedKey ? "" : "secondary"}" data-compare-closeout-month="${escapeHtml(key)}">${escapeHtml(state.months[key]?.label || key)}</button>`).join("")}
+          </div>
+          <div class="cards kb-simple-dashboard-cards">
+            ${metric("Closed month", report.monthLabel || selectedMonth.label || selectedKey, closedDate ? `Saved ${new Date(closedDate).toLocaleString()}` : "Saved closeout report")}
+            ${metric("Planned", totals.planned || 0, "Monthly Plan total in closeout snapshot.")}
+            ${metric("Paid", totals.paid || 0, "Paid or matched bill amount in closeout snapshot.", "green")}
+            ${metric("Remaining at review", totals.remainingAtReview || 0, "Amount remaining before selected closeout actions.", (totals.remainingAtReview || 0) > 0 ? "yellow" : "green")}
+            ${metric("Closed unused", totals.closedUnused || 0, "Remaining money closed as unused / not needed.")}
+            ${metric("Left open", totals.leftOpen || 0, "Anything intentionally left open.", (totals.leftOpen || 0) > 0 ? "red" : "green")}
+            ${metric("Income received", income.actualIncomeReceived || 0, `Job ${money.format(income.job || 0)} · Side hustle ${money.format(income.sideHustle || 0)} · Other ${money.format(income.other || 0)}`, "green")}
+            ${metric("Personal spent", Number(personal.Patricia || 0) + Number(personal.Alec || 0), `Patricia ${money.format(personal.Patricia || 0)} · Alec ${money.format(personal.Alec || 0)}`)}
+          </div>
+          <div class="mini-list" style="margin-top:.9rem">
+            <span class="pill ${checklist.billsChecked ? "green" : "yellow"}">Bills ${checklist.billsChecked ? "checked" : "not checked"}</span>
+            <span class="pill ${checklist.transactionsChecked ? "green" : "yellow"}">Transactions ${checklist.transactionsChecked ? "checked" : "not checked"}</span>
+            <span class="pill ${checklist.allowanceChecked ? "green" : "yellow"}">Personal money ${checklist.allowanceChecked ? "checked" : "not checked"}</span>
+            <span class="pill ${checklist.incomeChecked ? "green" : "yellow"}">Income ${checklist.incomeChecked ? "checked" : "not checked"}</span>
+          </div>
+          ${report.notes ? `<div class="banner" style="margin-top:1rem"><div><strong>Month notes</strong><span>${escapeHtml(report.notes)}</span></div></div>` : ""}
+        </div>
+        <div class="card"><div class="section-title"><h3>${escapeHtml(report.monthLabel || selectedMonth.label || selectedKey)} closeout lines</h3><span>Line-by-line saved snapshot</span></div>${renderCloseoutHistoryLines(report)}<p class="small muted" style="margin:.65rem 0 0">Category is not used for grouping here. This is the saved line/action snapshot from the final closeout report.</p></div>
+        <div class="card"><div class="section-title"><h3>${escapeHtml(report.monthLabel || selectedMonth.label || selectedKey)} transaction coverage</h3><span>Where transactions landed at closeout</span></div>${renderCloseoutHistoryCoverage(report)}</div>`;
+      }
+
+
 function renderCompare() {
         const allKeys = monthOptions();
         const keys = compareMonthWindow(allKeys, 6);
@@ -7231,8 +7337,15 @@ function renderCompare() {
         document.querySelector("#compare").innerHTML = [
           `<div class="card"><div class="section-title"><div><h3>Monthly Plan paid amounts by line</h3><p class="small muted" style="margin:.25rem 0 0">Rolling ${keys.length || 0} month(s). Normal bills are matched by bill name, while Personal Money and PayPal/Side Hustle stay split by Patricia/Alec.</p></div><span>${escapeHtml(deltaText)}</span></div>
             ${renderCompareLineTrendTable(keys)}
-          </div>`
+          </div>`,
+          renderCompareCloseoutHistory()
         ].join("");
+
+        document.querySelectorAll("[data-compare-closeout-month]").forEach(button => button.addEventListener("click", event => {
+          state.compareCloseoutMonth = event.currentTarget.dataset.compareCloseoutMonth;
+          saveState();
+          renderCompare();
+        }));
       }
 
       function monthComparisonRows() {

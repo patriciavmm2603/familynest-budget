@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Kingdom Builder</title>
-  <!-- v142 side hustle delete safe -->
+  <!-- v143 compare month line trend -->
   <!-- v140 Alec next paycheck owner match -->
   <!-- v84 safe next paycheck -->
   <!-- v82 expected income actuals -->
@@ -6964,41 +6964,237 @@ function renderProtectionLists(month = currentMonth(), plan = safeNextPaycheckPl
         return `<div class="table-wrap"><table><thead><tr><th>Category</th><th class="money">Monthly plan</th><th class="money">${escapeHtml(latest.label)} actual</th><th class="money">${prior ? escapeHtml(prior.label) : "Prior"} actual</th><th class="money">Change</th></tr></thead><tbody>${body}${specialRows}</tbody></table></div>`;
       }
 
+
+function compareNormalizeText(value) {
+        return String(value || "")
+          .toLowerCase()
+          .replace(/&/g, " and ")
+          .replace(/[^a-z0-9]+/g, " ")
+          .replace(/\b(auto|autopay|payment|pay|online|card|debit|direct|inc|llc|com)\b/g, " ")
+          .replace(/\s+/g, " ")
+          .trim();
+      }
+
+      function compareLineKeyForBudgetLine(line) {
+        const name = compareNormalizeText(line.payee || line.name || line.category || "bill");
+        const owner = compareNormalizeText(line.owner || "Shared");
+        const asset = compareNormalizeText(line.asset || "");
+        const category = compareNormalizeText(line.category || "");
+        return ["bill", name || "bill", owner || "shared", asset, category].join("|");
+      }
+
+      function compareLineLabelForBudgetLine(line) {
+        return String(line.payee || line.name || line.category || "Bill").replace(/\s+/g, " ").trim();
+      }
+
+      function compareLineDayForBudgetLine(line) {
+        return String(line.dueDay || "").trim() || "—";
+      }
+
+      function compareLinePaidActual(month, line) {
+        if (!month || !line) return 0;
+        const allLinked = Math.abs(sum((month.transactions || []).filter(txn =>
+          txn.reconciled &&
+          txn.billId === line.id &&
+          Number(txn.amount || 0) < 0
+        ), txn => Number(txn.amount || 0)));
+        const activeLinked = Math.abs(sum(activeTransactions(month).filter(txn =>
+          txn.reconciled &&
+          txn.billId === line.id &&
+          Number(txn.amount || 0) < 0
+        ), txn => Number(txn.amount || 0)));
+
+        // If a bill was paid by statement transactions, use only non-ignored linked transactions.
+        // If it was manually marked paid and has no linked transactions, keep the manual amount.
+        if (allLinked > 0.005 || activeLinked > 0.005) return roundMoney(activeLinked);
+        return roundMoney(Number(line.paidAmount || 0));
+      }
+
+      function compareMonthWindow(keys = monthOptions(), size = 6) {
+        const clean = (keys || []).slice().sort();
+        return clean.slice(Math.max(0, clean.length - size));
+      }
+
+      function compareMonthLineRecords(month, key) {
+        const records = [];
+        activeBudgetLines(allBudgetLines(month)).forEach(line => {
+          records.push({
+            key: compareLineKeyForBudgetLine(line),
+            label: compareLineLabelForBudgetLine(line),
+            category: line.category || "",
+            owner: line.owner || "Shared",
+            asset: line.asset || "",
+            day: compareLineDayForBudgetLine(line),
+            planned: roundMoney(Number(line.amount || 0)),
+            paid: compareLinePaidActual(month, line),
+            remaining: remainingForLine(line),
+            monthKey: key
+          });
+        });
+
+        const personalBudgets = personalBudgetByOwner(month);
+        ["Patricia", "Alec"].forEach(owner => {
+          records.push({
+            key: `personal-money-${owner.toLowerCase()}`,
+            label: `Personal Money — ${owner}`,
+            category: "Personal",
+            owner,
+            asset: "Personal",
+            day: "—",
+            planned: roundMoney(Number(personalBudgets[owner] || 0)),
+            paid: roundMoney(personalSpentForOwner(month, owner)),
+            remaining: Math.max(0, roundMoney(Number(personalBudgets[owner] || 0) - personalSpentForOwner(month, owner))),
+            monthKey: key
+          });
+        });
+        return records;
+      }
+
+      function compareLineTrendRows(keys = compareMonthWindow()) {
+        const months = keys.map(key => ({ key, month: state.months[key] })).filter(row => row.month);
+        const map = new Map();
+
+        months.forEach(({ key, month }) => {
+          compareMonthLineRecords(month, key).forEach(record => {
+            if (!map.has(record.key)) {
+              map.set(record.key, {
+                key: record.key,
+                label: record.label,
+                category: record.category,
+                owner: record.owner,
+                asset: record.asset,
+                day: record.day,
+                values: {},
+                plannedValues: {},
+                remainingValues: {}
+              });
+            }
+            const row = map.get(record.key);
+            row.label ||= record.label;
+            row.category ||= record.category;
+            row.owner ||= record.owner;
+            row.asset ||= record.asset;
+            if (!row.day || row.day === "—") row.day = record.day;
+            row.values[key] = roundMoney(Number(row.values[key] || 0) + Number(record.paid || 0));
+            row.plannedValues[key] = roundMoney(Number(row.plannedValues[key] || 0) + Number(record.planned || 0));
+            row.remainingValues[key] = roundMoney(Number(row.remainingValues[key] || 0) + Number(record.remaining || 0));
+          });
+        });
+
+        return Array.from(map.values()).map(row => {
+          const amounts = keys.map(key => Number(row.values[key] || 0));
+          const visibleAmounts = amounts.filter(value => value > 0.005);
+          const latest = amounts[amounts.length - 1] || 0;
+          const prior = amounts.length > 1 ? amounts[amounts.length - 2] || 0 : 0;
+          row.latest = latest;
+          row.prior = prior;
+          row.change = roundMoney(latest - prior);
+          row.average = visibleAmounts.length ? roundMoney(sum(visibleAmounts, value => value) / visibleAmounts.length) : 0;
+          row.total = roundMoney(sum(amounts, value => value));
+          return row;
+        }).sort((a, b) => {
+          const dayA = parseInt(a.day, 10); const dayB = parseInt(b.day, 10);
+          const normA = Number.isFinite(dayA) ? dayA : 99;
+          const normB = Number.isFinite(dayB) ? dayB : 99;
+          if (normA !== normB) return normA - normB;
+          return String(a.label).localeCompare(String(b.label));
+        });
+      }
+
+      function compareMonthPaidSpentTotal(month, key) {
+        return sum(compareMonthLineRecords(month, key), row => Number(row.paid || 0));
+      }
+
+      function compareMonthRemainingTotal(month, key) {
+        return sum(compareMonthLineRecords(month, key), row => Number(row.remaining || 0));
+      }
+
+      function compareTrendSummaryRows(keys = compareMonthWindow()) {
+        return keys.map(key => {
+          const month = state.months[key];
+          const paidSpent = compareMonthPaidSpentTotal(month, key);
+          const remaining = compareMonthRemainingTotal(month, key);
+          return {
+            key,
+            label: month?.label || key,
+            paidSpent,
+            remaining,
+            unreconciled: unreconciledCount(month)
+          };
+        });
+      }
+
+      function compareTrendLabel(row) {
+        if (!row) return "—";
+        const change = Number(row.change || 0);
+        if (Math.abs(change) < 0.01) return `<span class="pill">Same</span>`;
+        if (change > 0) return `<span class="pill red">Up ${money.format(change)}</span>`;
+        return `<span class="pill green">Down ${money.format(Math.abs(change))}</span>`;
+      }
+
+      function renderCompareLineTrendTable(keys = compareMonthWindow()) {
+        const rows = compareLineTrendRows(keys);
+        if (!rows.length) return `<div class="empty">No monthly plan lines yet.</div>`;
+        const monthHeaders = keys.map(key => `<th class="money">${escapeHtml((state.months[key]?.label || key).replace(/\s+2026$/, ""))}</th>`).join("");
+        return `<div class="table-wrap"><table><thead><tr>
+          <th>Line / item</th><th>Day</th><th>Owner</th><th>Category</th>${monthHeaders}<th class="money">Avg</th><th>Trend</th>
+        </tr></thead><tbody>
+          ${rows.map(row => `<tr>
+            <td><strong>${escapeHtml(row.label)}</strong>${row.asset ? `<div class="small muted">${escapeHtml(row.asset)}</div>` : ""}</td>
+            <td>${escapeHtml(row.day || "—")}</td>
+            <td>${escapeHtml(row.owner || "")}</td>
+            <td>${escapeHtml(row.category || "")}</td>
+            ${keys.map(key => `<td class="money">${row.values[key] > 0.005 ? money.format(row.values[key]) : "—"}</td>`).join("")}
+            <td class="money">${money.format(row.average || 0)}</td>
+            <td>${compareTrendLabel(row)}</td>
+          </tr>`).join("")}
+        </tbody></table></div>
+        <p class="small muted" style="margin:.65rem 0 0">Paid/spent uses monthly plan paid amounts and linked non-ignored CSV transactions. Ignored CSV rows stay recorded but count as $0 here. Personal Money rows use personal transactions for each person.</p>`;
+      }
+
+      function renderCompareMonthSummaryTable(rows) {
+        if (!rows.length) return `<div class="empty">No months yet.</div>`;
+        return `<div class="table-wrap"><table><thead><tr><th>Month</th><th class="money">Paid / spent</th><th class="money">Still unpaid</th><th>Review</th></tr></thead><tbody>
+          ${rows.map(row => `<tr><td><strong>${escapeHtml(row.label)}</strong></td><td class="money">${money.format(row.paidSpent)}</td><td class="money">${money.format(row.remaining)}</td><td>${row.unreconciled ? `<span class="pill red">${row.unreconciled} open</span>` : `<span class="pill green">Clean</span>`}</td></tr>`).join("")}
+        </tbody></table></div>`;
+      }
+
 function renderCompare() {
-        const rows = monthComparisonRows();
-        const latest = rows[rows.length-1];
-        const prior = rows[rows.length-2];
-        const delta = latest && prior ? latest.breathingRoom - prior.breathingRoom : 0;
-        const bestMonth = rows.reduce((best, row) => !best || row.breathingRoom > best.breathingRoom ? row : best, null);
+        const allKeys = monthOptions();
+        const keys = compareMonthWindow(allKeys, 6);
+        const rows = compareTrendSummaryRows(keys);
+        const latest = rows[rows.length - 1];
+        const prior = rows[rows.length - 2];
+        const delta = latest && prior ? roundMoney(latest.paidSpent - prior.paidSpent) : 0;
+        const average = rows.length ? roundMoney(sum(rows, row => row.paidSpent) / rows.length) : 0;
+        const deltaHint = rows.length > 1
+          ? (delta > 0 ? `Spending increased by ${money.format(delta)} vs prior month.` : delta < 0 ? `Spending decreased by ${money.format(Math.abs(delta))} vs prior month.` : "No change vs prior month.")
+          : "Need at least 2 months.";
 
         document.querySelector("#compare").innerHTML = [
           `<div class="cards">
-            ${countMetric("Months tracked", rows.length, "Each saved month becomes part of this view.")}
-            ${metric("Latest breathing room", latest ? latest.breathingRoom : 0, latest ? latest.label : "No month yet")}
-            ${metric("Change vs prior", delta, rows.length > 1 ? "Positive means the month improved." : "Need at least 2 months.", delta < 0 ? "red" : delta > 0 ? "green" : "")}
-            ${metric("Best month", bestMonth ? bestMonth.breathingRoom : 0, bestMonth ? bestMonth.label : "No month yet")}
+            ${countMetric("Months tracked", allKeys.length, "Each saved month becomes part of this view.")}
+            ${metric("Current paid / spent", latest ? latest.paidSpent : 0, latest ? `${latest.label}. Monthly Plan lines + Personal Money.` : "No month yet")}
+            ${metric("Change vs prior", delta, deltaHint, delta > 0 ? "red" : delta < 0 ? "green" : "")}
+            ${metric("6-month average", average, rows.length ? `Average of ${rows.length} shown month(s).` : "No month yet")}
           </div>`,
 
           rows.length > 1 ? `<div class="chart-card">
-            <h3>Breathing room trend</h3>
+            <h3>Paid / spent trend</h3>
+            <p class="small muted" style="margin-top:-.35rem">Monthly Plan rows plus Patricia/Alec Personal Money. Ignored CSV rows count as $0.</p>
             <div class="legend" id="compareLegend"></div>
-            <div style="position:relative;width:100%;height:220px"><canvas id="compareChart" role="img" aria-label="Line chart of monthly breathing room and planned spending trends">Monthly breathing room and spending trends.</canvas></div>
+            <div style="position:relative;width:100%;height:220px"><canvas id="compareChart" role="img" aria-label="Line chart of monthly paid and spent totals">Monthly paid and spent totals.</canvas></div>
           </div>` : "",
 
-          `<div class="card"><div class="section-title"><h3>Month-by-month comparison</h3><span>Includes side hustle gross and personal spending</span></div>
-          ${rows.length ? comparisonTable(rows) : `<div class="empty">No months yet.</div>`}
+          `<div class="card"><div class="section-title"><h3>Monthly Plan + Personal Money Trend</h3><span>Rolling ${rows.length || 0} month(s), line by line</span></div>
+            ${renderCompareLineTrendTable(keys)}
           </div>`,
 
-          `<div class="card"><div class="section-title"><h3>Category comparison</h3><span>Latest month vs prior month</span></div>
-            ${categoryComparisonTable(rows)}
+          `<div class="card"><div class="section-title"><h3>Month summary</h3><span>Paid/spent and unpaid totals</span></div>
+            ${renderCompareMonthSummaryTable(rows)}
           </div>`,
 
-          `<div class="split">
-            <div class="card"><div class="section-title"><h3>Latest month categories</h3><span>${latest ? escapeHtml(latest.label) : ""}</span></div>
-              ${latest ? miniBars({ Groceries: latest.groceries, Utilities: latest.utilities, Cars: latest.cars, Houses: latest.houses, Debt: latest.debtSpending, Personal: latest.personalSpending, SideHustleGross: latest.sideGigs }, Math.max(1, latest.actualSpending + latest.sideGigs)) : `<div class="empty">No data yet.</div>`}
-            </div>
-            <div class="card"><div class="section-title"><h3>What to watch</h3></div>${compareFlags(rows)}</div>
-          </div>`
+          `<div class="card"><div class="section-title"><h3>What to watch</h3></div>${compareFlags(rows)}</div>`
         ].join("");
 
         if (rows.length > 1) {
@@ -7008,36 +7204,38 @@ function renderCompare() {
             data: {
               labels: rows.map(r => r.label),
               datasets: [
-                { label: "Breathing room", data: rows.map(r => r.breathingRoom), borderColor: "#1baf7a", backgroundColor: "rgba(27,175,122,0.08)", fill: true, tension: .3, pointRadius: 5, pointBackgroundColor: "#1baf7a" },
-                { label: "Planned", data: rows.map(r => r.planned), borderColor: "#2a78d6", borderDash: [4,4], tension: .3, pointRadius: 4, pointBackgroundColor: "#2a78d6" },
-                { label: "Actual", data: rows.map(r => r.actualSpending || null), borderColor: "#e34948", tension: .3, pointRadius: 4, pointBackgroundColor: "#e34948" }
+                { label: "Paid / spent", data: rows.map(r => r.paidSpent), borderColor: "#e34948", backgroundColor: "rgba(227,73,72,0.08)", fill: true, tension: .3, pointRadius: 5, pointBackgroundColor: "#e34948" },
+                { label: "Still unpaid", data: rows.map(r => r.remaining), borderColor: "#2a78d6", borderDash: [4,4], tension: .3, pointRadius: 4, pointBackgroundColor: "#2a78d6" }
               ]
             },
             options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => " " + money.format(ctx.raw) } } }, scales: { x: { ticks: { color: "#888", font: { size: 11 } }, grid: { display: false } }, y: { ticks: { color: "#888", font: { size: 10 }, callback: v => "$" + Math.round(v/1000) + "k" }, grid: { color: "rgba(128,128,128,0.12)" } } } }
           });
           document.getElementById("compareLegend").innerHTML = [
-            `<span><span class="legend-dot" style="background:#1baf7a"></span>Breathing room</span>`,
-            `<span><span class="legend-dot" style="background:#2a78d6"></span>Planned</span>`,
-            `<span><span class="legend-dot" style="background:#e34948"></span>Actual spending</span>`
+            `<span><span class="legend-dot" style="background:#e34948"></span>Paid / spent</span>`,
+            `<span><span class="legend-dot" style="background:#2a78d6"></span>Still unpaid</span>`
           ].join("");
         }
       }
 
       function monthComparisonRows() {
-        return monthOptions().map(key => {
-          const month = state.months[key];
-          const planned = plannedTotal(month), actual = actualSpending(month), reliable = incomeTotal();
-          const confirmedExtra = sideGigNet(month) + contributionReceived(month) + actualIncome(month);
-          return {
-            key, label: month.label, planned, actualSpending: actual, actualIncome: actualIncome(month), confirmedExtra,
-            breathingRoom: reliable + confirmedExtra - Math.max(planned, actual),
-            groceries: actualByCategory(month, "Groceries"), utilities: actualByCategory(month, "Utilities"),
-            cars: actualByAsset(month, ["Car 1","Car 2"]), houses: actualByAsset(month, ["House 1","House 2"]),
-            debtSpending: actualByAsset(month, ["Debt"]) + actualByCategory(month, "Debt") + actualByCategory(month, "Credit Cards"),
-            personalSpending: actualPersonalSpending(month), personalAlec: personalSpentForOwner(month, "Alec"), personalPatricia: personalSpentForOwner(month, "Patricia"), daughters: contributionReceived(month), sideGigs: paypalSideGigGross(month),
-            unreconciled: unreconciledCount(month)
-          };
-        });
+        return compareTrendSummaryRows(compareMonthWindow(monthOptions(), 6)).map(row => ({
+          ...row,
+          planned: row.paidSpent,
+          actualSpending: row.paidSpent,
+          actualIncome: 0,
+          confirmedExtra: 0,
+          breathingRoom: row.paidSpent,
+          groceries: 0,
+          utilities: 0,
+          cars: 0,
+          houses: 0,
+          debtSpending: 0,
+          personalSpending: 0,
+          personalAlec: 0,
+          personalPatricia: 0,
+          daughters: 0,
+          sideGigs: 0
+        }));
       }
 
       function actualByCategory(month, category) {
@@ -7058,9 +7256,14 @@ function renderCompare() {
         const latest = rows[rows.length-1], prior = rows[rows.length-2];
         const flags = [];
         if (latest.unreconciled) flags.push(latest.unreconciled + " transactions still need a home.");
-        if (prior && latest.groceries > prior.groceries) flags.push("Groceries increased by " + money.format(latest.groceries - prior.groceries) + " vs prior month.");
-        if (prior && latest.personalSpending > prior.personalSpending) flags.push("Personal spending increased by " + money.format(latest.personalSpending - prior.personalSpending) + ".");
-        if (prior && latest.breathingRoom < prior.breathingRoom) flags.push("Breathing room dropped by " + money.format(prior.breathingRoom - latest.breathingRoom) + ".");
+        if (prior) {
+          const delta = roundMoney(latest.paidSpent - prior.paidSpent);
+          if (delta > 0.005) flags.push("Paid/spent increased by " + money.format(delta) + " vs prior month.");
+          if (delta < -0.005) flags.push("Paid/spent decreased by " + money.format(Math.abs(delta)) + " vs prior month.");
+        }
+        const lineRows = compareLineTrendRows(compareMonthWindow(monthOptions(), 6));
+        const biggestIncrease = lineRows.filter(row => row.change > 0.005).sort((a, b) => b.change - a.change)[0];
+        if (biggestIncrease) flags.push("Biggest line increase: " + biggestIncrease.label + " up " + money.format(biggestIncrease.change) + ".");
         if (!flags.length) flags.push("No obvious red flags in the latest comparison.");
         return `<div class="mini-list">${flags.map(flag => `<div class="mini-row"><div class="top"><span>${escapeHtml(flag)}</span></div></div>`).join("")}</div>`;
       }

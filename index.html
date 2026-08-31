@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Kingdom Builder</title>
-  <!-- v148 closeout history clean drafts -->
+  <!-- v149 closeout planned paid difference -->
   <!-- v140 Alec next paycheck owner match -->
   <!-- v84 safe next paycheck -->
   <!-- v82 expected income actuals -->
@@ -7285,6 +7285,7 @@ function compareCanonicalBillName(line) {
           dueDay: line.dueDay || "—",
           planned: roundMoney(Number(line.planned || 0)),
           paid: roundMoney(Number(line.paid || 0)),
+          difference: roundMoney(Number(line.paid || 0) - Number(line.planned || 0)),
           remaining: roundMoney(Number(line.remaining || 0)),
           overpaid: roundMoney(Number(line.overpaid || 0)),
           action: line.actionLabel || closeoutActionLabel(line.action || "already-closed"),
@@ -7300,15 +7301,24 @@ function compareCanonicalBillName(line) {
         });
       }
 
+
+      function closeoutDifferenceCell(value) {
+        const rounded = roundMoney(Number(value || 0));
+        if (rounded > 0) return `<span class="pill red">Over ${money.format(rounded)}</span>`;
+        if (rounded < 0) return `<span class="pill green">Under ${money.format(Math.abs(rounded))}</span>`;
+        return `<span class="pill">Same</span>`;
+      }
+
       function renderCloseoutHistoryLines(report) {
         const rows = closeoutHistoryLineRows(report);
         if (!rows.length) return `<div class="empty">No closeout line details saved for this month.</div>`;
-        return `<div class="table-wrap"><table><thead><tr><th>Line</th><th>Day</th><th class="money">Planned</th><th class="money">Paid</th><th class="money">Remaining at close</th><th>Close action</th><th class="money">Action amount</th></tr></thead><tbody>
+        return `<div class="table-wrap"><table><thead><tr><th>Line</th><th>Day</th><th class="money">Planned</th><th class="money">Paid</th><th class="money">Difference</th><th class="money">Remaining at close</th><th>Close action</th><th class="money">Action amount</th></tr></thead><tbody>
           ${rows.map(row => `<tr>
             <td><strong>${escapeHtml(row.payee)}</strong>${row.notes ? `<div class="small muted">${escapeHtml(row.notes)}</div>` : ""}</td>
             <td>${escapeHtml(row.dueDay || "—")}</td>
             <td class="money">${money.format(row.planned)}</td>
             <td class="money">${money.format(row.paid)}</td>
+            <td class="money">${closeoutDifferenceCell(row.difference)}</td>
             <td class="money">${money.format(row.remaining)}</td>
             <td>${escapeHtml(row.action)}</td>
             <td class="money">${row.actionAmount ? money.format(row.actionAmount) : "—"}</td>
@@ -7360,6 +7370,7 @@ function compareCanonicalBillName(line) {
             ${closeoutHistoryMonthCard("Closeout month", report.monthLabel || selectedMonth.label || selectedKey, sourceLabel || "Closeout history")}
             ${metric("Planned", totals.planned || 0, "Monthly Plan total in this closeout view.")}
             ${metric("Paid", totals.paid || 0, "Paid or matched bill amount in this closeout view.", "green")}
+            ${metric("Paid vs planned", roundMoney((totals.paid || 0) - (totals.planned || 0)), "Difference between paid and planned before remaining-at-close actions.", ((totals.paid || 0) - (totals.planned || 0)) > 0 ? "red" : ((totals.paid || 0) - (totals.planned || 0)) < 0 ? "green" : "")}
             ${metric("Remaining at review", totals.remainingAtReview || 0, "Amount remaining before selected closeout actions.", (totals.remainingAtReview || 0) > 0 ? "yellow" : "green")}
             ${metric("Closed unused", totals.closedUnused || 0, "Remaining money closed as unused / not needed.")}
             ${metric("Left open", totals.leftOpen || 0, "Anything intentionally left open.", (totals.leftOpen || 0) > 0 ? "red" : "green")}
@@ -7375,7 +7386,7 @@ function compareCanonicalBillName(line) {
           ${closeoutHistorySourceBanner(report, selectedMonth)}
           ${report.notes ? `<div class="banner" style="margin-top:1rem"><div><strong>Month notes</strong><span>${escapeHtml(report.notes)}</span></div></div>` : ""}
         </div>
-        <div class="card"><div class="section-title"><h3>${escapeHtml(report.monthLabel || selectedMonth.label || selectedKey)} closeout lines</h3><span>${escapeHtml(sourceLabel || "Line-by-line closeout")}</span></div>${renderCloseoutHistoryLines(report)}<p class="small muted" style="margin:.65rem 0 0">This is line/action detail. Categories are shown only as labels and are not used to decide whether a draft exists.</p></div>
+        <div class="card"><div class="section-title"><h3>${escapeHtml(report.monthLabel || selectedMonth.label || selectedKey)} closeout lines</h3><span>${escapeHtml(sourceLabel || "Planned · Paid · Difference · Remaining")}</span></div>${renderCloseoutHistoryLines(report)}<p class="small muted" style="margin:.65rem 0 0">This is line/action detail. Categories are shown only as labels and are not used to decide whether a draft exists.</p></div>
         <div class="card"><div class="section-title"><h3>${escapeHtml(report.monthLabel || selectedMonth.label || selectedKey)} transaction coverage</h3><span>Where transactions landed at closeout</span></div>${renderCloseoutHistoryCoverage(report)}</div>`;
       }
 

@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Kingdom Builder</title>
-  <!-- v141 manual must protect dashboard -->
+  <!-- v142 side hustle delete safe -->
   <!-- v140 Alec next paycheck owner match -->
   <!-- v84 safe next paycheck -->
   <!-- v82 expected income actuals -->
@@ -2998,7 +2998,7 @@ function normalizeState(parsed) {
         parsed.debts ||= [];
         parsed.debts.forEach(debt => { debt.rate ??= ""; debt.noInterestPromo ??= false; debt.promoEndDate ??= ""; debt.minimum ??= 0; debt.status ||= "Active"; });
         Object.values(parsed.months || {}).forEach(month => {
-          month.importMessage ||= ""; month.contributions ||= []; month.sideGigs ||= [];
+          month.importMessage ||= ""; month.contributions ||= []; month.sideGigs ||= []; ensureSideGigExclusions(month);
           month.sideGigs.forEach(gig => {
             gig.gross = Number(gig.gross || 0);
             if (isPaypalSideGig(gig)) gig.taxRate = PAYPAL_SIDE_HUSTLE_TAX_RATE;
@@ -3112,13 +3112,84 @@ function normalizeState(parsed) {
       function actualIncome(month = currentMonth()) {
         return sum(activeTransactions(month).filter(t => t.reconciled && Number(t.amount) > 0), t => t.amount);
       }
-      function sideGigGross(month = currentMonth()) { return sum(month.sideGigs || [], gig => gig.gross); }
+      
+      function ensureSideGigExclusions(month = currentMonth()) {
+        if (!month) return [];
+        if (!Array.isArray(month.sideGigExclusions)) month.sideGigExclusions = [];
+        return month.sideGigExclusions;
+      }
+
+      function sideGigKeyFromRowOrTxn(item) {
+        if (!item) return "";
+        if (item.transactionKey) return String(item.transactionKey);
+        if (isTransactionRow(item)) return sideGigTransactionKey(item);
+        return "";
+      }
+
+      function isSideGigExcluded(month = currentMonth(), item) {
+        const key = sideGigKeyFromRowOrTxn(item);
+        return Boolean(key && ensureSideGigExclusions(month).includes(key));
+      }
+
+      function addSideGigExclusion(month = currentMonth(), key) {
+        if (!key) return;
+        const exclusions = ensureSideGigExclusions(month);
+        if (!exclusions.includes(key)) exclusions.push(key);
+      }
+
+      function removeSideGigExclusion(month = currentMonth(), key) {
+        if (!month || !key) return;
+        month.sideGigExclusions = ensureSideGigExclusions(month).filter(item => item !== key);
+      }
+
+      function transactionForSideGig(month = currentMonth(), gig) {
+        const key = sideGigKeyFromRowOrTxn(gig);
+        if (!key) return null;
+        return (month.transactions || []).find(txn => sideGigTransactionKey(txn) === key || txn.transactionKey === key) || null;
+      }
+
+      function markTransactionNotSideHustle(txn) {
+        if (!txn) return;
+        if (Number(txn.amount || 0) > 0) {
+          txn.category = "Income";
+          txn.incomeType = "Other Income";
+          txn.reconciled = true;
+        } else if (txn.category === "Side Hustles") {
+          txn.category = "Uncategorized";
+          txn.reconciled = false;
+        }
+      }
+
+      function deleteSideGigLine(gigId) {
+        const month = currentMonth();
+        const row = (month.sideGigs || []).find(gig => gig.id === gigId);
+        if (!row) return;
+        const key = sideGigKeyFromRowOrTxn(row);
+        const txn = transactionForSideGig(month, row);
+        const linkedText = txn ? "\n\nThe bank transaction will stay in CSV Review and will be marked as Other Income, not Side Hustle." : "";
+        if (!confirm("Remove this side hustle line from PayPal/side hustle totals?" + linkedText)) return;
+        if (key) addSideGigExclusion(month, key);
+        if (txn && !isIgnoredTransaction(txn)) markTransactionNotSideHustle(txn);
+        month.sideGigs = (month.sideGigs || []).filter(gig => gig.id !== gigId);
+        saveState();
+        renderIncome();
+      }
+
+function sideGigGross(month = currentMonth()) { return sum((month.sideGigs || []).filter(gig => !isSideGigExcluded(month, gig)), gig => gig.gross); }
       function sideGigNet(month = currentMonth()) { return sum(month.sideGigs || [], gig => Number(gig.gross || 0) * (1 - Number(gig.taxRate || 0) / 100)); }
       function isPaypalSideGig(gig) {
         const text = [gig?.source, gig?.notes, gig?.transactionKey].join(" ").toLowerCase();
         return /paypal|pay pal|pp\*/.test(text);
       }
-      function paypalSideGigRows(month = currentMonth()) { return (month.sideGigs || []).filter(isPaypalSideGig); }
+      function paypalSideGigRows(month = currentMonth()) {
+        return (month.sideGigs || []).filter(gig => {
+          if (!isPaypalSideGig(gig)) return false;
+          if (isSideGigExcluded(month, gig)) return false;
+          const txn = transactionForSideGig(month, gig);
+          if (txn && isIgnoredTransaction(txn)) return false;
+          return true;
+        });
+      }
 
 
       function normalizedSideHustleOwner(owner) {
@@ -5845,21 +5916,27 @@ function renderProtectionLists(month = currentMonth(), plan = safeNextPaycheckPl
 
       function ignoreTransaction(month, txn, reason = "") {
         if (!txn) return;
+        const key = sideGigTransactionKey(txn);
         txn.ignored = true;
         txn.ignoredAt = new Date().toISOString();
         txn.ignoreReason = reason || txn.ignoreReason || "Ignored / excluded from this month";
         txn.reconciled = true;
         txn.billId = "";
+        if (isSideHustleTransaction(txn) || key) addSideGigExclusion(month, key);
         removeSideGigForTransaction(month, txn);
         applyBillPaymentStatuses(month);
       }
 
       function restoreIgnoredTransaction(txn) {
         if (!txn) return;
+        const month = currentMonth();
+        const key = sideGigTransactionKey(txn);
         txn.ignored = false;
         txn.ignoredAt = "";
         txn.ignoreReason = "";
+        removeSideGigExclusion(month, key);
         txn.reconciled = Boolean(txn.billId || (txn.category && txn.owner && txn.category !== "Uncategorized"));
+        syncSideGigsFromTransactions(month, [txn]);
       }
 
       function removeSideGigForTransaction(month, txn) {
@@ -6000,14 +6077,16 @@ function renderProtectionLists(month = currentMonth(), plan = safeNextPaycheckPl
 
       function syncSideGigsFromTransactions(month, transactions) {
         month.sideGigs ||= [];
+        ensureSideGigExclusions(month);
         const txns = transactions || [];
         txns.forEach(txn => {
-          if (isIgnoredTransaction(txn) || !isSideHustleTransaction(txn)) removeSideGigForTransaction(month, txn);
+          if (isIgnoredTransaction(txn) || isSideGigExcluded(month, txn) || !isSideHustleTransaction(txn)) removeSideGigForTransaction(month, txn);
         });
         const existing = new Set(month.sideGigs.map(gig => gig.transactionKey).filter(Boolean));
         let added = 0;
         txns.forEach(txn => {
           if (isIgnoredTransaction(txn)) return;
+          if (isSideGigExcluded(month, txn)) return;
           if (!isSideHustleTransaction(txn)) return;
           const key = sideGigTransactionKey(txn);
           if (existing.has(key)) return;
@@ -6684,7 +6763,7 @@ function renderProtectionLists(month = currentMonth(), plan = safeNextPaycheckPl
             </tbody></table></div></div>
           </div>`,
 
-          `<div class="card"><div class="section-title"><h3>Side hustle income</h3><span>Gross only by person</span></div>
+          `<div class="card"><div class="section-title"><h3>Side hustle income</h3><span>Gross only by person · remove lines without deleting bank transactions</span></div>
             <div class="cards" style="margin-bottom:.8rem">
               ${metric("Gross this month", paypalGross, "All side hustle deposits this month.")}
               ${metric("Patricia gross", sideByOwner.Patricia || 0, "Side hustle gross assigned to Patricia.", "green")}
@@ -6694,7 +6773,7 @@ function renderProtectionLists(month = currentMonth(), plan = safeNextPaycheckPl
             <div class="toolbar" style="justify-content:flex-start;margin-bottom:.8rem"><button id="addGig" type="button">Add Side Gig</button></div>
             <div class="table-wrap"><table><thead><tr><th>Date</th><th>Owner</th><th>Source</th><th class="money">Gross</th><th>Notes</th><th></th></tr></thead><tbody>
             ${month.sideGigs.map(row => {
-              return `<tr><td>${escapeHtml(row.date)}</td><td><select data-side-gig-owner="${row.id}" aria-label="Side hustle owner"><option value="Patricia" ${sideGigOwner(row, month) === "Patricia" ? "selected" : ""}>Patricia</option><option value="Alec" ${sideGigOwner(row, month) === "Alec" ? "selected" : ""}>Alec</option></select></td><td><strong>${escapeHtml(row.source)}</strong></td><td class="money">${money.format(row.gross)}</td><td>${row.notes ? escapeHtml(row.notes) : `<span class="muted">—</span>`}</td><td class="right"><button class="ghost" data-edit-gig="${row.id}" type="button">Edit</button></td></tr>`;
+              return `<tr><td>${escapeHtml(row.date)}</td><td><select data-side-gig-owner="${row.id}" aria-label="Side hustle owner"><option value="Patricia" ${sideGigOwner(row, month) === "Patricia" ? "selected" : ""}>Patricia</option><option value="Alec" ${sideGigOwner(row, month) === "Alec" ? "selected" : ""}>Alec</option></select></td><td><strong>${escapeHtml(row.source)}</strong></td><td class="money">${money.format(row.gross)}</td><td>${row.notes ? escapeHtml(row.notes) : `<span class="muted">—</span>`}</td><td class="right"><button class="ghost" data-edit-gig="${row.id}" type="button">Edit</button> <button class="danger" data-delete-gig="${row.id}" type="button">Remove</button></td></tr>`;
             }).join("") || `<tr><td colspan="6"><div class="empty">No side hustle rows yet.</div></td></tr>`}
             </tbody></table></div></div>`,
 
@@ -6717,6 +6796,7 @@ function renderProtectionLists(month = currentMonth(), plan = safeNextPaycheckPl
         document.querySelectorAll("[data-edit-contribution]").forEach(btn => btn.addEventListener("click", () => openContributionModal(month.contributions.find(row => row.id === btn.dataset.editContribution))));
         document.querySelector("#addGig").addEventListener("click", () => openGigModal());
         document.querySelectorAll("[data-edit-gig]").forEach(btn => btn.addEventListener("click", () => openGigModal(month.sideGigs.find(row => row.id === btn.dataset.editGig))));
+        document.querySelectorAll("[data-delete-gig]").forEach(btn => btn.addEventListener("click", () => deleteSideGigLine(btn.dataset.deleteGig)));
         document.querySelectorAll("[data-side-gig-owner]").forEach(selectEl => selectEl.addEventListener("change", event => {
           const row = month.sideGigs.find(item => item.id === event.target.dataset.sideGigOwner);
           if (!row) return;
@@ -6829,7 +6909,8 @@ function renderProtectionLists(month = currentMonth(), plan = safeNextPaycheckPl
       function openGigModal(row) {
         const editing = Boolean(row);
         const value = row || { date: "", owner: "Patricia", source: "PayPal", gross: 0, taxRate: PAYPAL_SIDE_HUSTLE_TAX_RATE, target: "Taxes", notes: "" };
-        openModal(editing ? "Edit side gig" : "Add side gig", `<form id="gigForm" class="form-grid">${field("Date", input("date", value.date, "date"))}${field("Owner", select("owner", ["Patricia","Alec"], sideGigOwner(value)))}${field("Source", input("source", value.source))}${field("Gross", input("gross", value.gross, "number", "0.01"))}${field("Tax %", input("taxRate", isPaypalSideGig(value) ? PAYPAL_SIDE_HUSTLE_TAX_RATE : value.taxRate, "number", "1"))}${field("Target", select("target", ["Taxes","Debt","Savings","Bills","Personal","Kids","Buffer"], value.target))}${field("Notes", input("notes", value.notes), "wide")}<div class="full toolbar"><button type="submit">Save</button></div></form>`);
+        openModal(editing ? "Edit side gig" : "Add side gig", `<form id="gigForm" class="form-grid">${field("Date", input("date", value.date, "date"))}${field("Owner", select("owner", ["Patricia","Alec"], sideGigOwner(value)))}${field("Source", input("source", value.source))}${field("Gross", input("gross", value.gross, "number", "0.01"))}${field("Tax %", input("taxRate", isPaypalSideGig(value) ? PAYPAL_SIDE_HUSTLE_TAX_RATE : value.taxRate, "number", "1"))}${field("Target", select("target", ["Taxes","Debt","Savings","Bills","Personal","Kids","Buffer"], value.target))}${field("Notes", input("notes", value.notes), "wide")}<div class="full toolbar" style="justify-content:space-between">${editing ? `<button type="button" class="danger" id="deleteGigFromModal">Remove</button>` : `<span></span>`}<button type="submit">Save</button></div></form>`);
+        document.querySelector("#deleteGigFromModal")?.addEventListener("click", () => deleteSideGigLine(value.id));
         document.querySelector("#gigForm").addEventListener("submit", event => {
           event.preventDefault();
           const data = formData(event.currentTarget);

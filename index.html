@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Kingdom Builder</title>
-  <!-- v143 compare month line trend -->
+  <!-- v145 compare line paypal personal -->
   <!-- v140 Alec next paycheck owner match -->
   <!-- v84 safe next paycheck -->
   <!-- v82 expected income actuals -->
@@ -6975,12 +6975,45 @@ function compareNormalizeText(value) {
           .trim();
       }
 
+function compareCanonicalBillName(line) {
+        const raw = compareNormalizeText([line?.payee, line?.name, line?.description, line?.notes].join(" "));
+        if (/pennymac/.test(raw)) return "pennymac";
+        if (/truist/.test(raw)) return "truist";
+        if (/achieva/.test(raw)) return "achieva";
+        if (/t\s*mobile|tmobile/.test(raw)) return "t-mobile";
+        if (/sofi/.test(raw)) return "sofi bank";
+        if (/synchrony/.test(raw) && /room|go/.test(raw)) return "synchrony rooms to go";
+        if (/care\s*credit/.test(raw)) return "care credit";
+        if (/pasco/.test(raw) && /water|util/.test(raw)) return "pasco utilities water";
+        if (/wrec|electric/.test(raw)) return "wrec electric";
+        if (/new\s*york\s*life/.test(raw)) return "new york life";
+        if (/wellhub/.test(raw)) return "wellhub";
+        if (/google/.test(raw) && /one/.test(raw)) return "google one";
+        if (/netflix/.test(raw)) return "netflix";
+        if (/disney/.test(raw)) return "disneyplus";
+        if (/grocer|grocery|groceries/.test(raw)) return "groceries";
+        if (/\bgas\b|fuel/.test(raw)) return "gas";
+        if (/figure|skating|patinada/.test(raw)) return "figure skating";
+        if (/journey/.test(raw)) return "journey giving";
+        if (/hoa/.test(raw) && /quarter/.test(raw)) return "hoa quarterly";
+        if (/hoa/.test(raw) || /epperson/.test(raw)) return "hoa";
+        return raw || compareNormalizeText(line?.category || "bill") || "bill";
+      }
+
       function compareLineKeyForBudgetLine(line) {
-        const name = compareNormalizeText(line.payee || line.name || line.category || "bill");
-        const owner = compareNormalizeText(line.owner || "Shared");
+        const name = compareCanonicalBillName(line);
         const asset = compareNormalizeText(line.asset || "");
         const category = compareNormalizeText(line.category || "");
-        return ["bill", name || "bill", owner || "shared", asset, category].join("|");
+        // v145: normal bills should not split by owner. Owner only matters for Personal Money and PayPal/Side Hustle rows.
+        // High-confidence bill aliases are grouped by canonical bill name so variants like Achieva / ACHIEVA CREDIT UNION match.
+        const canonicalOnly = new Set([
+          "pennymac", "truist", "achieva", "t-mobile", "sofi bank", "synchrony rooms to go",
+          "care credit", "pasco utilities water", "pasco county", "wrec electric", "new york life",
+          "wellhub", "google one", "netflix", "disneyplus", "groceries", "gas",
+          "figure skating", "journey giving", "hoa", "hoa quarterly"
+        ]);
+        if (canonicalOnly.has(name)) return ["bill", name].join("|");
+        return ["bill", name || "bill", asset, category].join("|");
       }
 
       function compareLineLabelForBudgetLine(line) {
@@ -7015,6 +7048,11 @@ function compareNormalizeText(value) {
         return clean.slice(Math.max(0, clean.length - size));
       }
 
+      function comparePersonalSpentForOwner(month = currentMonth(), ownerName = "") {
+        const target = normalizedOwnerName(ownerName);
+        return activeTransactions(month).reduce((total, txn) => total + personalAmountForOwner(txn, target), 0);
+      }
+
       function compareMonthLineRecords(month, key) {
         const records = [];
         activeBudgetLines(allBudgetLines(month)).forEach(line => {
@@ -7042,8 +7080,25 @@ function compareNormalizeText(value) {
             asset: "Personal",
             day: "—",
             planned: roundMoney(Number(personalBudgets[owner] || 0)),
-            paid: roundMoney(personalSpentForOwner(month, owner)),
-            remaining: Math.max(0, roundMoney(Number(personalBudgets[owner] || 0) - personalSpentForOwner(month, owner))),
+            paid: roundMoney(comparePersonalSpentForOwner(month, owner)),
+            remaining: Math.max(0, roundMoney(Number(personalBudgets[owner] || 0) - comparePersonalSpentForOwner(month, owner))),
+            monthKey: key
+          });
+        });
+
+        const paypalByOwner = sideHustleGrossByOwner(month);
+        ["Patricia", "Alec"].forEach(owner => {
+          const paid = roundMoney(Number(paypalByOwner[owner] || 0));
+          records.push({
+            key: `paypal-side-hustle-${owner.toLowerCase()}`,
+            label: `PayPal / Side Hustle — ${owner}`,
+            category: "Side Hustles",
+            owner,
+            asset: "Family",
+            day: "—",
+            planned: 0,
+            paid,
+            remaining: 0,
             monthKey: key
           });
         });
@@ -7064,13 +7119,17 @@ function compareNormalizeText(value) {
                 owner: record.owner,
                 asset: record.asset,
                 day: record.day,
+                owners: new Set(record.owner ? [record.owner] : []),
+                categories: new Set(record.category ? [record.category] : []),
                 values: {},
                 plannedValues: {},
                 remainingValues: {}
               });
             }
             const row = map.get(record.key);
-            row.label ||= record.label;
+            if (record.label && (!row.label || String(record.label).length < String(row.label).length)) row.label = record.label;
+            if (record.owner) row.owners.add(record.owner);
+            if (record.category) row.categories.add(record.category);
             row.category ||= record.category;
             row.owner ||= record.owner;
             row.asset ||= record.asset;
@@ -7084,13 +7143,13 @@ function compareNormalizeText(value) {
         return Array.from(map.values()).map(row => {
           const amounts = keys.map(key => Number(row.values[key] || 0));
           const visibleAmounts = amounts.filter(value => value > 0.005);
-          const latest = amounts[amounts.length - 1] || 0;
-          const prior = amounts.length > 1 ? amounts[amounts.length - 2] || 0 : 0;
-          row.latest = latest;
-          row.prior = prior;
-          row.change = roundMoney(latest - prior);
+          row.latest = amounts[amounts.length - 1] || 0;
+          row.prior = amounts.length > 1 ? amounts[amounts.length - 2] || 0 : 0;
+          row.change = roundMoney(row.latest - row.prior);
           row.average = visibleAmounts.length ? roundMoney(sum(visibleAmounts, value => value) / visibleAmounts.length) : 0;
           row.total = roundMoney(sum(amounts, value => value));
+          row.owner = row.owners && row.owners.size > 1 ? "Mixed" : (Array.from(row.owners || [])[0] || row.owner || "");
+          row.category = row.categories && row.categories.size > 1 ? "Mixed" : (Array.from(row.categories || [])[0] || row.category || "");
           return row;
         }).sort((a, b) => {
           const dayA = parseInt(a.day, 10); const dayB = parseInt(b.day, 10);
@@ -7136,20 +7195,19 @@ function compareNormalizeText(value) {
         const rows = compareLineTrendRows(keys);
         if (!rows.length) return `<div class="empty">No monthly plan lines yet.</div>`;
         const monthHeaders = keys.map(key => `<th class="money">${escapeHtml((state.months[key]?.label || key).replace(/\s+2026$/, ""))}</th>`).join("");
+        const totals = {};
+        keys.forEach(key => { totals[key] = roundMoney(sum(rows, row => Number(row.values[key] || 0))); });
         return `<div class="table-wrap"><table><thead><tr>
-          <th>Line / item</th><th>Day</th><th>Owner</th><th>Category</th>${monthHeaders}<th class="money">Avg</th><th>Trend</th>
+          <th>Line / item</th><th>Day</th>${monthHeaders}
         </tr></thead><tbody>
           ${rows.map(row => `<tr>
             <td><strong>${escapeHtml(row.label)}</strong>${row.asset ? `<div class="small muted">${escapeHtml(row.asset)}</div>` : ""}</td>
             <td>${escapeHtml(row.day || "—")}</td>
-            <td>${escapeHtml(row.owner || "")}</td>
-            <td>${escapeHtml(row.category || "")}</td>
-            ${keys.map(key => `<td class="money">${row.values[key] > 0.005 ? money.format(row.values[key]) : "—"}</td>`).join("")}
-            <td class="money">${money.format(row.average || 0)}</td>
-            <td>${compareTrendLabel(row)}</td>
+            ${keys.map(key => `<td class="money">${Number(row.values[key] || 0) > 0.005 ? money.format(row.values[key]) : "—"}</td>`).join("")}
           </tr>`).join("")}
+          <tr class="total-row"><td><strong>Total paid / spent</strong></td><td></td>${keys.map(key => `<td class="money"><strong>${money.format(totals[key] || 0)}</strong></td>`).join("")}</tr>
         </tbody></table></div>
-        <p class="small muted" style="margin:.65rem 0 0">Paid/spent uses monthly plan paid amounts and linked non-ignored CSV transactions. Ignored CSV rows stay recorded but count as $0 here. Personal Money rows use personal transactions for each person.</p>`;
+        <p class="small muted" style="margin:.65rem 0 0">This is paid/spent by Monthly Plan line. Personal Money and PayPal/Side Hustle are split by Patricia/Alec. Normal bills ignore owner changes. Ignored CSV rows stay recorded but count as $0 here.</p>`;
       }
 
       function renderCompareMonthSummaryTable(rows) {
@@ -7166,55 +7224,15 @@ function renderCompare() {
         const latest = rows[rows.length - 1];
         const prior = rows[rows.length - 2];
         const delta = latest && prior ? roundMoney(latest.paidSpent - prior.paidSpent) : 0;
-        const average = rows.length ? roundMoney(sum(rows, row => row.paidSpent) / rows.length) : 0;
-        const deltaHint = rows.length > 1
-          ? (delta > 0 ? `Spending increased by ${money.format(delta)} vs prior month.` : delta < 0 ? `Spending decreased by ${money.format(Math.abs(delta))} vs prior month.` : "No change vs prior month.")
-          : "Need at least 2 months.";
+        const deltaText = rows.length > 1
+          ? (delta > 0 ? `Current month paid/spent is ${money.format(delta)} higher than prior month.` : delta < 0 ? `Current month paid/spent is ${money.format(Math.abs(delta))} lower than prior month.` : "Current month paid/spent is the same as prior month.")
+          : "Need at least 2 months for a comparison.";
 
         document.querySelector("#compare").innerHTML = [
-          `<div class="cards">
-            ${countMetric("Months tracked", allKeys.length, "Each saved month becomes part of this view.")}
-            ${metric("Current paid / spent", latest ? latest.paidSpent : 0, latest ? `${latest.label}. Monthly Plan lines + Personal Money.` : "No month yet")}
-            ${metric("Change vs prior", delta, deltaHint, delta > 0 ? "red" : delta < 0 ? "green" : "")}
-            ${metric("6-month average", average, rows.length ? `Average of ${rows.length} shown month(s).` : "No month yet")}
-          </div>`,
-
-          rows.length > 1 ? `<div class="chart-card">
-            <h3>Paid / spent trend</h3>
-            <p class="small muted" style="margin-top:-.35rem">Monthly Plan rows plus Patricia/Alec Personal Money. Ignored CSV rows count as $0.</p>
-            <div class="legend" id="compareLegend"></div>
-            <div style="position:relative;width:100%;height:220px"><canvas id="compareChart" role="img" aria-label="Line chart of monthly paid and spent totals">Monthly paid and spent totals.</canvas></div>
-          </div>` : "",
-
-          `<div class="card"><div class="section-title"><h3>Monthly Plan + Personal Money Trend</h3><span>Rolling ${rows.length || 0} month(s), line by line</span></div>
+          `<div class="card"><div class="section-title"><div><h3>Monthly Plan paid amounts by line</h3><p class="small muted" style="margin:.25rem 0 0">Rolling ${keys.length || 0} month(s). Normal bills are matched by bill name, while Personal Money and PayPal/Side Hustle stay split by Patricia/Alec.</p></div><span>${escapeHtml(deltaText)}</span></div>
             ${renderCompareLineTrendTable(keys)}
-          </div>`,
-
-          `<div class="card"><div class="section-title"><h3>Month summary</h3><span>Paid/spent and unpaid totals</span></div>
-            ${renderCompareMonthSummaryTable(rows)}
-          </div>`,
-
-          `<div class="card"><div class="section-title"><h3>What to watch</h3></div>${compareFlags(rows)}</div>`
+          </div>`
         ].join("");
-
-        if (rows.length > 1) {
-          destroyChart("compareChart");
-          chartInstances["compareChart"] = new Chart(document.getElementById("compareChart"), {
-            type: "line",
-            data: {
-              labels: rows.map(r => r.label),
-              datasets: [
-                { label: "Paid / spent", data: rows.map(r => r.paidSpent), borderColor: "#e34948", backgroundColor: "rgba(227,73,72,0.08)", fill: true, tension: .3, pointRadius: 5, pointBackgroundColor: "#e34948" },
-                { label: "Still unpaid", data: rows.map(r => r.remaining), borderColor: "#2a78d6", borderDash: [4,4], tension: .3, pointRadius: 4, pointBackgroundColor: "#2a78d6" }
-              ]
-            },
-            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => " " + money.format(ctx.raw) } } }, scales: { x: { ticks: { color: "#888", font: { size: 11 } }, grid: { display: false } }, y: { ticks: { color: "#888", font: { size: 10 }, callback: v => "$" + Math.round(v/1000) + "k" }, grid: { color: "rgba(128,128,128,0.12)" } } } }
-          });
-          document.getElementById("compareLegend").innerHTML = [
-            `<span><span class="legend-dot" style="background:#e34948"></span>Paid / spent</span>`,
-            `<span><span class="legend-dot" style="background:#2a78d6"></span>Still unpaid</span>`
-          ].join("");
-        }
       }
 
       function monthComparisonRows() {

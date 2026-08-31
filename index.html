@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Kingdom Builder</title>
-  <!-- v149 closeout planned paid difference -->
+  <!-- v150 closeout personal in planned paid -->
   <!-- v140 Alec next paycheck owner match -->
   <!-- v84 safe next paycheck -->
   <!-- v82 expected income actuals -->
@@ -7342,6 +7342,40 @@ function compareCanonicalBillName(line) {
         </tbody></table></div>`;
       }
 
+
+      function closeoutHistoryPersonalPlanned(report, month) {
+        const fromReport = Number(report?.plannedActual?.totals?.plannedPersonal ?? NaN);
+        if (Number.isFinite(fromReport) && fromReport >= 0) return rawMoney(fromReport);
+        const budgets = personalBudgetByOwner(month || {});
+        return rawMoney(Number(budgets.Patricia || 0) + Number(budgets.Alec || 0));
+      }
+
+      function closeoutHistoryPersonalSpent(report) {
+        const personal = report?.personal || {};
+        const fromReport = Number(report?.plannedActual?.totals?.actualPersonal ?? NaN);
+        if (Number.isFinite(fromReport) && fromReport >= 0) return rawMoney(fromReport);
+        return rawMoney(Number(personal.Patricia || 0) + Number(personal.Alec || 0));
+      }
+
+      function closeoutHistoryCombinedTotals(report, month) {
+        const totals = report?.totals || {};
+        const monthlyPlanPlanned = rawMoney(totals.planned || 0);
+        const monthlyPlanPaid = rawMoney(totals.paid || 0);
+        const personalPlanned = closeoutHistoryPersonalPlanned(report, month);
+        const personalSpent = closeoutHistoryPersonalSpent(report);
+        const plannedWithPersonal = rawMoney(monthlyPlanPlanned + personalPlanned);
+        const paidWithPersonal = rawMoney(monthlyPlanPaid + personalSpent);
+        return {
+          monthlyPlanPlanned,
+          personalPlanned,
+          plannedWithPersonal,
+          monthlyPlanPaid,
+          personalSpent,
+          paidWithPersonal,
+          differenceWithPersonal: rawMoney(paidWithPersonal - plannedWithPersonal)
+        };
+      }
+
       function renderCompareCloseoutHistory() {
         const keys = closeoutHistoryMonthKeys();
         if (!keys.length) {
@@ -7357,6 +7391,7 @@ function compareCanonicalBillName(line) {
         const checklist = report.checklist || {};
         const closedDate = report.closedAt || report.generatedAt;
         const sourceLabel = closeoutHistorySourceLabel(report);
+        const combined = closeoutHistoryCombinedTotals(report, selectedMonth);
         return `<div class="card">
           <div class="section-title"><div><h3>Closeout history</h3><p class="small muted" style="margin:.25rem 0 0">Final reports and meaningful saved drafts by month. Empty current-month drafts are hidden.</p></div><span>${escapeHtml(keys.length)} month${keys.length === 1 ? "" : "s"}</span></div>
           <div class="toolbar" style="justify-content:flex-start;gap:.45rem;flex-wrap:wrap;margin-bottom:1rem">
@@ -7368,14 +7403,14 @@ function compareCanonicalBillName(line) {
           </div>
           <div class="cards kb-simple-dashboard-cards">
             ${closeoutHistoryMonthCard("Closeout month", report.monthLabel || selectedMonth.label || selectedKey, sourceLabel || "Closeout history")}
-            ${metric("Planned", totals.planned || 0, "Monthly Plan total in this closeout view.")}
-            ${metric("Paid", totals.paid || 0, "Paid or matched bill amount in this closeout view.", "green")}
-            ${metric("Paid vs planned", roundMoney((totals.paid || 0) - (totals.planned || 0)), "Difference between paid and planned before remaining-at-close actions.", ((totals.paid || 0) - (totals.planned || 0)) > 0 ? "red" : ((totals.paid || 0) - (totals.planned || 0)) < 0 ? "green" : "")}
-            ${metric("Remaining at review", totals.remainingAtReview || 0, "Amount remaining before selected closeout actions.", (totals.remainingAtReview || 0) > 0 ? "yellow" : "green")}
+            ${metric("Planned", combined.plannedWithPersonal, `Monthly Plan ${money.format(combined.monthlyPlanPlanned)} + Personal Money ${money.format(combined.personalPlanned)}.`)}
+            ${metric("Paid / spent", combined.paidWithPersonal, `Monthly Plan paid ${money.format(combined.monthlyPlanPaid)} + Personal spent ${money.format(combined.personalSpent)}.`, "green")}
+            ${metric("Paid/spent vs planned", combined.differenceWithPersonal, "Difference between paid/spent and planned, including personal money.", combined.differenceWithPersonal > 0 ? "red" : combined.differenceWithPersonal < 0 ? "green" : "")}
+            ${metric("Remaining at review", totals.remainingAtReview || 0, "Monthly Plan remaining before selected closeout actions. Personal money is shown in planned/paid but does not close like a bill.", (totals.remainingAtReview || 0) > 0 ? "yellow" : "green")}
             ${metric("Closed unused", totals.closedUnused || 0, "Remaining money closed as unused / not needed.")}
             ${metric("Left open", totals.leftOpen || 0, "Anything intentionally left open.", (totals.leftOpen || 0) > 0 ? "red" : "green")}
             ${metric("Income received", income.actualIncomeReceived || 0, `Job ${money.format(income.job || 0)} · Side hustle ${money.format(income.sideHustle || 0)} · Other ${money.format(income.other || 0)}`, "green")}
-            ${metric("Personal spent", Number(personal.Patricia || 0) + Number(personal.Alec || 0), `Patricia ${money.format(personal.Patricia || 0)} · Alec ${money.format(personal.Alec || 0)}`)}
+            ${metric("Personal spent", combined.personalSpent, `Planned personal money ${money.format(combined.personalPlanned)} · Patricia ${money.format(personal.Patricia || 0)} · Alec ${money.format(personal.Alec || 0)}${combined.personalSpent > combined.personalPlanned ? ` · Over by ${money.format(combined.personalSpent - combined.personalPlanned)}` : combined.personalSpent < combined.personalPlanned ? ` · Under by ${money.format(combined.personalPlanned - combined.personalSpent)}` : " · On plan"}`)}
           </div>
           <div class="mini-list" style="margin-top:.9rem">
             <span class="pill ${checklist.billsChecked ? "green" : "yellow"}">Bills ${checklist.billsChecked ? "checked" : "not checked"}</span>

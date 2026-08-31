@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Kingdom Builder</title>
-  <!-- v146 compare closeout history -->
+  <!-- v147 closeout draft history -->
   <!-- v140 Alec next paycheck owner match -->
   <!-- v84 safe next paycheck -->
   <!-- v82 expected income actuals -->
@@ -7218,7 +7218,10 @@ function compareCanonicalBillName(line) {
       }
 
       function closeoutHistoryMonthKeys() {
-        return monthOptions().filter(key => state.months?.[key]?.closeoutReport);
+        return monthOptions().filter(key => {
+          const month = state.months?.[key];
+          return Boolean(month?.closeoutReport || month?.closeout);
+        });
       }
 
       function closeoutHistorySelectedKey(keys = closeoutHistoryMonthKeys()) {
@@ -7227,6 +7230,40 @@ function compareCanonicalBillName(line) {
         if (state.activeMonth && keys.includes(state.activeMonth)) return state.activeMonth;
         return keys[keys.length - 1];
       }
+
+
+      function closeoutHistoryReportForMonth(key) {
+        const month = state.months?.[key];
+        if (!month) return null;
+        if (month.closeoutReport) {
+          return { ...month.closeoutReport, monthKey: month.closeoutReport.monthKey || key, monthLabel: month.closeoutReport.monthLabel || month.label || key, historySource: "final" };
+        }
+        if (!month.closeout) return null;
+        const report = buildCloseoutReport(month);
+        report.id = `closeout-draft-${key}`;
+        report.monthKey = key;
+        report.monthLabel = month.label || key;
+        report.status = "Draft saved";
+        report.historySource = "draft";
+        report.closedAt = "";
+        report.generatedAt = report.generatedAt || new Date().toISOString();
+        return report;
+      }
+
+      function closeoutHistorySourceLabel(report) {
+        if (!report) return "";
+        return report.historySource === "draft" ? "Draft history" : "Final saved report";
+      }
+
+      function closeoutHistorySourceBanner(report, month) {
+        if (!report) return "";
+        if (report.historySource === "draft") {
+          return `<div class="banner" style="background:var(--yellow-soft);border-color:#ead39c;color:var(--yellow);margin-top:1rem"><div><strong>Draft closeout reconstructed</strong><span>This month did not have a final closeoutReport saved. The view below is rebuilt from the saved month, closeout draft actions, checklist, and transactions. Nothing is changed or finalized by viewing it.</span></div></div>`;
+        }
+        return `<div class="banner" style="background:var(--green-soft);border-color:#b8d6c3;color:var(--green);margin-top:1rem"><div><strong>Final closeout report saved</strong><span>This month has a saved closeoutReport snapshot.</span></div></div>`;
+      }
+
+
 
       function closeoutHistoryLineRows(report) {
         return (report?.lines || []).map(line => ({
@@ -7284,26 +7321,31 @@ function compareCanonicalBillName(line) {
       function renderCompareCloseoutHistory() {
         const keys = closeoutHistoryMonthKeys();
         if (!keys.length) {
-          return `<div class="card"><div class="section-title"><h3>Closeout history</h3><span>No saved closeouts yet</span></div><div class="empty">When you save a final closeout report, it will show here by month. Nothing from the Closeout page is deleted by Compare Months.</div></div>`;
+          return `<div class="card"><div class="section-title"><h3>Closeout history</h3><span>No closeout data yet</span></div><div class="empty">When you save a closeout draft or final closeout report, it will show here by month. Nothing from the Closeout page is deleted by Compare Months.</div></div>`;
         }
         const selectedKey = closeoutHistorySelectedKey(keys);
         const selectedMonth = state.months[selectedKey];
-        const report = selectedMonth?.closeoutReport;
-        if (!report) return `<div class="card"><div class="section-title"><h3>Closeout history</h3><span>No saved closeout selected</span></div></div>`;
+        const report = closeoutHistoryReportForMonth(selectedKey);
+        if (!report) return `<div class="card"><div class="section-title"><h3>Closeout history</h3><span>No closeout selected</span></div></div>`;
         const totals = report.totals || {};
         const income = report.income || {};
         const personal = report.personal || {};
         const checklist = report.checklist || {};
         const closedDate = report.closedAt || report.generatedAt;
+        const sourceLabel = closeoutHistorySourceLabel(report);
         return `<div class="card">
-          <div class="section-title"><div><h3>Closeout history</h3><p class="small muted" style="margin:.25rem 0 0">Saved closeout reports by month. This reads the closeout snapshot; it does not rely on categories being perfect.</p></div><span>${escapeHtml(keys.length)} saved month${keys.length === 1 ? "" : "s"}</span></div>
+          <div class="section-title"><div><h3>Closeout history</h3><p class="small muted" style="margin:.25rem 0 0">Final reports and saved drafts by month. Draft months are reconstructed from saved closeout actions and the month data.</p></div><span>${escapeHtml(keys.length)} month${keys.length === 1 ? "" : "s"}</span></div>
           <div class="toolbar" style="justify-content:flex-start;gap:.45rem;flex-wrap:wrap;margin-bottom:1rem">
-            ${keys.map(key => `<button type="button" class="${key === selectedKey ? "" : "secondary"}" data-compare-closeout-month="${escapeHtml(key)}">${escapeHtml(state.months[key]?.label || key)}</button>`).join("")}
+            ${keys.map(key => {
+              const month = state.months[key];
+              const isFinal = Boolean(month?.closeoutReport);
+              return `<button type="button" class="${key === selectedKey ? "" : "secondary"}" data-compare-closeout-month="${escapeHtml(key)}">${escapeHtml(month?.label || key)} ${isFinal ? "✓" : "draft"}</button>`;
+            }).join("")}
           </div>
           <div class="cards kb-simple-dashboard-cards">
-            ${metric("Closed month", report.monthLabel || selectedMonth.label || selectedKey, closedDate ? `Saved ${new Date(closedDate).toLocaleString()}` : "Saved closeout report")}
-            ${metric("Planned", totals.planned || 0, "Monthly Plan total in closeout snapshot.")}
-            ${metric("Paid", totals.paid || 0, "Paid or matched bill amount in closeout snapshot.", "green")}
+            ${metric("Closeout month", report.monthLabel || selectedMonth.label || selectedKey, sourceLabel || "Closeout history")}
+            ${metric("Planned", totals.planned || 0, "Monthly Plan total in this closeout view.")}
+            ${metric("Paid", totals.paid || 0, "Paid or matched bill amount in this closeout view.", "green")}
             ${metric("Remaining at review", totals.remainingAtReview || 0, "Amount remaining before selected closeout actions.", (totals.remainingAtReview || 0) > 0 ? "yellow" : "green")}
             ${metric("Closed unused", totals.closedUnused || 0, "Remaining money closed as unused / not needed.")}
             ${metric("Left open", totals.leftOpen || 0, "Anything intentionally left open.", (totals.leftOpen || 0) > 0 ? "red" : "green")}
@@ -7316,9 +7358,10 @@ function compareCanonicalBillName(line) {
             <span class="pill ${checklist.allowanceChecked ? "green" : "yellow"}">Personal money ${checklist.allowanceChecked ? "checked" : "not checked"}</span>
             <span class="pill ${checklist.incomeChecked ? "green" : "yellow"}">Income ${checklist.incomeChecked ? "checked" : "not checked"}</span>
           </div>
+          ${closeoutHistorySourceBanner(report, selectedMonth)}
           ${report.notes ? `<div class="banner" style="margin-top:1rem"><div><strong>Month notes</strong><span>${escapeHtml(report.notes)}</span></div></div>` : ""}
         </div>
-        <div class="card"><div class="section-title"><h3>${escapeHtml(report.monthLabel || selectedMonth.label || selectedKey)} closeout lines</h3><span>Line-by-line saved snapshot</span></div>${renderCloseoutHistoryLines(report)}<p class="small muted" style="margin:.65rem 0 0">Category is not used for grouping here. This is the saved line/action snapshot from the final closeout report.</p></div>
+        <div class="card"><div class="section-title"><h3>${escapeHtml(report.monthLabel || selectedMonth.label || selectedKey)} closeout lines</h3><span>${escapeHtml(sourceLabel || "Line-by-line closeout")}</span></div>${renderCloseoutHistoryLines(report)}<p class="small muted" style="margin:.65rem 0 0">This is line/action detail. Categories are shown only as labels and are not used to decide whether a draft exists.</p></div>
         <div class="card"><div class="section-title"><h3>${escapeHtml(report.monthLabel || selectedMonth.label || selectedKey)} transaction coverage</h3><span>Where transactions landed at closeout</span></div>${renderCloseoutHistoryCoverage(report)}</div>`;
       }
 

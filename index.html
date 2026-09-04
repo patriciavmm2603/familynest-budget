@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Kingdom Builder</title>
-  <!-- v150 closeout personal in planned paid -->
+  <!-- v150 closeout personal in summary -->
   <!-- v140 Alec next paycheck owner match -->
   <!-- v84 safe next paycheck -->
   <!-- v82 expected income actuals -->
@@ -7342,40 +7342,6 @@ function compareCanonicalBillName(line) {
         </tbody></table></div>`;
       }
 
-
-      function closeoutHistoryPersonalPlanned(report, month) {
-        const fromReport = Number(report?.plannedActual?.totals?.plannedPersonal ?? NaN);
-        if (Number.isFinite(fromReport) && fromReport >= 0) return rawMoney(fromReport);
-        const budgets = personalBudgetByOwner(month || {});
-        return rawMoney(Number(budgets.Patricia || 0) + Number(budgets.Alec || 0));
-      }
-
-      function closeoutHistoryPersonalSpent(report) {
-        const personal = report?.personal || {};
-        const fromReport = Number(report?.plannedActual?.totals?.actualPersonal ?? NaN);
-        if (Number.isFinite(fromReport) && fromReport >= 0) return rawMoney(fromReport);
-        return rawMoney(Number(personal.Patricia || 0) + Number(personal.Alec || 0));
-      }
-
-      function closeoutHistoryCombinedTotals(report, month) {
-        const totals = report?.totals || {};
-        const monthlyPlanPlanned = rawMoney(totals.planned || 0);
-        const monthlyPlanPaid = rawMoney(totals.paid || 0);
-        const personalPlanned = closeoutHistoryPersonalPlanned(report, month);
-        const personalSpent = closeoutHistoryPersonalSpent(report);
-        const plannedWithPersonal = rawMoney(monthlyPlanPlanned + personalPlanned);
-        const paidWithPersonal = rawMoney(monthlyPlanPaid + personalSpent);
-        return {
-          monthlyPlanPlanned,
-          personalPlanned,
-          plannedWithPersonal,
-          monthlyPlanPaid,
-          personalSpent,
-          paidWithPersonal,
-          differenceWithPersonal: rawMoney(paidWithPersonal - plannedWithPersonal)
-        };
-      }
-
       function renderCompareCloseoutHistory() {
         const keys = closeoutHistoryMonthKeys();
         if (!keys.length) {
@@ -7388,10 +7354,10 @@ function compareCanonicalBillName(line) {
         const totals = report.totals || {};
         const income = report.income || {};
         const personal = report.personal || {};
+        const summaryMath = closeoutSummaryMath(report, selectedMonth);
         const checklist = report.checklist || {};
         const closedDate = report.closedAt || report.generatedAt;
         const sourceLabel = closeoutHistorySourceLabel(report);
-        const combined = closeoutHistoryCombinedTotals(report, selectedMonth);
         return `<div class="card">
           <div class="section-title"><div><h3>Closeout history</h3><p class="small muted" style="margin:.25rem 0 0">Final reports and meaningful saved drafts by month. Empty current-month drafts are hidden.</p></div><span>${escapeHtml(keys.length)} month${keys.length === 1 ? "" : "s"}</span></div>
           <div class="toolbar" style="justify-content:flex-start;gap:.45rem;flex-wrap:wrap;margin-bottom:1rem">
@@ -7403,14 +7369,14 @@ function compareCanonicalBillName(line) {
           </div>
           <div class="cards kb-simple-dashboard-cards">
             ${closeoutHistoryMonthCard("Closeout month", report.monthLabel || selectedMonth.label || selectedKey, sourceLabel || "Closeout history")}
-            ${metric("Planned", combined.plannedWithPersonal, `Monthly Plan ${money.format(combined.monthlyPlanPlanned)} + Personal Money ${money.format(combined.personalPlanned)}.`)}
-            ${metric("Paid / spent", combined.paidWithPersonal, `Monthly Plan paid ${money.format(combined.monthlyPlanPaid)} + Personal spent ${money.format(combined.personalSpent)}.`, "green")}
-            ${metric("Paid/spent vs planned", combined.differenceWithPersonal, "Difference between paid/spent and planned, including personal money.", combined.differenceWithPersonal > 0 ? "red" : combined.differenceWithPersonal < 0 ? "green" : "")}
-            ${metric("Remaining at review", totals.remainingAtReview || 0, "Monthly Plan remaining before selected closeout actions. Personal money is shown in planned/paid but does not close like a bill.", (totals.remainingAtReview || 0) > 0 ? "yellow" : "green")}
+            ${metric("Planned", summaryMath.totalPlanned, `Monthly Plan ${money.format(summaryMath.monthlyPlanPlanned)} + Personal Money ${money.format(summaryMath.personalPlanned)}.`)}
+            ${metric("Paid / spent", summaryMath.totalPaidSpent, `Monthly Plan paid ${money.format(summaryMath.monthlyPlanPaid)} + Personal spent ${money.format(summaryMath.personalSpent)}.`, "green")}
+            ${metric("Paid / spent vs planned", summaryMath.paidVsPlanned, "Paid/spent minus planned total, including personal money.", summaryMath.paidVsPlanned > 0 ? "red" : summaryMath.paidVsPlanned < 0 ? "green" : "")}
+            ${metric("Remaining at review", totals.remainingAtReview || 0, "Monthly Plan remaining before selected closeout actions. Personal money is included above, not closed like a bill.", (totals.remainingAtReview || 0) > 0 ? "yellow" : "green")}
             ${metric("Closed unused", totals.closedUnused || 0, "Remaining money closed as unused / not needed.")}
             ${metric("Left open", totals.leftOpen || 0, "Anything intentionally left open.", (totals.leftOpen || 0) > 0 ? "red" : "green")}
             ${metric("Income received", income.actualIncomeReceived || 0, `Job ${money.format(income.job || 0)} · Side hustle ${money.format(income.sideHustle || 0)} · Other ${money.format(income.other || 0)}`, "green")}
-            ${metric("Personal spent", combined.personalSpent, `Planned personal money ${money.format(combined.personalPlanned)} · Patricia ${money.format(personal.Patricia || 0)} · Alec ${money.format(personal.Alec || 0)}${combined.personalSpent > combined.personalPlanned ? ` · Over by ${money.format(combined.personalSpent - combined.personalPlanned)}` : combined.personalSpent < combined.personalPlanned ? ` · Under by ${money.format(combined.personalPlanned - combined.personalSpent)}` : " · On plan"}`)}
+            ${metric("Personal spent", summaryMath.personalSpent, `Patricia ${money.format(personal.Patricia || 0)} · Alec ${money.format(personal.Alec || 0)} · Planned ${money.format(summaryMath.personalPlanned)}`, summaryMath.personalSpent > summaryMath.personalPlanned ? "yellow" : "")}
           </div>
           <div class="mini-list" style="margin-top:.9rem">
             <span class="pill ${checklist.billsChecked ? "green" : "yellow"}">Bills ${checklist.billsChecked ? "checked" : "not checked"}</span>
@@ -8486,16 +8452,40 @@ function renderCompare() {
         return `<div class="table-wrap"><table><thead><tr><th>${escapeHtml(title)}</th><th class="money">Planned</th><th class="money">Paid</th><th class="money">Remaining</th><th class="money">Overpaid</th><th class="money">Rollover</th><th class="money">Closed unused</th></tr></thead><tbody>${entries.map(([name, row]) => `<tr><td><strong>${escapeHtml(name)}</strong></td><td class="money">${money.format(row.planned || 0)}</td><td class="money">${money.format(row.paid || 0)}</td><td class="money">${money.format(row.remaining || 0)}</td><td class="money">${money.format(row.overpaid || 0)}</td><td class="money">${money.format(row.rollover || 0)}</td><td class="money">${money.format(row.closedUnused || 0)}</td></tr>`).join("")}</tbody></table></div>`;
       }
 
-      function renderCloseoutSummaryCards(report) {
+      
+      function closeoutPersonalPlannedTotal(report = {}, month = currentMonth()) {
+        const fromReport = Number(report?.plannedActual?.totals?.plannedPersonal || 0);
+        if (Number.isFinite(fromReport) && fromReport > 0) return roundMoney(fromReport);
+        const budgets = personalBudgetByOwner(month || currentMonth());
+        return roundMoney(Number(budgets.Patricia || 0) + Number(budgets.Alec || 0));
+      }
+
+      function closeoutPersonalSpentTotal(report = {}) {
+        return roundMoney(Number(report?.personal?.Patricia || 0) + Number(report?.personal?.Alec || 0));
+      }
+
+      function closeoutSummaryMath(report = {}, month = currentMonth()) {
+        const monthlyPlanPlanned = roundMoney(Number(report?.totals?.planned || 0));
+        const monthlyPlanPaid = roundMoney(Number(report?.totals?.paid || 0));
+        const personalPlanned = closeoutPersonalPlannedTotal(report, month);
+        const personalSpent = closeoutPersonalSpentTotal(report);
+        const totalPlanned = roundMoney(monthlyPlanPlanned + personalPlanned);
+        const totalPaidSpent = roundMoney(monthlyPlanPaid + personalSpent);
+        const paidVsPlanned = roundMoney(totalPaidSpent - totalPlanned);
+        return { monthlyPlanPlanned, monthlyPlanPaid, personalPlanned, personalSpent, totalPlanned, totalPaidSpent, paidVsPlanned };
+      }
+
+function renderCloseoutSummaryCards(report) {
+        const math = closeoutSummaryMath(report, currentMonth());
         return `<div class="cards kb-simple-dashboard-cards">
-          ${metric("Planned bills", report.totals.planned, "Original planned budget for this month.")}
-          ${metric("Paid", report.totals.paid, "Paid/matched/manual amount before close.", "green")}
-          ${metric("Remaining reviewed", report.totals.remainingAtReview, "Line-by-line remaining before close actions.", report.totals.remainingAtReview > 0 ? "yellow" : "green")}
-          ${metric("Rolled over", report.totals.rolledOver, "Amount selected to move into next month.", report.totals.rolledOver > 0 ? "yellow" : "")}
-          ${metric("Closed unused/skipped", report.totals.closedUnused + report.totals.skippedNotOwed, "Remaining amount closed without counting as paid.")}
-          ${metric("Overpaid", report.totals.overpaid, "Paid above planned on individual lines.")}
+          ${metric("Planned", math.totalPlanned, `Monthly Plan ${money.format(math.monthlyPlanPlanned)} + Personal Money ${money.format(math.personalPlanned)}.`)}
+          ${metric("Paid / spent", math.totalPaidSpent, `Monthly Plan paid ${money.format(math.monthlyPlanPaid)} + Personal spent ${money.format(math.personalSpent)}.`, "green")}
+          ${metric("Paid / spent vs planned", math.paidVsPlanned, "Paid/spent minus planned total, including personal money.", math.paidVsPlanned > 0 ? "red" : math.paidVsPlanned < 0 ? "green" : "")}
+          ${metric("Remaining reviewed", report.totals.remainingAtReview, "Monthly Plan remaining before close actions. Personal money is included above, not closed like a bill.", report.totals.remainingAtReview > 0 ? "yellow" : "green")}
+          ${metric("Rolled over", report.totals.rolledOver, "Monthly Plan amount selected to move into next month.", report.totals.rolledOver > 0 ? "yellow" : "")}
+          ${metric("Closed unused/skipped", report.totals.closedUnused + report.totals.skippedNotOwed, "Monthly Plan remaining closed without counting as paid.")}
           ${metric("Actual income", report.income.actualIncomeReceived, `Job ${money.format(report.income.job)} · Side ${money.format(report.income.sideHustle)} · Other ${money.format(report.income.other)}`, "green")}
-          ${metric("Personal spending", report.personal.Alec + report.personal.Patricia, `Alec ${money.format(report.personal.Alec)} · Patricia ${money.format(report.personal.Patricia)}`, "yellow")}
+          ${metric("Personal spending", math.personalSpent, `Alec ${money.format(report.personal.Alec || 0)} · Patricia ${money.format(report.personal.Patricia || 0)} · Planned ${money.format(math.personalPlanned)}`, math.personalSpent > math.personalPlanned ? "yellow" : "")}
         </div>`;
       }
 

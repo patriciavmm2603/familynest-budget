@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kingdom Builder — Redesign Concept</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --wine:#5E1F2E; --wine-deep:#431522; --cream:#F8F1E5; --gold:#C9A24B;
+    --espresso:#2E2118; --muted:#7a6f60; --card:#FFFDF8; --line:#e7dcc8;
+    --green:#3d7a52; --red:#a9432f;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{
+    background:#d8cdb8; font-family:Inter,system-ui,sans-serif; color:var(--espresso);
+    display:flex; justify-content:center; min-height:100vh; padding:24px 12px;
+  }
+  .phone{
+    width:390px; height:844px; background:var(--cream); border-radius:44px;
+    overflow:hidden; position:relative; box-shadow:0 30px 80px rgba(46,33,24,.35);
+    display:flex; flex-direction:column;
+  }
+  .screen{flex:1; overflow-y:auto; padding-bottom:96px;}
+  .screen::-webkit-scrollbar{display:none;}
+
+  /* header */
+  .masthead{background:var(--wine); color:var(--cream); padding:20px 20px 18px;}
+  .masthead .kicker{
+    font-family:Oswald,sans-serif; font-size:11px; letter-spacing:.32em;
+    color:var(--gold); text-transform:uppercase; margin-bottom:6px;
+  }
+  .masthead h1{
+    font-family:Oswald,sans-serif; font-weight:700; font-size:30px;
+    letter-spacing:.06em; text-transform:uppercase; line-height:1;
+  }
+  .masthead .month{
+    margin-top:8px; font-size:13px; color:#e8d9bd; display:flex;
+    justify-content:space-between; align-items:center;
+  }
+  .gold-rule{height:3px; background:var(--gold); margin-top:14px; width:64px;}
+
+  /* hero */
+  .hero{
+    margin:-0px 16px 0; background:var(--card); border:1px solid var(--line);
+    border-radius:18px; padding:22px 20px; margin-top:16px;
+    box-shadow:0 10px 28px rgba(94,31,46,.08); position:relative; overflow:hidden;
+  }
+  .hero::before{content:""; position:absolute; left:0; top:0; bottom:0; width:5px; background:var(--gold);}
+  .hero .label{
+    font-family:Oswald,sans-serif; font-size:12px; letter-spacing:.24em;
+    text-transform:uppercase; color:var(--muted);
+  }
+  .hero .amount{
+    font-family:Fraunces,Georgia,serif; font-weight:700; font-size:52px;
+    color:var(--espresso); margin:6px 0 2px; letter-spacing:-.01em;
+  }
+  .hero .sub{font-size:13px; color:var(--muted);}
+  .hero .sub strong{color:var(--wine);}
+
+  /* metric trio */
+  .trio{display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; padding:14px 16px 0;}
+  .metric{
+    background:var(--card); border:1px solid var(--line); border-radius:14px;
+    padding:12px 10px; text-align:center;
+  }
+  .metric .m-label{
+    font-family:Oswald,sans-serif; font-size:10px; letter-spacing:.14em;
+    text-transform:uppercase; color:var(--muted); margin-bottom:6px;
+  }
+  .metric .m-value{font-family:Fraunces,Georgia,serif; font-weight:700; font-size:19px; color:var(--espresso);}
+  .metric.wine .m-value{color:var(--wine);}
+  .metric .m-hint{font-size:10.5px; color:var(--muted); margin-top:4px;}
+
+  /* section */
+  .section{padding:20px 16px 0;}
+  .section-head{display:flex; justify-content:space-between; align-items:baseline; margin-bottom:10px;}
+  .section-head h2{
+    font-family:Oswald,sans-serif; font-size:17px; letter-spacing:.08em;
+    text-transform:uppercase; color:var(--espresso);
+  }
+  .section-head .total{font-family:Fraunces,Georgia,serif; font-weight:700; font-size:17px; color:var(--wine);}
+
+  .bill-card{
+    background:var(--card); border:1px solid var(--line); border-radius:14px;
+    padding:13px 14px; margin-bottom:10px; display:flex; gap:12px; align-items:center;
+  }
+  .bill-card.locked{border-left:4px solid var(--wine);}
+  .bill-card.flex{border-left:4px solid var(--gold);}
+  .check{
+    width:26px; height:26px; border-radius:8px; border:2px solid var(--gold);
+    flex:none; display:flex; align-items:center; justify-content:center;
+    font-size:15px; color:var(--cream); font-weight:700;
+  }
+  .check.on{background:var(--wine); border-color:var(--wine);}
+  .bill-info{flex:1; min-width:0;}
+  .bill-name{font-weight:600; font-size:14.5px;}
+  .bill-meta{font-size:11.5px; color:var(--muted); margin-top:2px;}
+  .bill-amt{text-align:right;}
+  .bill-amt .amt{font-family:Fraunces,Georgia,serif; font-weight:700; font-size:17px;}
+  .bill-amt .tag{
+    display:inline-block; margin-top:3px; font-size:10px; letter-spacing:.08em;
+    text-transform:uppercase; padding:2px 8px; border-radius:20px;
+  }
+  .tag.fixed{background:#f0e4ef; color:var(--wine);}
+  .tag.flexible{background:#f7efdc; color:#8a6500;}
+  .edit-hint{font-size:10.5px; color:var(--muted); margin-top:3px;}
+
+  /* tab bar */
+  .tabbar{
+    position:absolute; bottom:0; left:0; right:0; background:var(--card);
+    border-top:1px solid var(--line); display:flex; padding:10px 6px 22px;
+  }
+  .tab{flex:1; text-align:center; font-size:10px; color:var(--muted); font-weight:600;}
+  .tab .ico{font-size:20px; display:block; margin-bottom:3px;}
+  .tab.active{color:var(--wine);}
+  .tab.active .ico{filter:none;}
+
+  .concept-note{
+    max-width:390px; margin:0 auto; padding:18px 6px 0; font-size:12.5px;
+    color:#5c5347; line-height:1.55;
+  }
+  .concept-note strong{color:var(--wine);}
+</style>
+</head>
+<body>
+<div>
+  <div class="phone">
+    <div class="screen">
+      <div class="masthead">
+        <div class="kicker">Stewardship · October 2026</div>
+        <h1>Kingdom Builder</h1>
+        <div class="month"><span>Patricia &amp; Alec</span><span>☰</span></div>
+        <div class="gold-rule"></div>
+      </div>
+
+      <div class="hero">
+        <div class="label">Safe to spend</div>
+        <div class="amount">$1,240.50</div>
+        <div class="sub">before payday · <strong>Oct 22</strong> · after protecting <strong>$2,310</strong></div>
+      </div>
+
+      <div class="trio">
+        <div class="metric wine">
+          <div class="m-label">Must protect</div>
+          <div class="m-value">$2,310</div>
+          <div class="m-hint">5 lines checked</div>
+        </div>
+        <div class="metric">
+          <div class="m-label">Cash now</div>
+          <div class="m-value">$3,550</div>
+          <div class="m-hint">checking</div>
+        </div>
+        <div class="metric">
+          <div class="m-label">Next pay</div>
+          <div class="m-value">$2,840</div>
+          <div class="m-hint">Oct 22</div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-head">
+          <h2>Money we can't touch</h2>
+          <span class="total">$2,310.00</span>
+        </div>
+
+        <div class="bill-card locked">
+          <div class="check on">✓</div>
+          <div class="bill-info">
+            <div class="bill-name">PennyMac Mortgage</div>
+            <div class="bill-meta">Due 1st · Planned $1,747.92 · Paid $1,747.92</div>
+          </div>
+          <div class="bill-amt">
+            <div class="amt">$1,747.92</div>
+            <span class="tag fixed">Fixed</span>
+          </div>
+        </div>
+
+        <div class="bill-card flex">
+          <div class="check on">✓</div>
+          <div class="bill-info">
+            <div class="bill-name">Groceries</div>
+            <div class="bill-meta">Planned $400 · Paid $132.40</div>
+          </div>
+          <div class="bill-amt">
+            <div class="amt">$400.00</div>
+            <span class="tag flexible">Flexible</span>
+            <div class="edit-hint">tap to edit</div>
+          </div>
+        </div>
+
+        <div class="bill-card flex">
+          <div class="check"></div>
+          <div class="bill-info">
+            <div class="bill-name">Journey Church</div>
+            <div class="bill-meta">Planned $310 · Paid $0</div>
+          </div>
+          <div class="bill-amt">
+            <div class="amt">$310.00</div>
+            <span class="tag flexible">Flexible</span>
+            <div class="edit-hint">tap to edit</div>
+          </div>
+        </div>
+
+        <div class="bill-card locked">
+          <div class="check"></div>
+          <div class="bill-info">
+            <div class="bill-name">USAA Insurance Payment</div>
+            <div class="bill-meta">Due 15th · Planned $214.30 · Paid $0</div>
+          </div>
+          <div class="bill-amt">
+            <div class="amt">$214.30</div>
+            <span class="tag fixed">Fixed</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tabbar">
+      <div class="tab active"><span class="ico">◈</span>Dashboard</div>
+      <div class="tab"><span class="ico">▤</span>Plan</div>
+      <div class="tab"><span class="ico">☰</span>Review</div>
+      <div class="tab"><span class="ico">♥</span>Money</div>
+      <div class="tab"><span class="ico">···</span>More</div>
+    </div>
+  </div>
+  <p class="concept-note"><strong>Concept:</strong> your wine/cream/gold palette, one hero number, bottom tab bar instead of the dropdown, and the protection list as cards instead of an 8-column table. Nothing here is final — it's the direction I'd take it.</p>
+</div>
+</body>
+</html>

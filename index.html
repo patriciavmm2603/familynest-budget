@@ -2555,10 +2555,10 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="Kingdom Builder">
-  <link rel="apple-touch-icon" href="/icons/kingdom-builder-icon-192.png?v=40">
-  <link rel="icon" type="image/png" sizes="192x192" href="/icons/kingdom-builder-icon-192.png?v=40">
-  <link rel="icon" type="image/png" sizes="512x512" href="/icons/kingdom-builder-icon-512.png?v=40">
-  <link rel="icon" type="image/png" sizes="32x32" href="/kingdom-builder-favicon.png?v=40">
+  <link rel="apple-touch-icon" href="/kingdom-builder-icon-192.png?v=41">
+  <link rel="icon" type="image/png" sizes="192x192" href="/kingdom-builder-icon-192.png?v=41">
+  <link rel="icon" type="image/png" sizes="512x512" href="/kingdom-builder-icon-512.png?v=41">
+  <link rel="icon" type="image/png" sizes="32x32" href="/kingdom-builder-favicon.png?v=41">
 
 
 </head>
@@ -3589,26 +3589,26 @@ function normalizeState(parsed) {
         return map[id] || ["•", label];
       }
 
+      /* Redesign: Home / Plan / Review / Money / More (More opens the sheet) */
+      const MOBILE_MORE_VIEWS = ["cashguard", "template", "debt", "income", "compare", "closeout"];
+
       function renderMobileBottomNav() {
         const node = document.querySelector("#mobileBottomNav");
         if (!node) return;
-        const quick = ["dashboard", "budget", "transactions", "allowance", "income"];
-        node.innerHTML = quick.map(id => {
-          const found = navItems.find(([view]) => view === id);
-          if (!found) return "";
-          const [icon, label] = bottomNavLabel(id, found[1]);
-          return `<button type="button" class="${state.activeView === id ? "active" : ""}" data-bottom-view="${id}"><span class="kb-nav-icon">${icon}</span><span>${escapeHtml(label)}</span></button>`;
-        }).join("");
-        node.querySelectorAll("[data-bottom-view]").forEach(btn => btn.addEventListener("click", () => {
-          const targetView = btn.dataset.bottomView;
-          if (shouldShowBibleGate(targetView)) {
-            openBibleGate(targetView);
-            return;
-          }
-          state.activeView = targetView;
-          saveState();
-          render();
-        }));
+        const tabs = [
+          { view: "dashboard", icon: "◈", label: "Home" },
+          { view: "budget", icon: "▤", label: "Plan" },
+          { view: "transactions", icon: "☰", label: "Review" },
+          { view: "allowance", icon: "♥", label: "Money" }
+        ];
+        const active = state.activeView;
+        node.innerHTML = tabs.map(t =>
+          `<button type="button" class="mtab${active === t.view ? " active" : ""}" data-mtab="${t.view}" aria-label="${t.label}"><span class="mtab-ico">${t.icon}</span><span>${escapeHtml(t.label)}</span></button>`
+        ).join("") +
+        `<button type="button" class="mtab${MOBILE_MORE_VIEWS.includes(active) ? " active" : ""}" data-mtab-more="1" aria-label="More"><span class="mtab-ico">···</span><span>More</span></button>`;
+        document.querySelectorAll(".mobile-more-sheet [data-mtab]").forEach(b => {
+          b.classList.toggle("current", b.dataset.mtab === active);
+        });
       }
 
       function renderShell() {
@@ -9338,59 +9338,8 @@ function renderCloseoutSummaryCards(report) {
         if (active && select.value !== active) select.value = active;
       }
 
-      /* Redesign: mobile bottom tab bar + More sheet */
-      const MOBILE_TABS = [
-        { view: "dashboard", label: "Home", icon: "◈" },
-        { view: "budget", label: "Plan", icon: "▤" },
-        { view: "transactions", label: "Review", icon: "☰" },
-        { view: "allowance", label: "Money", icon: "♥" },
-      ];
-      const MORE_VIEWS = ["cashguard", "template", "debt", "income", "compare", "closeout"];
-
-      function buildMobileTabs() {
-        const nav = document.getElementById("mobileBottomNav");
-        if (!nav || nav.dataset.built) return;
-        nav.dataset.built = "1";
-        MOBILE_TABS.forEach(t => {
-          const b = document.createElement("button");
-          b.type = "button";
-          b.className = "mtab";
-          b.dataset.mtab = t.view;
-          b.setAttribute("aria-label", t.label);
-          const ico = document.createElement("span");
-          ico.className = "mtab-ico";
-          ico.textContent = t.icon;
-          const lbl = document.createElement("span");
-          lbl.textContent = t.label;
-          b.appendChild(ico); b.appendChild(lbl);
-          nav.appendChild(b);
-        });
-        const more = document.createElement("button");
-        more.type = "button";
-        more.className = "mtab";
-        more.dataset.mtabMore = "1";
-        more.setAttribute("aria-label", "More");
-        const mico = document.createElement("span");
-        mico.className = "mtab-ico"; mico.textContent = "···";
-        const mlbl = document.createElement("span"); mlbl.textContent = "More";
-        more.appendChild(mico); more.appendChild(mlbl);
-        nav.appendChild(more);
-      }
-
-      function syncMobileTabs() {
-        const nav = document.getElementById("mobileBottomNav");
-        if (!nav || !nav.dataset.built) return;
-        const active = document.body.dataset.activeView || "";
-        nav.querySelectorAll(".mtab").forEach(b => {
-          const isMoreBtn = b.hasAttribute("data-mtab-more");
-          const on = isMoreBtn ? MORE_VIEWS.includes(active) : b.dataset.mtab === active;
-          b.classList.toggle("active", on);
-        });
-        document.querySelectorAll(".mobile-more-sheet [data-mtab]").forEach(b => {
-          b.classList.toggle("current", b.dataset.mtab === active);
-        });
-      }
-
+      /* Redesign: mobile bottom tab bar + More sheet wiring.
+         Tabs themselves are rendered by renderMobileBottomNav() in the main script. */
       function goMobileView(view) {
         const navButton = document.querySelector(`#nav [data-view="${view}"], [data-view="${view}"]`);
         if (navButton) navButton.click();
@@ -9407,7 +9356,6 @@ function renderCloseoutSummaryCards(report) {
         const tab = event.target.closest("#mobileBottomNav [data-mtab], .mobile-more-sheet [data-mtab]");
         if (tab) {
           goMobileView(tab.dataset.mtab);
-          setTimeout(syncMobileTabs, 120);
           return;
         }
         if (event.target.closest(".mobile-sheet-scrim")) {
@@ -9415,10 +9363,6 @@ function renderCloseoutSummaryCards(report) {
           return;
         }
       });
-
-      buildMobileTabs();
-      const syncBothMobile = function () { syncScreenSelect(); syncMobileTabs(); };
-      window.addEventListener("load", function () { setTimeout(syncBothMobile, 300); });
 
       document.addEventListener("change", function (event) {
         if (event.target && event.target.classList.contains("mobile-screen-select")) {
@@ -9459,7 +9403,7 @@ function renderCloseoutSummaryCards(report) {
         if (action === "refresh") location.reload();
       });
 
-      const observer = new MutationObserver(function () { syncScreenSelect(); syncMobileTabs(); });
+      const observer = new MutationObserver(syncScreenSelect);
       observer.observe(document.body, { attributes: true, attributeFilter: ["data-active-view"] });
       window.addEventListener("load", function () {
         setTimeout(syncScreenSelect, 250);

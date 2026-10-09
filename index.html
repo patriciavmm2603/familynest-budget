@@ -5622,11 +5622,7 @@ function renderProtectionLists(month = currentMonth(), plan = safeNextPaycheckPl
       function renderSafeNextPaycheckPlan(plan) {
         const hasPaycheck = Boolean(plan.paycheck);
         const safeBeforePay = roundMoney(Number(plan.safeToSpendBeforePaycheck ?? (plan.checking - plan.amountToKeepSafe)));
-        const payName = hasPaycheck ? escapeHtml(plan.paycheck.owner || "Income") : "No paycheck found";
         const payDate = hasPaycheck ? escapeHtml(shortMonthDay(plan.paycheck.date)) : "—";
-        const incomingHint = hasPaycheck
-          ? `${payName} ${payDate}: ${money.format(plan.paycheckAmount)}. Future money — do not treat it as available until it posts.`
-          : "No future paycheck left in this month. Use the safe-before-paycheck number.";
 
         const safeHint = safeBeforePay >= 0
           ? `Be careful: this is the max safe spending before ${payDate}.`
@@ -5647,7 +5643,6 @@ function renderProtectionLists(month = currentMonth(), plan = safeNextPaycheckPl
             </div>
 
             ${metric("Must protect before paycheck", plan.amountToKeepSafe, "Checked rows from the Money We Can't Touch Planner.", "yellow")}
-            ${metric("Next paycheck", plan.cashComingIn, incomingHint, plan.cashComingIn > 0 ? "green" : "")}
           </div>
 
           <div class="card metric kb-hero">

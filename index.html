@@ -2548,6 +2548,115 @@
         .kb-protection-row .kb-protect-day-input { max-width: 3.6rem; }
         .kb-protection-row .kb-type select { width: auto; min-height: 2.2rem; font-size: .82rem; }
       }
+
+      /* Theme catalog: explicit themes override the :root palette */
+      body[data-theme="dark-luxe"] {
+        --bg: #170f0d;
+        --ink: #F3EAD8;
+        --muted: #a89880;
+        --line: #3a2a22;
+        --card: #1f1411;
+        --card-2: #2a1c16;
+        --wine: #a05064;
+        --wine-deep: #5E1F2E;
+        --gold: #C9A24B;
+        --gold-soft: #3a2c14;
+        --green: #5aad82;
+        --green-soft: #1a3328;
+        --red: #e07060;
+        --red-soft: #3a1a15;
+        --yellow: #d4a040;
+        --yellow-soft: #2e2200;
+        --blue: #6aadcc;
+        --blue-soft: #142230;
+        --orange: #e07a30;
+        --orange-soft: #2e1800;
+        --shadow: 0 16px 40px rgba(0,0,0,.45);
+        color-scheme: dark;
+      }
+      body[data-theme="warm-minimal"] {
+        --bg: #FBF8F1;
+        --ink: #292019;
+        --muted: #8a7c68;
+        --line: #ece3d0;
+        --card: #ffffff;
+        --card-2: #f5efe2;
+        --wine: #5E1F2E;
+        --wine-deep: #471524;
+        --gold: #C9A24B;
+        --gold-soft: #f6ecd4;
+        --green: #3d7a52;
+        --green-soft: #dcebe2;
+        --red: #a9432f;
+        --red-soft: #f6e0d9;
+        --yellow: #8a6500;
+        --yellow-soft: #fff0bf;
+        --blue: #315f7a;
+        --blue-soft: #dceaf1;
+        --orange: #b85c00;
+        --orange-soft: #fde8cc;
+        --shadow: 0 10px 30px rgba(46,33,24,.06);
+        color-scheme: light;
+      }
+      body[data-theme="classic"] {
+        --bg: #f7f4ee;
+        --ink: #221f1b;
+        --muted: #6f665b;
+        --line: #ddd3c4;
+        --card: #fffdf9;
+        --card-2: #efe7da;
+        --wine: #2f6f4e;
+        --wine-deep: #1e4a34;
+        --gold: #b7861f;
+        --gold-soft: #f3ead0;
+        --green: #2f6f4e;
+        --green-soft: #d9eadf;
+        --red: #a94332;
+        --red-soft: #f5ddd8;
+        --yellow: #8a6500;
+        --yellow-soft: #fff0bf;
+        --blue: #315f7a;
+        --blue-soft: #dceaf1;
+        --orange: #b85c00;
+        --orange-soft: #fde8cc;
+        --shadow: 0 16px 40px rgba(49,39,25,.10);
+        color-scheme: light;
+      }
+      @media (prefers-color-scheme: dark) {
+        body[data-theme="classic"] {
+          --bg: #1a1917;
+          --ink: #f0ece4;
+          --muted: #a09588;
+          --line: #3a3530;
+          --card: #242019;
+          --card-2: #2e2820;
+          --wine: #5aad82;
+          --gold: #d4a040;
+          --gold-soft: #2e2200;
+        }
+      }
+
+      /* Theme picker in the More sheet */
+      .mms-theme-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+      .mms-theme-grid button {
+        display: flex; align-items: center; gap: .65rem;
+        background: var(--card-2) !important;
+        color: var(--ink) !important;
+        border: 1px solid var(--line) !important;
+        border-radius: 12px !important;
+        padding: .7rem .8rem !important;
+        font-size: .86rem !important;
+        font-weight: 700 !important;
+        cursor: pointer;
+        box-shadow: none !important;
+      }
+      .mms-theme-grid button.current { border-color: var(--wine) !important; box-shadow: 0 0 0 1px var(--wine) !important; }
+      .mms-swatches { display: flex; flex: none; }
+      .mms-swatches i {
+        width: 20px; height: 20px; border-radius: 50%;
+        border: 2px solid var(--card); margin-left: -7px;
+      }
+      .mms-swatches i:first-child { margin-left: 0; }
 </style>
   
   <link rel="manifest" href="/manifest.webmanifest">
@@ -2570,6 +2679,15 @@
   <div class="mobile-sheet-scrim" aria-hidden="true"></div>
   <div class="mobile-more-sheet" role="dialog" aria-label="More screens and tools">
     <div class="mms-handle"></div>
+    <div class="mms-group">
+      <div class="mms-title">Theme</div>
+      <div class="mms-theme-grid">
+        <button type="button" data-theme-pick="editorial"><span class="mms-swatches"><i style="background:#5E1F2E"></i><i style="background:#F8F1E5"></i><i style="background:#C9A24B"></i></span>Editorial Wine</button>
+        <button type="button" data-theme-pick="dark-luxe"><span class="mms-swatches"><i style="background:#170f0d"></i><i style="background:#C9A24B"></i><i style="background:#a05064"></i></span>Dark Luxe</button>
+        <button type="button" data-theme-pick="warm-minimal"><span class="mms-swatches"><i style="background:#FBF8F1"></i><i style="background:#5E1F2E"></i><i style="background:#ece3d0"></i></span>Warm Minimal</button>
+        <button type="button" data-theme-pick="classic"><span class="mms-swatches"><i style="background:#2f6f4e"></i><i style="background:#f7f4ee"></i><i style="background:#b7861f"></i></span>Classic</button>
+      </div>
+    </div>
     <div class="mms-group">
       <div class="mms-title">Screens</div>
       <div class="mms-grid">
@@ -3589,6 +3707,29 @@ function normalizeState(parsed) {
         return map[id] || ["•", label];
       }
 
+      /* Redesign: theme catalog */
+      const THEMES = {
+        editorial: { themeColor: "#5E1F2E" },
+        "dark-luxe": { themeColor: "#170f0d" },
+        "warm-minimal": { themeColor: "#FBF8F1" },
+        classic: { themeColor: "#2f6f4e" }
+      };
+      function currentTheme() { return THEMES[state.theme] ? state.theme : "editorial"; }
+      function applyTheme() {
+        const t = currentTheme();
+        document.body.dataset.theme = t;
+        const meta = document.querySelector('meta[name="theme-color"]');
+        if (meta && THEMES[t]) meta.setAttribute("content", THEMES[t].themeColor);
+        document.querySelectorAll("[data-theme-pick]").forEach(b => b.classList.toggle("current", b.dataset.themePick === t));
+      }
+      function setTheme(t) {
+        if (!THEMES[t]) return;
+        state.theme = t;
+        applyTheme();
+        saveState();
+        document.body.classList.remove("mobile-more-open");
+      }
+
       /* Redesign: Home / Plan / Review / Money / More (More opens the sheet) */
       const MOBILE_MORE_VIEWS = ["cashguard", "template", "debt", "income", "compare", "closeout"];
 
@@ -3613,6 +3754,7 @@ function normalizeState(parsed) {
 
       function renderShell() {
         document.body.dataset.activeView = state.activeView;
+        applyTheme();
         document.querySelector("#nav").innerHTML = navItems.map(([id, label]) =>
           `<button type="button" class="nav-btn ${state.activeView === id ? "active" : ""}" data-view="${id}">${label}</button>`
         ).join("");
@@ -9348,6 +9490,11 @@ function renderCloseoutSummaryCards(report) {
       }
 
       document.addEventListener("click", function (event) {
+        const themeBtn = event.target.closest("[data-theme-pick]");
+        if (themeBtn) {
+          setTheme(themeBtn.dataset.themePick);
+          return;
+        }
         const moreBtn = event.target.closest("[data-mtab-more]");
         if (moreBtn) {
           document.body.classList.toggle("mobile-more-open");

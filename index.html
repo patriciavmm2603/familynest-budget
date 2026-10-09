@@ -2657,6 +2657,103 @@
         border: 2px solid var(--card); margin-left: -7px;
       }
       .mms-swatches i:first-child { margin-left: 0; }
+
+      /* ============ BEAUTY PASS: unified visual system ============ */
+      /* Buttons */
+      button {
+        border: 0; border-radius: 12px; background: var(--wine); color: #fffdf8;
+        padding: .7rem 1.15rem; cursor: pointer; font-weight: 700; font-size: .92rem;
+        box-shadow: 0 2px 10px rgba(94,31,46,.20);
+        transition: transform .12s ease, box-shadow .15s ease, background .15s ease, opacity .15s ease;
+        -webkit-tap-highlight-color: transparent;
+      }
+      button:hover { transform: translateY(-1px); box-shadow: 0 5px 16px rgba(94,31,46,.26); }
+      button:active { transform: translateY(0) scale(.99); box-shadow: 0 1px 6px rgba(94,31,46,.20); }
+      button.secondary { background: var(--card); color: var(--ink); border: 1px solid var(--line); box-shadow: none; }
+      button.secondary:hover { border-color: var(--gold); box-shadow: 0 3px 10px rgba(46,33,24,.10); }
+      button.ghost { background: transparent; color: var(--ink); border: 1px solid transparent; box-shadow: none; }
+      button.ghost:hover { background: var(--card-2); box-shadow: none; transform: none; }
+      button.ghost.active { background: var(--gold-soft); border-color: var(--gold); color: var(--ink); box-shadow: none; }
+      button.danger { background: var(--red); color: #fff; box-shadow: 0 2px 10px rgba(169,67,50,.25); }
+      button.danger:hover { box-shadow: 0 5px 16px rgba(169,67,50,.32); }
+      button:disabled { opacity: .45; cursor: not-allowed; transform: none !important; box-shadow: none; }
+      button.small, .kb-mini-button { padding: .42rem .7rem !important; font-size: .8rem !important; border-radius: 9px !important; min-height: 0 !important; }
+
+      /* Inputs */
+      input, select, textarea {
+        border-radius: 12px !important;
+        padding: .7rem .8rem !important;
+        min-height: 2.6rem !important;
+        transition: border-color .15s ease, box-shadow .15s ease;
+      }
+      input:focus, select:focus, textarea:focus {
+        outline: none !important; border-color: var(--gold) !important;
+        box-shadow: 0 0 0 3px var(--gold-soft) !important;
+      }
+      input[type="checkbox"] { accent-color: var(--wine); width: 1.15rem; height: 1.15rem; }
+
+      /* Cards */
+      .card { border-radius: 16px !important; padding: 1.15rem !important; }
+      .cards { gap: 1rem !important; }
+
+      /* Tables */
+      .table-wrap { border-radius: 14px !important; overflow: auto; }
+      th {
+        font-family: Oswald, "Arial Narrow", sans-serif; font-weight: 600;
+        letter-spacing: .1em; font-size: .72rem !important;
+        background: var(--card-2) !important; color: var(--muted) !important;
+      }
+      td { padding: .75rem .85rem !important; }
+      tbody tr { transition: background .12s ease; }
+      tbody tr:hover { background: var(--card-2); }
+
+      /* Pills */
+      .pill { border-radius: 999px !important; padding: .28rem .7rem !important; font-size: .72rem !important; font-weight: 700 !important; letter-spacing: .02em; }
+      .pill.green { background: var(--green-soft); color: var(--green); border: 1px solid var(--green); }
+      .pill.red { background: var(--red-soft); color: var(--red); border: 1px solid var(--red); }
+      .pill.blue { background: var(--blue-soft); color: var(--blue); border: 1px solid var(--blue); }
+      .pill.yellow { background: var(--yellow-soft); color: var(--yellow); border: 1px solid var(--yellow); }
+
+      /* Banners */
+      .banner { border-radius: 14px !important; padding: 1rem 1.15rem !important; border-width: 1px; }
+
+      /* Modal base (used by the pretty confirm/alert system) */
+      .kb-modal-scrim {
+        position: fixed; inset: 0; z-index: 4000;
+        background: rgba(46,33,24,.5);
+        display: flex; align-items: center; justify-content: center; padding: 1.25rem;
+        opacity: 0; transition: opacity .18s ease;
+      }
+      .kb-modal-scrim.show { opacity: 1; }
+      .kb-modal {
+        background: var(--card); color: var(--ink);
+        border: 1px solid var(--line); border-radius: 20px;
+        box-shadow: 0 24px 60px rgba(46,33,24,.3);
+        padding: 1.5rem; width: 100%; max-width: 26rem;
+        transform: translateY(10px) scale(.98); transition: transform .18s ease;
+      }
+      .kb-modal-scrim.show .kb-modal { transform: none; }
+      .kb-modal h3 { font-family: Oswald, "Arial Narrow", sans-serif; font-size: 1.05rem; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; margin: 0 0 .6rem; }
+      .kb-modal p { margin: 0 0 1.25rem; color: var(--muted); font-size: .92rem; line-height: 1.55; }
+      .kb-modal-actions { display: flex; gap: .7rem; justify-content: flex-end; }
+      .kb-modal-actions button { flex: 1; }
+      .kb-modal-prompt-input { margin-bottom: 1.25rem; }
+
+      /* Toast */
+      .kb-toast-wrap {
+        position: fixed; left: 50%; bottom: calc(96px + env(safe-area-inset-bottom)); z-index: 4100;
+        transform: translateX(-50%) translateY(16px); opacity: 0; pointer-events: none;
+        transition: opacity .2s ease, transform .2s ease;
+        width: max-content; max-width: calc(100vw - 2.5rem);
+      }
+      .kb-toast-wrap.show { opacity: 1; transform: translateX(-50%); }
+      .kb-toast {
+        background: var(--ink); color: var(--bg);
+        border-radius: 14px; padding: .85rem 1.2rem;
+        font-size: .9rem; font-weight: 600;
+        box-shadow: 0 12px 32px rgba(46,33,24,.35);
+        text-align: center;
+      }
 </style>
   
   <link rel="manifest" href="/manifest.webmanifest">
@@ -3160,7 +3257,7 @@
           } else {
             setStorageStatus("Cloud paused", "Supabase returned malformed data. Cloud save is paused to protect shared data.");
           }
-          alert("Kingdom Builder stopped cloud saving to protect your data. Supabase returned a shared row, but it did not contain a valid state.months object. I did NOT overwrite it with seed/demo data.");
+          kbAlertModal("Kingdom Builder stopped cloud saving to protect your data. Supabase returned a shared row, but it did not contain a valid state.months object. I did NOT overwrite it with seed/demo data.");
         } catch (err) {
           cloudReady = false;
           const local = loadLocalState();
@@ -3170,7 +3267,7 @@
           } else {
             setStorageStatus("Setup needed", "Could not load Supabase and no local backup was found. " + (err.message || err));
           }
-          alert("Kingdom Builder shared storage could not load. I did NOT overwrite Supabase. Cloud saving is paused until this is fixed.\n\n" + (err.message || err));
+          kbAlertModal("Kingdom Builder shared storage could not load. I did NOT overwrite Supabase. Cloud saving is paused until this is fixed.\n\n" + (err.message || err));
         }
       }
 
@@ -3541,14 +3638,14 @@ function normalizeState(parsed) {
         }
       }
 
-      function deleteSideGigLine(gigId) {
+      async function deleteSideGigLine(gigId) {
         const month = currentMonth();
         const row = (month.sideGigs || []).find(gig => gig.id === gigId);
         if (!row) return;
         const key = sideGigKeyFromRowOrTxn(row);
         const txn = transactionForSideGig(month, row);
         const linkedText = txn ? "\n\nThe bank transaction will stay in CSV Review and will be marked as Other Income, not Side Hustle." : "";
-        if (!confirm("Remove this side hustle line from PayPal/side hustle totals?" + linkedText)) return;
+        if (!await kbConfirmDelete("Remove this side hustle line from PayPal/side hustle totals?" + linkedText)) return;
         if (key) addSideGigExclusion(month, key);
         if (txn && !isIgnoredTransaction(txn)) markTransactionNotSideHustle(txn);
         month.sideGigs = (month.sideGigs || []).filter(gig => gig.id !== gigId);
@@ -3728,6 +3825,69 @@ function normalizeState(parsed) {
         applyTheme();
         saveState();
         document.body.classList.remove("mobile-more-open");
+      }
+
+      /* Beauty pass: pretty dialogs replacing native confirm/alert/prompt */
+      function kbModal({ title, body, okText = "OK", cancelText = null, inputValue = null }) {
+        return new Promise(resolve => {
+          const scrim = document.createElement("div");
+          scrim.className = "kb-modal-scrim";
+          const inputHtml = inputValue !== null
+            ? `<input class="kb-modal-prompt-input" type="text" value="${escapeHtml(inputValue ?? "")}">`
+            : "";
+          scrim.innerHTML = `<div class="kb-modal" role="dialog" aria-modal="true">`
+            + (title ? `<h3>${escapeHtml(title)}</h3>` : "")
+            + (body ? `<p>${escapeHtml(body)}</p>` : "")
+            + inputHtml
+            + `<div class="kb-modal-actions">`
+            + (cancelText ? `<button type="button" class="secondary" data-kb-cancel>${escapeHtml(cancelText)}</button>` : "")
+            + `<button type="button" data-kb-ok>${escapeHtml(okText)}</button>`
+            + `</div></div>`;
+          document.body.appendChild(scrim);
+          requestAnimationFrame(() => scrim.classList.add("show"));
+          const done = (val) => {
+            scrim.classList.remove("show");
+            setTimeout(() => scrim.remove(), 200);
+            resolve(val);
+          };
+          scrim.querySelector("[data-kb-ok]").addEventListener("click", () => {
+            const inp = scrim.querySelector(".kb-modal-prompt-input");
+            done(inputValue !== null ? (inp ? inp.value : "") : true);
+          });
+          const cancelBtn = scrim.querySelector("[data-kb-cancel]");
+          if (cancelBtn) cancelBtn.addEventListener("click", () => done(inputValue !== null ? null : false));
+          scrim.addEventListener("click", (e) => { if (e.target === scrim) done(inputValue !== null ? null : false); });
+          const onKey = (e) => { if (e.key === "Escape") { document.removeEventListener("keydown", onKey); done(inputValue !== null ? null : false); } };
+          document.addEventListener("keydown", onKey);
+          const focusEl = scrim.querySelector(".kb-modal-prompt-input") || scrim.querySelector("[data-kb-ok]");
+          if (focusEl) setTimeout(() => focusEl.focus(), 80);
+        });
+      }
+      function kbConfirm(message, okText) {
+        return kbModal({ title: "Are you sure?", body: message, okText: okText || "Yes, continue", cancelText: "Cancel" });
+      }
+      function kbConfirmDelete(message) {
+        return kbModal({ title: "Delete this?", body: message, okText: "Delete", cancelText: "Keep" });
+      }
+      function kbAlertModal(message) {
+        return kbModal({ title: "Heads up", body: message, okText: "OK" });
+      }
+      let kbToastTimer = null;
+      function kbToast(message) {
+        let wrap = document.querySelector(".kb-toast-wrap");
+        if (!wrap) {
+          wrap = document.createElement("div");
+          wrap.className = "kb-toast-wrap";
+          wrap.innerHTML = `<div class="kb-toast"></div>`;
+          document.body.appendChild(wrap);
+        }
+        wrap.querySelector(".kb-toast").textContent = String(message ?? "");
+        wrap.classList.add("show");
+        clearTimeout(kbToastTimer);
+        kbToastTimer = setTimeout(() => wrap.classList.remove("show"), 2600);
+      }
+      function kbPrompt(message, defaultValue) {
+        return kbModal({ title: "Enter a value", body: message, okText: "Save", cancelText: "Cancel", inputValue: defaultValue ?? "" });
       }
 
       /* Redesign: Home / Plan / Review / Money / More (More opens the sheet) */
@@ -4928,15 +5088,15 @@ function billLineName(line) {
           .filter(row => row.amountLeft > 0.005 || row.ignored);
       }
 
-      function addManualProtectionLine() {
+      async function addManualProtectionLine() {
         const month = currentMonth();
         const settings = ensureMonthlyProtectionSettings(month);
-        const name = window.prompt("What do you need to protect?");
+        const name = await kbPrompt("What do you need to protect?");
         if (!name) return;
-        const amountRaw = window.prompt("Amount to protect?");
+        const amountRaw = await kbPrompt("Amount to protect?", "");
         const amount = Number(amountRaw);
         if (!Number.isFinite(amount) || amount <= 0) {
-          window.alert("Enter a valid amount.");
+          kbToast("Enter a valid amount.");
           return;
         }
         settings.manualLines.push({ id: `manual-${Date.now()}`, name: name.trim(), amount, expenseType: "Flexible", ignore: false });
@@ -4973,7 +5133,7 @@ function billLineName(line) {
         if (!row) return;
         if (field === "amount") {
           const amount = Number(value);
-          if (!Number.isFinite(amount) || amount < 0) return alert("Enter a valid amount.");
+          if (!Number.isFinite(amount) || amount < 0) return kbToast("Enter a valid amount.");
           row.amount = amount;
         }
         if (field === "ignore") row.ignore = Boolean(value);
@@ -4982,12 +5142,12 @@ function billLineName(line) {
         renderDashboard();
       }
 
-      function deleteManualProtectionLine(id) {
+      async function deleteManualProtectionLine(id) {
         const month = currentMonth();
         const settings = ensureMonthlyProtectionSettings(month);
         const row = settings.manualLines.find(item => item.id === id);
         if (!row) return;
-        if (!confirm(`Remove "${row.name || "manual protection line"}"?`)) return;
+        if (!await kbConfirmDelete(`Remove "${row.name || "manual protection line"}"?`)) return;
         settings.manualLines = settings.manualLines.filter(item => item.id !== id);
         saveState();
         renderDashboard();
@@ -5885,8 +6045,8 @@ function renderProtectionLists(month = currentMonth(), plan = safeNextPaycheckPl
         document.querySelectorAll("[data-template-action='copyCurrent']").forEach(btn => btn.addEventListener("click", saveCurrentMonthAsTemplate));
       }
 
-      function saveCurrentMonthAsTemplate() {
-        if (!confirm("Replace the Base Template with the current month's budget lines? Existing months will not change.")) return;
+      async function saveCurrentMonthAsTemplate() {
+        if (!await kbConfirm("Replace the Base Template with the current month's budget lines? Existing months will not change.")) return;
         state.baseTemplate = buildBaseTemplateFromMonth(currentMonth());
         state.baseTemplate.lastEdited = new Date().toISOString();
         render();
@@ -6075,9 +6235,9 @@ function renderProtectionLists(month = currentMonth(), plan = safeNextPaycheckPl
         document.querySelectorAll("[data-action='clearBudgetFilters']").forEach(btn => btn.addEventListener("click", () => { clearBudgetFilters(); renderBudget(); saveState(); }));
         document.querySelectorAll("[data-template-action='copyCurrent']").forEach(btn => btn.addEventListener("click", saveCurrentMonthAsTemplate));
         document.querySelectorAll("[data-action='createMonth']").forEach(btn => btn.addEventListener("click", openCreateMonthModal));
-        document.querySelector("[data-action='resetJune']")?.addEventListener("click", () => {
-          if (state.activeMonth !== "2026-06") return alert("Switch to June first if you want to reset June.");
-          if (!confirm("Reset June budget lines back to the spreadsheet template?")) return;
+        document.querySelector("[data-action='resetJune']")?.addEventListener("click", async () => {
+          if (state.activeMonth !== "2026-06") return kbToast("Switch to June first if you want to reset June.");
+          if (!await kbConfirm("Reset June budget lines back to the spreadsheet template?")) return;
           currentMonth().budgetLines = juneTemplate.map(line => ({ ...line, id: uid("bill"), paycheckId: defaultPaycheckId(line) }));
           render();
         });
@@ -6165,8 +6325,8 @@ function renderProtectionLists(month = currentMonth(), plan = safeNextPaycheckPl
           closeModal(); render(); saveState();
         });
         const deleteBtn = document.querySelector("#deleteBudget");
-        if (deleteBtn) deleteBtn.addEventListener("click", () => {
-          if (!confirm("Delete this budget line?")) return;
+        if (deleteBtn) deleteBtn.addEventListener("click", async () => {
+          if (!await kbConfirmDelete("Delete this budget line?")) return;
           const index = targetLines.findIndex(item => item.id === value.id);
           if (index >= 0) targetLines.splice(index, 1);
           if (context === "template") state.baseTemplate.lastEdited = new Date().toISOString();
@@ -6270,11 +6430,11 @@ function renderProtectionLists(month = currentMonth(), plan = safeNextPaycheckPl
         document.querySelector("[name='transactionCategoryFilter']").addEventListener("change", event => { state.transactionCategoryFilter = event.target.value; state.selectedTransactionIds = []; renderTransactions(); saveState(); });
         document.querySelector("[name='transactionSort']").addEventListener("change", event => { state.transactionSort = event.target.value; renderTransactions(); saveState(); });
         document.querySelector("#clearTxnFilters").addEventListener("click", () => { state.transactionSearch = ""; state.transactionFilter = "All"; state.transactionCategoryFilter = "All"; state.transactionSort = "Date newest"; state.selectedTransactionIds = []; renderTransactions(); saveState(); });
-        document.querySelector("#applyBulkTxn").addEventListener("click", () => { const visible = filteredTransactions(month); if (!visible.length) return alert("No visible transactions."); if (!confirm("Update " + visible.length + " visible transactions?")) return; applyBulkTransactionUpdate(month, visible); });
-        document.querySelector("#applyBulkSelectedTxn").addEventListener("click", () => { const selected = selectedTransactions(month); if (!selected.length) return alert("Select one or more transactions first."); if (!confirm("Update " + selected.length + " selected transactions?")) return; applyBulkTransactionUpdate(month, selected); });
-        document.querySelector("#markSelectedPersonal").addEventListener("click", () => { const selected = selectedTransactions(month).filter(txn => !isIgnoredTransaction(txn)); if (!selected.length) return alert("Select active transactions first."); if (!confirm("Mark " + selected.length + " selected as Personal?")) return; markTransactionsPersonal(month, selected); });
-        document.querySelector("#ignoreSelectedTxn").addEventListener("click", () => { const selected = selectedTransactions(month).filter(txn => !isIgnoredTransaction(txn)); if (!selected.length) return alert("Select active transactions first."); const reason = prompt("Why ignore these lines?", "Statement overlap / already handled in another month") || "Ignored / excluded from this month"; if (!confirm("Ignore " + selected.length + " selected transactions? They will stay saved but stop counting in review/totals.")) return; ignoreTransactions(month, selected, reason); renderTransactions(); });
-        document.querySelector("#restoreSelectedTxn").addEventListener("click", () => { const selected = selectedTransactions(month).filter(isIgnoredTransaction); if (!selected.length) return alert("Select ignored transactions first."); if (!confirm("Restore " + selected.length + " ignored transactions?")) return; restoreIgnoredTransactions(selected); renderTransactions(); });
+        document.querySelector("#applyBulkTxn").addEventListener("click", async () => { const visible = filteredTransactions(month); if (!visible.length) return kbToast("No visible transactions."); if (!await kbConfirm("Update " + visible.length + " visible transactions?")) return; applyBulkTransactionUpdate(month, visible); });
+        document.querySelector("#applyBulkSelectedTxn").addEventListener("click", async () => { const selected = selectedTransactions(month); if (!selected.length) return kbToast("Select one or more transactions first."); if (!await kbConfirm("Update " + selected.length + " selected transactions?")) return; applyBulkTransactionUpdate(month, selected); });
+        document.querySelector("#markSelectedPersonal").addEventListener("click", async () => { const selected = selectedTransactions(month).filter(txn => !isIgnoredTransaction(txn)); if (!selected.length) return kbToast("Select active transactions first."); if (!await kbConfirm("Mark " + selected.length + " selected as Personal?")) return; markTransactionsPersonal(month, selected); });
+        document.querySelector("#ignoreSelectedTxn").addEventListener("click", async () => { const selected = selectedTransactions(month).filter(txn => !isIgnoredTransaction(txn)); if (!selected.length) return kbToast("Select active transactions first."); const reason = (await kbPrompt("Why ignore these lines?", "Statement overlap / already handled in another month")) || "Ignored / excluded from this month"; if (!await kbConfirm("Ignore " + selected.length + " selected transactions? They will stay saved but stop counting in review/totals.")) return; ignoreTransactions(month, selected, reason); renderTransactions(); });
+        document.querySelector("#restoreSelectedTxn").addEventListener("click", async () => { const selected = selectedTransactions(month).filter(isIgnoredTransaction); if (!selected.length) return kbToast("Select ignored transactions first."); if (!await kbConfirm("Restore " + selected.length + " ignored transactions?")) return; restoreIgnoredTransactions(selected); renderTransactions(); });
         document.querySelector("#selectVisibleTxn").addEventListener("click", () => { const ids = new Set(state.selectedTransactionIds || []); rows.forEach(txn => ids.add(txn.id)); state.selectedTransactionIds = [...ids]; renderTransactions(); saveState(); });
         document.querySelector("#clearSelectedTxn").addEventListener("click", () => { state.selectedTransactionIds = []; renderTransactions(); saveState(); });
         const toggleVisible = document.querySelector("#toggleVisibleTxn");
@@ -6292,7 +6452,7 @@ function renderProtectionLists(month = currentMonth(), plan = safeNextPaycheckPl
           saveState();
         }));
         document.querySelectorAll("[data-edit-txn]").forEach(btn => btn.addEventListener("click", () => openTransactionModal(month.transactions.find(txn => txn.id === btn.dataset.editTxn))));
-        document.querySelectorAll("[data-ignore-txn]").forEach(btn => btn.addEventListener("click", () => { const txn = month.transactions.find(item => item.id === btn.dataset.ignoreTxn); if (!txn) return; const reason = prompt("Why ignore this line?", "Statement overlap / already handled in another month") || "Ignored / excluded from this month"; ignoreTransaction(month, txn, reason); renderTransactions(); saveState(); }));
+        document.querySelectorAll("[data-ignore-txn]").forEach(btn => btn.addEventListener("click", async () => { const txn = month.transactions.find(item => item.id === btn.dataset.ignoreTxn); if (!txn) return; const reason = (await kbPrompt("Why ignore this line?", "Statement overlap / already handled in another month")) || "Ignored / excluded from this month"; ignoreTransaction(month, txn, reason); renderTransactions(); saveState(); }));
         document.querySelectorAll("[data-restore-txn]").forEach(btn => btn.addEventListener("click", () => { const txn = month.transactions.find(item => item.id === btn.dataset.restoreTxn); if (!txn) return; restoreIgnoredTransaction(txn); renderTransactions(); saveState(); }));
         document.querySelectorAll("[data-split-personal]").forEach(btn => btn.addEventListener("click", () => openPersonalSplitModal(month.transactions.find(txn => txn.id === btn.dataset.splitPersonal))));
       }
@@ -6746,8 +6906,8 @@ function renderProtectionLists(month = currentMonth(), plan = safeNextPaycheckPl
           if (suggestion.owner) form.elements.owner.value = suggestion.owner;
         });
         const deleteBtn = document.querySelector("#deleteTxn");
-        if (deleteBtn) deleteBtn.addEventListener("click", () => {
-          if (!confirm("Delete this transaction?")) return;
+        if (deleteBtn) deleteBtn.addEventListener("click", async () => {
+          if (!await kbConfirmDelete("Delete this transaction?")) return;
           const reviewState = captureTransactionReviewState("");
           currentMonth().transactions = currentMonth().transactions.filter(item => item.id !== value.id);
           closeModal(); render(); restoreTransactionReviewState(reviewState); saveState();
@@ -6885,7 +7045,7 @@ function renderProtectionLists(month = currentMonth(), plan = safeNextPaycheckPl
       function openPersonalSplitModal(txn) {
         if (!txn) return;
         if (!isPersonalTransaction(txn)) {
-          alert("This split tool only works for reconciled transactions categorized as Personal.");
+          kbToast("This split tool only works for reconciled transactions categorized as Personal.");
           return;
         }
         const amount = Math.abs(Number(txn.amount || 0));
@@ -6940,8 +7100,8 @@ function renderProtectionLists(month = currentMonth(), plan = safeNextPaycheckPl
           const pat = Math.round(Number(patInput.value || 0) * 100) / 100;
           const alec = Math.round(Number(alecInput.value || 0) * 100) / 100;
           const total = Math.round((pat + alec) * 100) / 100;
-          if (pat < 0 || alec < 0) return alert("Split amounts cannot be negative.");
-          if (Math.abs(total - amount) >= 0.01) return alert("The split must add up to " + money.format(amount) + ".");
+          if (pat < 0 || alec < 0) return kbToast("Split amounts cannot be negative.");
+          if (Math.abs(total - amount) >= 0.01) return kbToast("The split must add up to " + money.format(amount) + ".");
           txn.personalSplit = { Patricia: pat, Alec: alec };
           txn.owner = "Split";
           txn.category = "Personal";
@@ -7243,9 +7403,9 @@ function renderProtectionLists(month = currentMonth(), plan = safeNextPaycheckPl
         document.querySelectorAll("[data-delete-income]").forEach(btn => btn.addEventListener("click", () => deleteIncomeLine(btn.dataset.deleteIncome)));
         document.querySelector("#addQuarterlyIncome")?.addEventListener("click", () => openQuarterlyIncomeModal());
         document.querySelectorAll("[data-edit-quarterly-income]").forEach(btn => btn.addEventListener("click", () => openQuarterlyIncomeModal(state.quarterlyIncome.find(row => row.id === btn.dataset.editQuarterlyIncome))));
-        document.querySelectorAll("[data-move-quarterly-income]").forEach(btn => btn.addEventListener("click", () => {
+        document.querySelectorAll("[data-move-quarterly-income]").forEach(btn => btn.addEventListener("click", async () => {
           const row = state.quarterlyIncome.find(item => item.id === btn.dataset.moveQuarterlyIncome);
-          if (row && confirm("Move this line to Reliable income so it counts every month?")) moveQuarterlyIncomeToReliable(row);
+          if (row && await kbConfirm("Move this line to Reliable income so it counts every month?")) moveQuarterlyIncomeToReliable(row);
         }));
         document.querySelector("#addPaycheck").addEventListener("click", () => openPaycheckModal());
         document.querySelectorAll("[data-edit-paycheck]").forEach(btn => btn.addEventListener("click", () => openPaycheckModal(month.paychecks.find(row => row.id === btn.dataset.editPaycheck))));
@@ -7305,8 +7465,8 @@ function renderProtectionLists(month = currentMonth(), plan = safeNextPaycheckPl
           }
           closeModal(); render(); saveState();
         });
-        document.querySelector("#deleteQuarterlyIncome")?.addEventListener("click", () => {
-          if (!confirm("Delete this quarterly money line?")) return;
+        document.querySelector("#deleteQuarterlyIncome")?.addEventListener("click", async () => {
+          if (!await kbConfirmDelete("Delete this quarterly money line?")) return;
           state.quarterlyIncome = state.quarterlyIncome.filter(item => item.id !== value.id);
           closeModal(); render(); saveState();
         });
@@ -7329,10 +7489,10 @@ function renderProtectionLists(month = currentMonth(), plan = safeNextPaycheckPl
         document.querySelector("#deleteIncomeFromModal")?.addEventListener("click", () => deleteIncomeLine(value.id));
       }
 
-            function deleteIncomeLine(id) {
+            async function deleteIncomeLine(id) {
         const row = state.incomes.find(item => item.id === id);
         if (!row) return;
-        if (!confirm("Delete this reliable income line?")) return;
+        if (!await kbConfirmDelete("Delete this reliable income line?")) return;
         state.incomes = state.incomes.filter(item => item.id !== id);
         closeModal(); render(); saveState();
       }
@@ -9089,7 +9249,7 @@ function renderCloseoutSummaryCards(report) {
 
         document.querySelector("#saveCloseoutDraft").addEventListener("click", () => {
           saveDraft();
-          alert("Closeout draft saved with current Remaining amounts.");
+          kbToast("Closeout draft saved with current Remaining amounts.");
           renderCloseout();
         });
 
@@ -9108,15 +9268,15 @@ function renderCloseoutSummaryCards(report) {
           renderCloseout();
         }));
 
-        document.querySelector("#saveFinalCloseout").addEventListener("click", () => {
+        document.querySelector("#saveFinalCloseout").addEventListener("click", async () => {
           saveDraft();
-          if (!closeoutComplete(month)) return alert("Check all closeout items first.");
+          if (!closeoutComplete(month)) return kbToast("Check all closeout items first.");
           const reportNow = buildCloseoutReport(month);
           const flags = reportNow.plannedActual?.reviewFlags || [];
           const coverageIssues = reportNow.transactionCoverage?.unplacedCount || 0;
           const flagText = flags.length ? `\n\n${flags.length} planned-vs-actual review flag${flags.length === 1 ? "" : "s"} will be saved in the report. Review them before locking if needed.` : "";
           const coverageText = coverageIssues ? `\n\n${coverageIssues} transaction coverage issue${coverageIssues === 1 ? "" : "s"} remain. These should be reviewed before final close.` : "";
-          if (!confirm(`Save the final closeout report and close remaining ${month.label || "month"} lines using the selected actions?` + flagText + coverageText)) return;
+          if (!await kbConfirm(`Save the final closeout report and close remaining ${month.label || "month"} lines using the selected actions?` + flagText + coverageText)) return;
           finalizeCloseoutReport(month);
           render();
         });
@@ -9127,7 +9287,7 @@ function renderCloseoutSummaryCards(report) {
         });
 
         document.querySelector("#copyNextFromCloseout").addEventListener("click", () => {
-          if (!month.closeoutReport) return alert("Save the final closeout report first.");
+          if (!month.closeoutReport) return kbToast("Save the final closeout report first.");
           createMonthFromSource(nextMonthKey(state.activeMonth), "__baseTemplate");
         });
       }
@@ -9275,8 +9435,8 @@ function renderCloseoutSummaryCards(report) {
           if (editing) Object.assign(value, next); else state.quarterlyExpenses.push(next);
           closeModal(); render(); saveState();
         });
-        document.querySelector("#deleteQuarterlyExpense")?.addEventListener("click", () => {
-          if (!confirm("Delete this quarterly expense?")) return;
+        document.querySelector("#deleteQuarterlyExpense")?.addEventListener("click", async () => {
+          if (!await kbConfirmDelete("Delete this quarterly expense?")) return;
           state.quarterlyExpenses = state.quarterlyExpenses.filter(item => item.id !== value.id);
           closeModal(); render(); saveState();
         });
@@ -9350,12 +9510,12 @@ function renderCloseoutSummaryCards(report) {
         document.querySelector("#modalBody").innerHTML = "";
       }
 
-      function deleteActiveMonth() {
+      async function deleteActiveMonth() {
         const keys = monthOptions();
-        if (keys.length <= 1) { alert("You need at least one month. Create another month before deleting this one."); return; }
-        if (isClosedMonth()) { alert("Closed months are preserved as history and cannot be deleted."); return; }
+        if (keys.length <= 1) { kbToast("You need at least one month. Create another month before deleting this one."); return; }
+        if (isClosedMonth()) { kbToast("Closed months are preserved as history and cannot be deleted."); return; }
         const label = currentMonth().label || state.activeMonth;
-        if (!confirm("Delete " + label + "? Your Base Template and other months stay safe.")) return;
+        if (!await kbConfirmDelete("Delete " + label + "? Your Base Template and other months stay safe.")) return;
         delete state.months[state.activeMonth];
         state.activeMonth = monthOptions()[0];
         state.safetyAssumePaidBillIds = [];
@@ -9387,9 +9547,9 @@ function renderCloseoutSummaryCards(report) {
 
       function createMonthFromSource(targetKey, sourceKey) {
         const next = String(targetKey||"").slice(0,7);
-        if (!/^\d{4}-\d{2}$/.test(next)) return alert("Use YYYY-MM, like 2026-07.");
+        if (!/^\d{4}-\d{2}$/.test(next)) return kbToast("Use YYYY-MM, like 2026-07.");
         const source = state.baseTemplate;
-        if (state.months[next]) return alert("That month already exists. Kingdom Builder will not replace its saved data.");
+        if (state.months[next]) return kbToast("That month already exists. Kingdom Builder will not replace its saved data.");
         const label = new Date(next+"-02T00:00:00").toLocaleDateString("en-US", { month: "long", year: "numeric" });
         state.months[next] = {
           label,
@@ -9446,15 +9606,15 @@ function renderCloseoutSummaryCards(report) {
         const file = event.target.files[0];
         if (!file) return;
         const reader = new FileReader();
-        reader.onload = () => {
+        reader.onload = async () => {
           try {
             const imported = JSON.parse(String(reader.result||""));
             if (!imported.months || typeof imported.months !== "object" || Array.isArray(imported.months)) throw new Error("Missing months");
             const monthKeys = Object.keys(imported.months);
             if (!monthKeys.length || monthKeys.some(key => !/^\d{4}-\d{2}$/.test(key) || !imported.months[key] || typeof imported.months[key] !== "object")) throw new Error("Invalid months");
-            if (!confirm(`Import this backup with ${monthKeys.length} saved month${monthKeys.length === 1 ? "" : "s"}? This replaces the current shared app state.`)) { event.target.value = ""; return; }
+            if (!await kbConfirm(`Import this backup with ${monthKeys.length} saved month${monthKeys.length === 1 ? "" : "s"}? This replaces the current shared app state.`, "Import")) { event.target.value = ""; return; }
             state = normalizeState(imported); saveState(); render();
-          } catch { alert("That backup file could not be read."); }
+          } catch { kbToast("That backup file could not be read."); }
           event.target.value = "";
         };
         reader.readAsText(file);

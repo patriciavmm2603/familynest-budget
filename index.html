@@ -2754,6 +2754,30 @@
         box-shadow: 0 12px 32px rgba(46,33,24,.35);
         text-align: center;
       }
+
+      /* Info bubbles: notes live behind an (i) tap, not on the screen */
+      .metric .label { display: flex; align-items: center; }
+      .kb-info-btn {
+        width: 1.3rem; height: 1.3rem; border-radius: 50% !important;
+        background: var(--card-2) !important; color: var(--muted) !important;
+        border: 1px solid var(--line) !important;
+        font-size: .72rem !important; font-weight: 800 !important; font-style: italic;
+        font-family: Georgia, "Times New Roman", serif !important;
+        padding: 0 !important; min-height: 0 !important; box-shadow: none !important;
+        display: inline-flex !important; align-items: center; justify-content: center;
+        margin-left: .45rem; vertical-align: middle; cursor: pointer; flex: none;
+      }
+      .kb-info-btn:hover { border-color: var(--gold) !important; color: var(--wine) !important; transform: none !important; box-shadow: none !important; }
+      .kb-info-bubble {
+        position: fixed; z-index: 4200; max-width: 18rem;
+        background: var(--ink); color: var(--bg);
+        border-radius: 12px; padding: .8rem 1rem;
+        font-size: .85rem; line-height: 1.5; font-weight: 500;
+        box-shadow: 0 12px 32px rgba(46,33,24,.35);
+        opacity: 0; transform: translateY(6px); pointer-events: none;
+        transition: opacity .15s ease, transform .15s ease;
+      }
+      .kb-info-bubble.show { opacity: 1; transform: none; }
 </style>
   
   <link rel="manifest" href="/manifest.webmanifest">
@@ -3890,6 +3914,61 @@ function normalizeState(parsed) {
         return kbModal({ title: "Enter a value", body: message, okText: "Save", cancelText: "Cancel", inputValue: defaultValue ?? "" });
       }
 
+      /* Beauty pass: metric hints become (i) info bubbles instead of on-screen notes */
+      let kbInfoBubbleEl = null;
+      function kbHideInfoBubble() {
+        if (kbInfoBubbleEl) kbInfoBubbleEl.classList.remove("show");
+      }
+      function kbInfoBubbles() {
+        document.querySelectorAll(".card.metric").forEach(card => {
+          const hint = card.querySelector(":scope > .hint");
+          const label = card.querySelector(":scope > .label");
+          if (!hint || !label || hint.dataset.kbDone) return;
+          hint.dataset.kbDone = "1";
+          const text = (hint.textContent || "").trim();
+          if (text) {
+            const btn = document.createElement("button");
+            btn.type = "button";
+            btn.className = "kb-info-btn";
+            btn.dataset.kbInfo = text;
+            btn.setAttribute("aria-label", "About this number");
+            btn.textContent = "i";
+            label.appendChild(btn);
+          }
+          hint.remove();
+        });
+      }
+      document.addEventListener("click", (e) => {
+        const btn = e.target.closest("[data-kb-info]");
+        if (!btn) { kbHideInfoBubble(); return; }
+        e.stopPropagation();
+        if (!kbInfoBubbleEl) {
+          kbInfoBubbleEl = document.createElement("div");
+          kbInfoBubbleEl.className = "kb-info-bubble";
+          kbInfoBubbleEl.setAttribute("role", "note");
+          document.body.appendChild(kbInfoBubbleEl);
+        }
+        if (kbInfoBubbleEl.classList.contains("show") && kbInfoBubbleEl.dataset.for === btn.dataset.kbInfo) {
+          kbHideInfoBubble();
+          return;
+        }
+        kbInfoBubbleEl.dataset.for = btn.dataset.kbInfo;
+        kbInfoBubbleEl.textContent = btn.dataset.kbInfo;
+        const bw = Math.min(288, window.innerWidth - 32);
+        kbInfoBubbleEl.style.maxWidth = bw + "px";
+        kbInfoBubbleEl.style.visibility = "hidden";
+        kbInfoBubbleEl.classList.add("show");
+        const bh = kbInfoBubbleEl.offsetHeight || 60;
+        const r = btn.getBoundingClientRect();
+        let top = r.top - bh - 10;
+        if (top < 8) top = r.bottom + 10;
+        let left = r.left + r.width / 2 - bw / 2;
+        left = Math.max(16, Math.min(left, window.innerWidth - bw - 16));
+        kbInfoBubbleEl.style.top = top + "px";
+        kbInfoBubbleEl.style.left = left + "px";
+        kbInfoBubbleEl.style.visibility = "";
+      });
+
       /* Redesign: Home / Plan / Review / Money / More (More opens the sheet) */
       const MOBILE_MORE_VIEWS = ["cashguard", "template", "debt", "income", "compare", "closeout"];
 
@@ -3978,6 +4057,7 @@ function normalizeState(parsed) {
         renderIncome();
         renderCompare();
         renderCloseout();
+        kbInfoBubbles();
         if (closedMonthSnapshot && state.months?.[renderedMonthKey]) state.months[renderedMonthKey] = JSON.parse(closedMonthSnapshot);
         lockClosedMonthControls();
         kbV121DashboardEmptyGuard();

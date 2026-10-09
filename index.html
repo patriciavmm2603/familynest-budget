@@ -2131,6 +2131,14 @@
         padding: .25rem .5rem;
         border-radius: .65rem;
       }
+      .kb-protect-amount-static {
+        display: inline-block;
+        width: 100%;
+        min-height: 2.15rem;
+        line-height: 2.15rem;
+        font-weight: 800;
+        white-space: nowrap;
+      }
       .kb-money-num,
       .kb-protect-edit,
       .kb-ignore,
@@ -4653,10 +4661,15 @@ function renderProtectionControls(row) {
         if (!row.controlKey) return { countInput: `<input type="checkbox" disabled ${row.checked ? "checked" : ""}>`, dayInput: "", amountInput: "", ignoreInput: "" };
         const amountValue = row.overrideValue === null || row.overrideValue === undefined ? "" : String(row.overrideValue);
         const dayValue = row.dayOverrideValue === null || row.dayOverrideValue === undefined ? "" : String(row.dayOverrideValue);
+        // Pat's rule: only Flexible rows get an editable Protect amount. Fixed rows show the full amount as locked text.
+        const protectEditable = row.expenseType === "Flexible";
+        const amountInput = protectEditable
+          ? `<input class="kb-protect-amount-input" type="number" step="0.01" data-protect-amount="${escapeHtml(row.controlKey)}" value="${escapeHtml(amountValue)}" placeholder="${Number(row.defaultAmount || row.protectAmount || 0).toFixed(2)}">`
+          : `<span class="kb-protect-amount-static">${money.format(Number(row.protectAmount || 0))}</span>`;
         return {
           countInput: `<input type="checkbox" data-protect-count="${escapeHtml(row.controlKey)}" ${row.checked ? "checked" : ""} title="Count this line in Must Protect">`,
           dayInput: `<input class="kb-protect-day-input" type="number" min="1" max="31" step="1" data-protect-day="${escapeHtml(row.controlKey)}" value="${escapeHtml(dayValue)}" placeholder="${escapeHtml(row.dueFallback || "day")}">`,
-          amountInput: `<input class="kb-protect-amount-input" type="number" step="0.01" data-protect-amount="${escapeHtml(row.controlKey)}" value="${escapeHtml(amountValue)}" placeholder="${Number(row.defaultAmount || row.protectAmount || 0).toFixed(2)}">`,
+          amountInput,
           ignoreInput: ""
         };
       }
@@ -4845,7 +4858,8 @@ function renderProtectionControls(row) {
       function protectionRowDefaultChecked(key, fallbackAmount = 0, month = currentMonth()) {
         const override = protectionOverrideForKey(key, month);
         if (Object.prototype.hasOwnProperty.call(override, "ignore")) return !Boolean(override.ignore);
-        return Number(fallbackAmount || 0) > 0.005;
+        // Pat's rule: every row starts unchecked the first time; she checks what to protect.
+        return false;
       }
 
       function billProtectDay(line) {
@@ -4859,20 +4873,22 @@ function currentMonthProtectedRows(month = currentMonth(), plan = safeNextPayche
         activeBudgetLines(allBudgetLines(month)).forEach(line => {
           const key = scopedProtectionKey(line, "monthly");
           const remaining = remainingForLine(line);
-          const protectAmount = protectionAmountForKey(key, remaining, month);
+          // Pat's rule: protect the FULL planned amount, even if already paid this month.
+          const planned = Number(line.amount || 0);
+          const protectAmount = protectionAmountForKey(key, planned, month);
           const dueFallback = billProtectDay(line);
-          const checked = protectionRowDefaultChecked(key, remaining, month);
+          const checked = protectionRowDefaultChecked(key, planned, month);
           rows.push({
             name: billLineName(line),
             dueDate: protectionDayOverrideForKey(key, dueFallback, month),
             dueFallback,
             category: line.category || "",
-            plannedAmount: Number(line.amount || 0),
+            plannedAmount: planned,
             paidAmount: Number(line.paidAmount || 0),
             amountLeft: remaining,
             amount: protectAmount,
             protectAmount,
-            defaultAmount: remaining,
+            defaultAmount: planned,
             controlKey: key,
             checked,
             ignored: !checked,
@@ -4887,20 +4903,22 @@ function currentMonthProtectedRows(month = currentMonth(), plan = safeNextPayche
         personalRemainingRowsByOwner(month).forEach(personal => {
           const personalLine = { id: `personal-money-${personal.owner}`, payee: `Personal Money — ${personal.owner}`, category: "Personal", expenseType: "Flexible" };
           const key = scopedProtectionKey(personalLine, "personal");
-          const fallback = roundMoney(Number(personal.remaining || 0));
-          const protectAmount = protectionAmountForKey(key, fallback, month);
-          const checked = protectionRowDefaultChecked(key, fallback, month);
+          // Pat's rule: protect the FULL personal budget, not what's left; she edits it if needed.
+          const fullBudget = roundMoney(Number(personal.budget || 0));
+          const remainingPersonal = roundMoney(Number(personal.remaining || 0));
+          const protectAmount = protectionAmountForKey(key, fullBudget, month);
+          const checked = protectionRowDefaultChecked(key, fullBudget, month);
           rows.push({
             name: `Personal Money — ${escapeHtml(personal.owner)}`,
             dueDate: protectionDayOverrideForKey(key, "", month),
             dueFallback: "",
             category: "Personal",
-            plannedAmount: Number(personal.budget || 0),
+            plannedAmount: fullBudget,
             paidAmount: Number(personal.spent || 0),
-            amountLeft: fallback,
+            amountLeft: remainingPersonal,
             amount: protectAmount,
             protectAmount,
-            defaultAmount: fallback,
+            defaultAmount: fullBudget,
             controlKey: key,
             checked,
             ignored: !checked,
@@ -4952,7 +4970,7 @@ function renderProtectionLists(month = currentMonth(), plan = safeNextPaycheckPl
               <span>${money.format(listTotal)}</span>
             </div>
             <p class="muted small" style="margin-top:-.25rem">
-              Dashboard-only planner. It lists every Monthly Plan line plus Personal Money for Patricia and Alec. Only checked rows count in Must Protect; editing Protect changes the dashboard math only.
+              Dashboard-only planner. It lists every Monthly Plan line plus Personal Money for Patricia and Alec. All rows start unchecked — check what you want to protect. Fixed rows show the full planned amount (locked); Flexible rows can be edited. Only checked rows count in Must Protect.
             </p>
             <div class="kb-list-stack">
               ${twoColumnMoneyList("Monthly Plan + Personal Money", rows, "No monthly plan lines to protect.")}

@@ -7105,8 +7105,25 @@ function compareCanonicalBillName(line) {
         if (/journey/.test(raw)) return "journey giving";
         if (/hoa/.test(raw) && /quarter/.test(raw)) return "hoa quarterly";
         if (/hoa/.test(raw) || /epperson/.test(raw)) return "hoa";
+        // Pat's aliases: her renamed plan lines matched to the CSV/bank names.
+        if (/anemia|flcancer/.test(raw)) return "anemia treatment";
+        if (/usaa/.test(raw)) return "usaa";
+        if (/frontier/.test(raw)) return "frontier";
+        if (/amazon\s*prime/.test(raw)) return "amazon prime";
+        if (/\bciti/.test(raw)) return "citibank";
+        if (/state\s*farm/.test(raw)) return "state farm";
         return raw || compareNormalizeText(line?.category || "bill") || "bill";
       }
+
+      // Pat's rule: show the CSV/bank name for aliased lines, not her renamed plan name.
+      const compareCsvLabels = {
+        "anemia treatment": "FLCANCER.C* FL CANCER",
+        "usaa": "USAA INSURANCE PAYMENT",
+        "frontier": "FRONTIER COMMUNI",
+        "amazon prime": "Amazon Prime",
+        "citibank": "Citi card online",
+        "state farm": "state farm insurance"
+      };
 
       function compareLineKeyForBudgetLine(line) {
         const name = compareCanonicalBillName(line);
@@ -7118,13 +7135,16 @@ function compareCanonicalBillName(line) {
           "pennymac", "truist", "achieva", "t-mobile", "sofi bank", "synchrony rooms to go",
           "care credit", "pasco utilities water", "pasco county", "wrec electric", "new york life",
           "wellhub", "google one", "netflix", "disneyplus", "groceries", "gas",
-          "figure skating", "journey giving", "hoa", "hoa quarterly"
+          "figure skating", "journey giving", "hoa", "hoa quarterly",
+          "anemia treatment", "usaa", "frontier", "amazon prime", "citibank", "state farm"
         ]);
         if (canonicalOnly.has(name)) return ["bill", name].join("|");
         return ["bill", name || "bill", asset, category].join("|");
       }
 
       function compareLineLabelForBudgetLine(line) {
+        const csvLabel = compareCsvLabels[compareCanonicalBillName(line)];
+        if (csvLabel) return csvLabel;
         return String(line.payee || line.name || line.category || "Bill").replace(/\s+/g, " ").trim();
       }
 

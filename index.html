@@ -187,6 +187,7 @@
         .cards.kb-trio { grid-template-columns: 1fr; }
       }
       .metric .hint { margin-top: .45rem; color: var(--muted); font-size: .8rem; line-height: 1.35; }
+      #pageSubtitle:empty { display: none; }
 
       .chart-card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 1rem; margin-bottom: 1rem; }
       .chart-card h3 { font-size: .95rem; font-weight: 800; margin-bottom: .65rem; }
@@ -4087,7 +4088,7 @@ function normalizeState(parsed) {
           dashboard: ["Dashboard", "A quick pulse check for the current month."],
           cashguard: ["Keep in Account", "Know what must stay in the joint account this month hits."],
           template: ["Base Template", "Edit the reusable budget lines that new months can start from."],
-          budget: ["Monthly Plan", "Edit lines, add one-time items, and keep Patricia/Alec sections clear."],
+          budget: ["Monthly Plan", ""],
           transactions: ["CSV Review", "Upload bank CSVs and give every line a category, owner, and home."],
           allowance: ["Personal Money", "Protect guilt-free personal spending so extra money does not disappear."],
           debt: ["Debt Tracker", "Track balances, minimums, and who owns each debt."],

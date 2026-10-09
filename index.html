@@ -2528,62 +2528,56 @@
         .mms-grid button.current { border-color: var(--wine) !important; color: var(--wine) !important; }
         .mms-ico { font-size: 1.1rem; color: var(--gold); flex: none; }
 
-        /* Redesign: protection planner rows become cards on mobile */
+        /* Redesign: protection planner rows become cards on mobile.
+           Pat 2026-10-09: structured grid. Row 1: checkbox, name, amount.
+           Row 2: Day input + Fixed/Flexible. Nothing else shows. */
         .kb-protection-header { display: none; }
         .kb-protection-table { overflow: visible; }
         .kb-protection-row {
-          display: flex !important;
-          flex-wrap: wrap;
+          display: grid !important;
+          grid-template-columns: auto minmax(0, 1fr) auto;
+          grid-template-areas:
+            "check name amount"
+            "check day type";
+          gap: .65rem .7rem;
           align-items: center;
-          gap: .45rem .7rem;
           min-width: 0 !important;
           background: var(--card);
           border: 1px solid var(--line) !important;
           border-radius: 14px;
-          padding: .85rem .95rem;
+          padding: 1rem 1.05rem;
           margin-bottom: .65rem;
         }
-        .kb-protection-row .kb-count-cell { order: 1; }
-        .kb-protection-row .kb-bill-name { order: 2; flex: 1 1 40%; min-width: 0; }
-        .kb-protection-row .kb-protect-edit { order: 3; margin-left: auto; text-align: right; }
-        .kb-protection-row .kb-protect-day { order: 4; }
-        .kb-protection-row .kb-type { order: 5; }
-        .kb-protection-row .kb-money-num {
-          order: 6;
-          font-size: .78rem;
-          color: var(--muted);
-          white-space: nowrap;
-        }
-        .kb-protection-row > div:nth-of-type(5)::before { content: "Planned "; font-weight: 700; }
-        .kb-protection-row > div:nth-of-type(6)::before { content: "Paid "; font-weight: 700; }
-        .kb-protection-row > div:nth-of-type(7)::before { content: "Left "; font-weight: 700; }
-        .kb-protection-row .kb-protect-amount-input { max-width: 7.5rem; }
-        .kb-protection-row .kb-protect-day-input { max-width: 3.6rem; }
-        .kb-protection-row .kb-type select { width: auto; min-height: 2.2rem; font-size: .82rem; }
-        /* Pat 2026-10-09: declutter + polish mobile protection cards.
-           Keep: checkbox, expense name, day, Fixed/Flexible, amount
-           (+ editable amount for Flexible). Hide the rest. */
-        .kb-protection-row { gap: .6rem .7rem; padding: 1rem 1.05rem; }
+        .kb-protection-row .kb-count-cell { grid-area: check; }
         .kb-protection-row .kb-bill-name {
+          grid-area: name; min-width: 0;
           font-family: Oswald, "Arial Narrow", sans-serif;
           font-size: 1.06rem; letter-spacing: .02em; line-height: 1.25;
         }
         .kb-protection-row .kb-bill-name .small.muted { display: none; }
+        .kb-protection-row .kb-protect-edit { grid-area: amount; margin: 0; text-align: right; }
         .kb-protection-row .kb-protect-edit .small.muted { display: none; }
-        .kb-protection-row .kb-money-num { display: none; }
         .kb-protection-row .kb-protect-amount-static {
-          font-family: Fraunces, Georgia, serif; font-size: 1.22rem;
+          font-family: Fraunces, Georgia, serif; font-size: 1.22rem; white-space: nowrap;
         }
         .kb-protection-row .kb-protect-amount-input {
           font-family: Fraunces, Georgia, serif; font-size: 1.05rem; text-align: right;
+          max-width: 7.5rem;
         }
-        .kb-protection-row .kb-protect-day { display: flex; align-items: center; gap: .45rem; }
+        .kb-protection-row .kb-protect-day {
+          grid-area: day; display: flex; align-items: center; gap: .45rem;
+        }
         .kb-protection-row .kb-protect-day::before {
           content: "Day";
           font-size: .72rem; font-weight: 800; text-transform: uppercase;
           letter-spacing: .08em; color: var(--muted);
         }
-        .kb-protection-row .kb-type select { border-radius: 999px; }
+        .kb-protection-row .kb-protect-day-input { max-width: 3.6rem; }
+        .kb-protection-row .kb-type { grid-area: type; justify-self: end; }
+        .kb-protection-row .kb-type select {
+          width: auto; min-height: 2.2rem; font-size: .82rem; border-radius: 999px;
+        }
+        .kb-protection-row .kb-money-num { display: none; }
       }
 
       /* Theme catalog: explicit themes override the :root palette */

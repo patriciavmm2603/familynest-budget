@@ -2547,6 +2547,30 @@
         .kb-protection-row .kb-protect-amount-input { max-width: 7.5rem; }
         .kb-protection-row .kb-protect-day-input { max-width: 3.6rem; }
         .kb-protection-row .kb-type select { width: auto; min-height: 2.2rem; font-size: .82rem; }
+        /* Pat 2026-10-09: declutter + polish mobile protection cards.
+           Keep: checkbox, expense name, day, Fixed/Flexible, amount
+           (+ editable amount for Flexible). Hide the rest. */
+        .kb-protection-row { gap: .6rem .7rem; padding: 1rem 1.05rem; }
+        .kb-protection-row .kb-bill-name {
+          font-family: Oswald, "Arial Narrow", sans-serif;
+          font-size: 1.06rem; letter-spacing: .02em; line-height: 1.25;
+        }
+        .kb-protection-row .kb-bill-name .small.muted { display: none; }
+        .kb-protection-row .kb-protect-edit .small.muted { display: none; }
+        .kb-protection-row .kb-money-num { display: none; }
+        .kb-protection-row .kb-protect-amount-static {
+          font-family: Fraunces, Georgia, serif; font-size: 1.22rem;
+        }
+        .kb-protection-row .kb-protect-amount-input {
+          font-family: Fraunces, Georgia, serif; font-size: 1.05rem; text-align: right;
+        }
+        .kb-protection-row .kb-protect-day { display: flex; align-items: center; gap: .45rem; }
+        .kb-protection-row .kb-protect-day::before {
+          content: "Day";
+          font-size: .72rem; font-weight: 800; text-transform: uppercase;
+          letter-spacing: .08em; color: var(--muted);
+        }
+        .kb-protection-row .kb-type select { border-radius: 999px; }
       }
 
       /* Theme catalog: explicit themes override the :root palette */
@@ -5578,15 +5602,16 @@ function renderProtectionLists(month = currentMonth(), plan = safeNextPaycheckPl
             <div class="kb-list-stack">
               ${twoColumnMoneyList("Monthly Plan + Personal Money", rows, "No monthly plan lines to protect.")}
             </div>
+            ${matches ? "" : `
             <div class="card kb-reconcile-card" style="padding:1rem;margin-top:.4rem">
               <div class="kb-money-total" style="display:grid;grid-template-columns:minmax(0,1fr) 9rem;gap:1rem;align-items:center;font-weight:900;">
                 <span>Must Protect from checked rows</span>
                 <span style="text-align:right;white-space:nowrap;">${money.format(listTotal)}</span>
               </div>
               <div class="small muted" style="margin-top:.35rem">
-                ${matches ? "Matches the Must Protect card." : `Does not match the Must Protect card by ${money.format(difference)} — review dashboard-only selections.`}
+                Does not match the Must Protect card by ${money.format(difference)} — review dashboard-only selections.
               </div>
-            </div>`;
+            </div>`}`;
         });
       }
 
@@ -5665,18 +5690,6 @@ function renderProtectionLists(month = currentMonth(), plan = safeNextPaycheckPl
           ${renderSafeNextPaycheckPlan(safePaycheckPlan)}
 
           ${renderProtectionLists(month, safePaycheckPlan)}
-
-          <div class="card">
-            <div class="section-title"><h3>Quick actions</h3><span>Details live in the other tabs</span></div>
-            <div class="kb-action-grid">
-              <button type="button" data-jump="income">Income</button>
-              <button type="button" data-jump="budget">Monthly Plan</button>
-              <button type="button" data-jump="transactions">CSV Review</button>
-              <button type="button" data-jump="allowance">Personal Money</button>
-              <button type="button" data-jump="debt">Debt Tracker</button>
-              <button type="button" data-jump="compare">Compare Months</button>
-            </div>
-          </div>
 
           ${count ? `<div class="banner"><div><strong>${count} imported lines still need a home</strong><span>Review category, owner, and income type before trusting the dashboard totals.</span></div><button type="button" class="secondary" data-jump="transactions">Go to Review</button></div>` : ""}
         `;

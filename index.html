@@ -170,6 +170,19 @@
         font-size: clamp(2.6rem, 9vw, 3.4rem);
         margin-top: .5rem;
       }
+      /* Hero as first card of the trio: same footprint as siblings, keeps the gold bar */
+      .cards.kb-trio .card.metric.kb-hero {
+        padding: 1rem 1.1rem 1rem 1.35rem;
+        margin-bottom: 0;
+      }
+      .cards.kb-trio .card.metric.kb-hero .label {
+        font-size: .78rem; letter-spacing: .04em;
+        font-family: inherit;
+      }
+      .cards.kb-trio .card.metric.kb-hero .value {
+        font-size: 2.3rem;
+        margin-top: .4rem;
+      }
       @media (max-width: 760px) {
         .cards.kb-trio { grid-template-columns: 1fr; }
       }
@@ -5593,12 +5606,9 @@ function renderProtectionLists(month = currentMonth(), plan = safeNextPaycheckPl
 
           return `
             <div class="section-title" style="margin:.25rem 0 .15rem">
-              <h3>Money We Can't Touch Planner</h3>
+              <h3>Money We Can't Touch Planner<button type="button" class="kb-info-btn" data-kb-info="Dashboard-only planner. It lists every Monthly Plan line plus Personal Money for Patricia and Alec. All rows start unchecked — check what you want to protect. Fixed rows show the full planned amount (locked); Flexible rows can be edited. Only checked rows count in Must Protect." aria-label="About this section">i</button></h3>
               <span>${money.format(listTotal)}</span>
             </div>
-            <p class="muted small" style="margin-top:-.25rem">
-              Dashboard-only planner. It lists every Monthly Plan line plus Personal Money for Patricia and Alec. All rows start unchecked — check what you want to protect. Fixed rows show the full planned amount (locked); Flexible rows can be edited. Only checked rows count in Must Protect.
-            </p>
             <div class="kb-list-stack">
               ${twoColumnMoneyList("Monthly Plan + Personal Money", rows, "No monthly plan lines to protect.")}
             </div>
@@ -5635,6 +5645,11 @@ function renderProtectionLists(month = currentMonth(), plan = safeNextPaycheckPl
           </div>
 
           <div class="cards kb-simple-dashboard-cards kb-trio">
+            <div class="card metric kb-hero">
+              <div class="label">${safeBeforePay >= 0 ? "Safe to spend before paycheck" : "Short before paycheck"}</div>
+              <div class="value ${safeBeforePay < 0 ? "red" : "green"}">${money.format(safeBeforePay)}</div>
+              <div class="hint">${safeHint}</div>
+            </div>
             <div class="card metric">
               <div class="label">Cash available now</div>
               <div class="value">${money.format(plan.checking)}</div>
@@ -5643,12 +5658,6 @@ function renderProtectionLists(month = currentMonth(), plan = safeNextPaycheckPl
             </div>
 
             ${metric("Must protect before paycheck", plan.amountToKeepSafe, "Checked rows from the Money We Can't Touch Planner.", "yellow")}
-          </div>
-
-          <div class="card metric kb-hero">
-            <div class="label">${safeBeforePay >= 0 ? "Safe to spend before paycheck" : "Short before paycheck"}</div>
-            <div class="value ${safeBeforePay < 0 ? "red" : "green"}">${money.format(safeBeforePay)}</div>
-            <div class="hint">${safeHint}</div>
           </div>
 
           <div class="banner" style="margin-top:-.25rem;margin-bottom:1rem">

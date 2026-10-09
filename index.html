@@ -5652,13 +5652,6 @@ function renderProtectionLists(month = currentMonth(), plan = safeNextPaycheckPl
             </div>
 
             ${metric("Must protect before paycheck", plan.amountToKeepSafe, "Checked rows from the Money We Can't Touch Planner.", "yellow")}
-          </div>
-
-          <div class="banner" style="margin-top:-.25rem;margin-bottom:1rem">
-            <div>
-              <strong>${safeBeforePay >= 0 ? `Be careful: ${money.format(safeBeforePay)} is the safe spending limit before payday.` : `Careful: you are short ${money.format(Math.abs(safeBeforePay))} before payday.`}</strong>
-              <span>The next paycheck is future money. Do not treat it as available until it posts.</span>
-            </div>
           </div>`;
       }
 

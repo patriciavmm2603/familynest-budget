@@ -4476,7 +4476,7 @@ function billLineName(line) {
       function defaultExpenseTypeForLine(line) {
         const text = flexibleKeywordText(line);
         if (/achieva/.test(text)) return "Flexible";
-        if (/grocer|food|fuel|gas|skating|patinada|personal|allowance|household|eating|restaurant|fun|misc|shopping|kids|clothes|beauty|gifts|tith|journey church/.test(text)) return "Flexible";
+        if (/grocer|food|fuel|gas|skating|patinada|personal|allowance|household|eating|restaurant|fun|misc|shopping|kids|clothes|beauty|gifts|tith|journey/.test(text)) return "Flexible";
         return "Fixed";
       }
 

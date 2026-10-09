@@ -6169,13 +6169,9 @@ function renderProtectionLists(month = currentMonth(), plan = safeNextPaycheckPl
           `<div class="card"><div class="section-title"><h3>Budget lines</h3><span>${rows.length} lines</span></div>
           <div class="toolbar" style="justify-content:flex-start;margin-bottom:.8rem">
             <button type="button" data-action="addBudget">＋ Add Line</button><button type="button" class="secondary kb-mobile-create-month" data-action="createMonth">Create Month</button>
-            <button type="button" class="secondary" data-action="clearBudgetFilters">✕ Clear Filters</button>
-            
-            <button type="button" class="secondary" data-template-action="copyCurrent">Save Current Month as Template</button>
           </div>
           <div class="form-grid" style="margin-bottom:.8rem">
             ${field("Search budget", input("budgetSearch", state.budgetSearch || ""), "wide")}
-            ${field("Sort monthly plan", select("budgetSortSelect", budgetSortOptions(), state.budgetSort || "Due day soonest"), "wide")}
             <button type="button" id="runBudgetSearch">Search</button>
             <button type="button" id="clearBudgetSearch" class="secondary">Clear Search</button>
           </div>

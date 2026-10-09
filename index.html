@@ -7304,18 +7304,32 @@ function compareCanonicalBillName(line) {
         if (!rows.length) return `<div class="empty">No monthly plan lines yet.</div>`;
         const monthHeaders = keys.map(key => `<th class="money">${escapeHtml((state.months[key]?.label || key).replace(/\s+2026$/, ""))}</th>`).join("");
         const totals = {};
-        keys.forEach(key => { totals[key] = roundMoney(sum(rows, row => Number(row.values[key] || 0))); });
+        const plannedTotals = {};
+        keys.forEach(key => {
+          totals[key] = roundMoney(sum(rows, row => Number(row.values[key] || 0)));
+          plannedTotals[key] = roundMoney(sum(rows, row => Number(row.plannedValues[key] || 0)));
+        });
+        // Pat's rule: each month cell shows paid (actual) with the planned amount below it,
+        // plus a trend column with the change vs the prior month and the multi-month average.
+        const compareCell = (paid, planned) => {
+          const p = Number(paid || 0), pl = Number(planned || 0);
+          if (p <= 0.005 && pl <= 0.005) return "—";
+          const paidHtml = p > 0.005 ? `<strong>${money.format(p)}</strong>` : `<span class="muted">—</span>`;
+          const plannedHtml = pl > 0.005 ? `<div class="small muted">plan ${money.format(pl)}</div>` : "";
+          return `${paidHtml}${plannedHtml}`;
+        };
         return `<div class="table-wrap"><table><thead><tr>
-          <th>Line / item</th><th>Day</th>${monthHeaders}
+          <th>Line / item</th><th>Day</th>${monthHeaders}<th>Trend</th>
         </tr></thead><tbody>
           ${rows.map(row => `<tr>
             <td><strong>${escapeHtml(row.label)}</strong>${row.asset ? `<div class="small muted">${escapeHtml(row.asset)}</div>` : ""}</td>
             <td>${escapeHtml(row.day || "—")}</td>
-            ${keys.map(key => `<td class="money">${Number(row.values[key] || 0) > 0.005 ? money.format(row.values[key]) : "—"}</td>`).join("")}
+            ${keys.map(key => `<td class="money">${compareCell(row.values[key], row.plannedValues[key])}</td>`).join("")}
+            <td>${compareTrendLabel(row)}<div class="small muted">avg ${money.format(row.average || 0)}</div></td>
           </tr>`).join("")}
-          <tr class="total-row"><td><strong>Total paid / spent</strong></td><td></td>${keys.map(key => `<td class="money"><strong>${money.format(totals[key] || 0)}</strong></td>`).join("")}</tr>
+          <tr class="total-row"><td><strong>Total</strong></td><td></td>${keys.map(key => `<td class="money"><strong>${money.format(totals[key] || 0)}</strong><div class="small muted">plan ${money.format(plannedTotals[key] || 0)}</div></td>`).join("")}<td></td></tr>
         </tbody></table></div>
-        <p class="small muted" style="margin:.65rem 0 0">This is paid/spent by Monthly Plan line. Personal Money and PayPal/Side Hustle are split by Patricia/Alec. Normal bills ignore owner changes. Ignored CSV rows stay recorded but count as $0 here.</p>`;
+        <p class="small muted" style="margin:.65rem 0 0">Paid/spent with the planned amount below it, by Monthly Plan line. Personal Money and PayPal/Side Hustle are split by Patricia/Alec. Normal bills ignore owner changes and lines renamed with the same keywords stay on one row. Ignored CSV rows stay recorded but count as $0 here.</p>`;
       }
 
       function renderCompareMonthSummaryTable(rows) {
@@ -7512,7 +7526,7 @@ function renderCompare() {
           : "Need at least 2 months for a comparison.";
 
         document.querySelector("#compare").innerHTML = [
-          `<div class="card"><div class="section-title"><div><h3>Monthly Plan paid amounts by line</h3><p class="small muted" style="margin:.25rem 0 0">Rolling ${keys.length || 0} month(s). Normal bills are matched by bill name, while Personal Money and PayPal/Side Hustle stay split by Patricia/Alec.</p></div><span>${escapeHtml(deltaText)}</span></div>
+          `<div class="card"><div class="section-title"><div><h3>Monthly Plan by line</h3><p class="small muted" style="margin:.25rem 0 0">Rolling ${keys.length || 0} month(s). Paid with planned below it, so you can spot drift. Normal bills are matched by bill name, while Personal Money and PayPal/Side Hustle stay split by Patricia/Alec.</p></div><span>${escapeHtml(deltaText)}</span></div>
             ${renderCompareLineTrendTable(keys)}
           </div>`,
           renderCompareCloseoutHistory()

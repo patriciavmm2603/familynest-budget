@@ -3937,6 +3937,25 @@ function normalizeState(parsed) {
           }
           hint.remove();
         });
+        /* Section subtitles: only sentence-like notes become bubbles; data (amounts, counts) stays visible */
+        document.querySelectorAll(".section-title").forEach(st => {
+          const sub = st.querySelector(":scope > span");
+          const h3 = st.querySelector(":scope > h3") || st.querySelector("h3");
+          if (!sub || !h3 || sub.dataset.kbDone) return;
+          sub.dataset.kbDone = "1";
+          const text = (sub.textContent || "").trim();
+          const isData = /\$[\d,]/.test(text) || text.length <= 40;
+          if (!isData && text) {
+            const btn = document.createElement("button");
+            btn.type = "button";
+            btn.className = "kb-info-btn";
+            btn.dataset.kbInfo = text;
+            btn.setAttribute("aria-label", "About this section");
+            btn.textContent = "i";
+            h3.appendChild(btn);
+            sub.remove();
+          }
+        });
       }
       document.addEventListener("click", (e) => {
         const btn = e.target.closest("[data-kb-info]");

@@ -5296,11 +5296,8 @@ function renderProtectionControls(row) {
         if (!row.controlKey) return { countInput: `<input type="checkbox" disabled ${row.checked ? "checked" : ""}>`, dayInput: "", amountInput: "", ignoreInput: "" };
         const amountValue = row.overrideValue === null || row.overrideValue === undefined ? "" : String(row.overrideValue);
         const dayValue = row.dayOverrideValue === null || row.dayOverrideValue === undefined ? "" : String(row.dayOverrideValue);
-        // Pat's rule: only Flexible rows get an editable Protect amount. Fixed rows show the full amount as locked text.
-        const protectEditable = row.expenseType === "Flexible";
-        const amountInput = protectEditable
-          ? `<input class="kb-protect-amount-input" type="number" step="0.01" data-protect-amount="${escapeHtml(row.controlKey)}" value="${escapeHtml(amountValue)}" placeholder="${Number(row.defaultAmount || row.protectAmount || 0).toFixed(2)}">`
-          : `<span class="kb-protect-amount-static">${money.format(Number(row.protectAmount || 0))}</span>`;
+        // Pat 2026-10-22: every row gets an editable Protect amount, same as Flexible had.
+        const amountInput = `<input class="kb-protect-amount-input" type="number" step="0.01" data-protect-amount="${escapeHtml(row.controlKey)}" value="${escapeHtml(amountValue)}" placeholder="${Number(row.defaultAmount || row.protectAmount || 0).toFixed(2)}">`;
         return {
           countInput: `<input type="checkbox" data-protect-count="${escapeHtml(row.controlKey)}" ${row.checked ? "checked" : ""} title="Count this line in Must Protect">`,
           dayInput: `<input class="kb-protect-day-input" type="number" min="1" max="31" step="1" data-protect-day="${escapeHtml(row.controlKey)}" value="${escapeHtml(dayValue)}" placeholder="${escapeHtml(row.dueFallback || "day")}">`,
@@ -5591,6 +5588,32 @@ function earlyNextMonthProtectedRows(month = currentMonth(), plan = safeNextPayc
       
       
 
+      function husbandUpdateText(month = currentMonth(), plan = safeNextPaycheckPlan(month)) {
+        const totals = buildProtectionTotals(month, plan);
+        const allRows = totals.currentRows || [];
+        const checkedRows = allRows.filter(row => row.checked);
+        const total = protectionRowsTotal(allRows);
+        const available = Number(plan.checking || 0);
+        const diff = roundMoney(available - total);
+        const { year, month: monthNum } = activeMonthDateParts();
+        const lines = [
+          "Money update",
+          `Cash available: ${money.format(available)}`,
+          `Need to protect: ${money.format(total)}`,
+          diff >= 0 ? `Safe to spend: ${money.format(diff)}` : `Short: ${money.format(Math.abs(diff))}`,
+          "",
+          "Protect breakdown:"
+        ];
+        if (!checkedRows.length) lines.push("- Nothing checked yet");
+        checkedRows.forEach(row => {
+          const amount = Number(row.protectAmount ?? row.amount ?? 0);
+          const day = Number(row.dueDate || 0);
+          const due = day >= 1 && day <= 31 && year && monthNum ? `, due ${shortMonthDay(monthDate(year, monthNum, day))}` : "";
+          lines.push(`- ${row.name}${due}, ${money.format(amount)}`);
+        });
+        return lines.join("\n");
+      }
+
 function renderProtectionLists(month = currentMonth(), plan = safeNextPaycheckPlan(month)) {
         return safeRenderDashboardBlock("Money We Can't Touch Planner", () => {
           const totals = buildProtectionTotals(month, plan);
@@ -5601,11 +5624,14 @@ function renderProtectionLists(month = currentMonth(), plan = safeNextPaycheckPl
 
           return `
             <div class="section-title" style="margin:.25rem 0 .15rem">
-              <h3>Money We Can't Touch Planner<button type="button" class="kb-info-btn" data-kb-info="Dashboard-only planner. It lists every Monthly Plan line plus Personal Money for Patricia and Alec. All rows start unchecked — check what you want to protect. Fixed rows show the full planned amount (locked); Flexible rows can be edited. Only checked rows count in Must Protect." aria-label="About this section">i</button></h3>
+              <h3>Money We Can't Touch Planner<button type="button" class="kb-info-btn" data-kb-info="Dashboard-only planner. It lists every Monthly Plan line plus Personal Money for Patricia and Alec. All rows start unchecked — check what you want to protect. You can edit any row's amount. Only checked rows count in Must Protect." aria-label="About this section">i</button></h3>
               <span>${money.format(listTotal)}</span>
             </div>
             <div class="kb-list-stack">
               ${twoColumnMoneyList("Monthly Plan + Personal Money", rows, "No monthly plan lines to protect.")}
+            </div>
+            <div class="toolbar" style="margin-top:.8rem">
+              <button type="button" class="secondary" id="kbDraftHusbandText">Draft text for Alec</button>
             </div>
             ${matches ? "" : `
             <div class="card kb-reconcile-card" style="padding:1rem;margin-top:.4rem">
@@ -5746,6 +5772,32 @@ function renderProtectionLists(month = currentMonth(), plan = safeNextPaycheckPl
         });
         const addManualProtectionBtn = document.querySelector("#addManualProtectionLineBtn");
         if (addManualProtectionBtn) addManualProtectionBtn.addEventListener("click", addManualProtectionLine);
+        const draftHusbandBtn = document.querySelector("#kbDraftHusbandText");
+        if (draftHusbandBtn) draftHusbandBtn.addEventListener("click", () => {
+          const text = husbandUpdateText(month, safePaycheckPlan);
+          openModal("Text for Alec", `
+            <p class="muted small" style="margin-top:0">Copy it, or share it straight to Messages.</p>
+            <textarea id="kbHusbandText" readonly rows="12" style="width:100%">${escapeHtml(text)}</textarea>
+            <div class="toolbar" style="margin-top:.8rem;justify-content:space-between">
+              <button type="button" class="secondary" id="kbHusbandTextClose">Close</button>
+              <span style="display:inline-flex;gap:.5rem">
+                <button type="button" class="secondary" id="kbHusbandTextCopy">Copy</button>
+                <button type="button" id="kbHusbandTextShare">Share</button>
+              </span>
+            </div>`);
+          document.querySelector("#kbHusbandTextClose")?.addEventListener("click", closeModal);
+          document.querySelector("#kbHusbandTextCopy")?.addEventListener("click", async () => {
+            try { await navigator.clipboard.writeText(text); kbToast("Copied. Paste it in Messages."); }
+            catch {
+              const ta = document.querySelector("#kbHusbandText");
+              if (ta) { ta.select(); document.execCommand("copy"); kbToast("Copied. Paste it in Messages."); }
+            }
+          });
+          document.querySelector("#kbHusbandTextShare")?.addEventListener("click", async () => {
+            if (navigator.share) { try { await navigator.share({ text }); } catch {} }
+            else kbToast("Sharing is not available here. Use Copy instead.");
+          });
+        });
       }
 
             function renderKeepInAccountCard(info) {

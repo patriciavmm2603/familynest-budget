@@ -5627,11 +5627,11 @@ function renderProtectionLists(month = currentMonth(), plan = safeNextPaycheckPl
               <h3>Money We Can't Touch Planner<button type="button" class="kb-info-btn" data-kb-info="Dashboard-only planner. It lists every Monthly Plan line plus Personal Money for Patricia and Alec. All rows start unchecked — check what you want to protect. You can edit any row's amount. Only checked rows count in Must Protect." aria-label="About this section">i</button></h3>
               <span>${money.format(listTotal)}</span>
             </div>
+            <div class="toolbar" style="margin:.35rem 0 .8rem">
+              <button type="button" class="secondary" id="kbDraftHusbandText">Draft text for Alec</button>
+            </div>
             <div class="kb-list-stack">
               ${twoColumnMoneyList("Monthly Plan + Personal Money", rows, "No monthly plan lines to protect.")}
-            </div>
-            <div class="toolbar" style="margin-top:.8rem">
-              <button type="button" class="secondary" id="kbDraftHusbandText">Draft text for Alec</button>
             </div>
             ${matches ? "" : `
             <div class="card kb-reconcile-card" style="padding:1rem;margin-top:.4rem">

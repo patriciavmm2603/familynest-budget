@@ -3761,6 +3761,13 @@ function normalizeState(parsed) {
           return { key, label: month.label || key, monthNum: monthNumberFromKey(key), gross, setAside, net: gross - setAside, count: paypalSideGigRows(month).length };
         }).sort((a, b) => a.monthNum - b.monthNum);
       }
+      function sideHustleMonthlyRollupByOwner(year = activeYear()) {
+        return Object.entries(state.months || {}).filter(([key]) => Number(String(key).slice(0, 4)) === Number(year)).map(([key, month]) => {
+          const byOwner = sideHustleGrossByOwner(month);
+          return { key, monthNum: monthNumberFromKey(key), patricia: byOwner.Patricia || 0, alec: byOwner.Alec || 0 };
+        }).sort((a, b) => a.monthNum - b.monthNum);
+      }
+
       function paypalSideHustleYtdTotals(monthKey = state.activeMonth) {
         const year = Number(String(monthKey || "").slice(0,4)) || activeYear();
         const throughMonth = monthNumberFromKey(monthKey) || 12;
@@ -7030,10 +7037,35 @@ function renderProtectionLists(month = currentMonth(), plan = safeNextPaycheckPl
           else next.reconciled = Boolean(next.billId || (next.category && next.owner && next.category !== "Uncategorized"));
           if (next.category !== "Personal" || next.billId || Number(next.amount || 0) >= 0) delete next.personalSplit;
           const reviewState = captureTransactionReviewState(next.id);
-          if (editing) Object.assign(value, next); else currentMonth().transactions.push(next);
-          if (next.ignored) removeSideGigForTransaction(currentMonth(), next);
-          syncSideGigsFromTransactions(currentMonth(), [editing ? value : next]);
-          applyBillPaymentStatuses(currentMonth()); closeModal(); render(); restoreTransactionReviewState(reviewState); saveState();
+          const fromMonth = currentMonth();
+          const targetKey = /^\d{4}-\d{2}/.test(String(next.date || "")) ? String(next.date).slice(0, 7) : "";
+          const wantsMove = editing && targetKey && targetKey !== state.activeMonth;
+          const targetMonth = wantsMove ? state.months[targetKey] : null;
+          if (wantsMove && !targetMonth) {
+            Object.assign(value, next);
+            if (next.ignored) removeSideGigForTransaction(fromMonth, next);
+            syncSideGigsFromTransactions(fromMonth, [value]);
+            applyBillPaymentStatuses(fromMonth); closeModal(); render(); restoreTransactionReviewState(reviewState); saveState();
+            kbToast(targetKey + " is not created yet, so this stayed in " + (fromMonth.label || state.activeMonth) + ". Create that month first, then change the date.");
+          } else if (targetMonth) {
+            removeSideGigForTransaction(fromMonth, value);
+            fromMonth.transactions = fromMonth.transactions.filter(item => item.id !== value.id);
+            if (next.billId && !(targetMonth.budgetLines || []).some(line => line.id === next.billId)) { next.billId = ""; next.reconciled = Boolean(next.category && next.owner && next.category !== "Uncategorized"); }
+            Object.assign(value, next);
+            targetMonth.transactions ||= [];
+            targetMonth.transactions.push(value);
+            if (next.ignored) removeSideGigForTransaction(targetMonth, value);
+            syncSideGigsFromTransactions(targetMonth, [value]);
+            applyBillPaymentStatuses(fromMonth);
+            applyBillPaymentStatuses(targetMonth);
+            closeModal(); render(); restoreTransactionReviewState(reviewState); saveState();
+            kbToast("Moved to " + (targetMonth.label || targetKey) + ".");
+          } else {
+            if (editing) Object.assign(value, next); else fromMonth.transactions.push(next);
+            if (next.ignored) removeSideGigForTransaction(fromMonth, next);
+            syncSideGigsFromTransactions(fromMonth, [editing ? value : next]);
+            applyBillPaymentStatuses(fromMonth); closeModal(); render(); restoreTransactionReviewState(reviewState); saveState();
+          }
         });
         document.querySelector("#txnForm").elements.billId.addEventListener("change", () => {
           const form = document.querySelector("#txnForm");
@@ -7576,12 +7608,15 @@ function renderProtectionLists(month = currentMonth(), plan = safeNextPaycheckPl
 
             function renderPayPalSideHustleYearSection(ytd) {
         const rows = sideHustleMonthlyRollup(ytd?.year || activeYear());
+        const ownerByKey = Object.fromEntries(sideHustleMonthlyRollupByOwner(ytd?.year || activeYear()).map(row => [row.key, row]));
+        const ytdPatricia = rows.reduce((sum, row) => sum + Number(ownerByKey[row.key]?.patricia || 0), 0);
+        const ytdAlec = rows.reduce((sum, row) => sum + Number(ownerByKey[row.key]?.alec || 0), 0);
         const activeKey = state.activeMonth;
         return `<div class="card"><div class="section-title"><h3>PayPal side hustle tracker</h3><span>${money.format(ytd?.setAside || 0)} recommended set aside YTD</span></div>
-          <div class="income-math"><strong>How this works:</strong> only PayPal side-hustle deposits count here. The monthly amount resets each month, and the year-to-date rollup helps you know what to reserve for taxes.</div>
-          <div class="table-wrap"><table><thead><tr><th>Month</th><th class="money">PayPal gross</th><th class="money">Recommended set aside</th><th class="money">After set aside</th><th class="money">Lines</th></tr></thead><tbody>
-          ${rows.length ? rows.map(row => `<tr${row.key === activeKey ? ` style="background:var(--green-soft)"` : ""}><td><strong>${escapeHtml(row.label)}</strong>${row.key === activeKey ? `<div class="muted" style="font-size:.78rem;color:var(--green)">Current month</div>` : ""}</td><td class="money">${money.format(row.gross)}</td><td class="money" style="color:var(--yellow)">${money.format(row.setAside)}</td><td class="money" style="color:var(--green)">${money.format(row.net)}</td><td class="money">${row.count}</td></tr>`).join("") : `<tr><td colspan="5"><div class="empty">No PayPal side hustle deposits for this year yet.</div></td></tr>`}
-          </tbody><tfoot><tr><th>Year to date</th><th class="money">${money.format(ytd?.gross || 0)}</th><th class="money">${money.format(ytd?.setAside || 0)}</th><th class="money">${money.format(ytd?.net || 0)}</th><th class="money">${Number(ytd?.count || 0)}</th></tr></tfoot></table></div>
+          <div class="income-math"><strong>How this works:</strong> only PayPal side-hustle deposits count here. The monthly amount resets each month, and the year-to-date rollup helps you know what to reserve for taxes. Patricia and Alec columns split each month by person.</div>
+          <div class="table-wrap"><table><thead><tr><th>Month</th><th class="money">Patricia</th><th class="money">Alec</th><th class="money">PayPal gross</th><th class="money">Recommended set aside</th><th class="money">After set aside</th><th class="money">Lines</th></tr></thead><tbody>
+          ${rows.length ? rows.map(row => `<tr${row.key === activeKey ? ` style="background:var(--green-soft)"` : ""}><td><strong>${escapeHtml(row.label)}</strong>${row.key === activeKey ? `<div class="muted" style="font-size:.78rem;color:var(--green)">Current month</div>` : ""}</td><td class="money">${money.format(ownerByKey[row.key]?.patricia || 0)}</td><td class="money">${money.format(ownerByKey[row.key]?.alec || 0)}</td><td class="money">${money.format(row.gross)}</td><td class="money" style="color:var(--yellow)">${money.format(row.setAside)}</td><td class="money" style="color:var(--green)">${money.format(row.net)}</td><td class="money">${row.count}</td></tr>`).join("") : `<tr><td colspan="7"><div class="empty">No PayPal side hustle deposits for this year yet.</div></td></tr>`}
+          </tbody><tfoot><tr><th>Year to date</th><th class="money">${money.format(ytdPatricia)}</th><th class="money">${money.format(ytdAlec)}</th><th class="money">${money.format(ytd?.gross || 0)}</th><th class="money">${money.format(ytd?.setAside || 0)}</th><th class="money">${money.format(ytd?.net || 0)}</th><th class="money">${Number(ytd?.count || 0)}</th></tr></tfoot></table></div>
         </div>`;
       }
 
